@@ -1,6 +1,8 @@
 import { memo, useState, useRef, useEffect, useMemo } from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { ConceptNodeData } from '@/lib/reactFlowTypes'
 import { useUIStore } from '@/stores/uiStore'
 import { useMapStore } from '@/stores/mapStore'
@@ -290,9 +292,13 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
       )}
       
       {data.concept.notes && (
-        <div className="text-xs mt-1 line-clamp-2" style={{ color: nodeStyle.textColor, opacity: 0.7 }}>
-          {data.concept.notes.substring(0, 50)}
-          {data.concept.notes.length > 50 && '...'}
+        <div 
+          className="text-xs mt-1 line-clamp-2 [&_*]:text-inherit [&_*]:text-xs [&_strong]:font-bold [&_em]:italic [&_code]:font-mono [&_a]:underline" 
+          style={{ color: nodeStyle.textColor, opacity: 0.7 }}
+        >
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {data.concept.notes}
+          </ReactMarkdown>
         </div>
       )}
       {Object.keys(getNonStyleMetadata(data.concept.metadata || {})).length > 0 && (
