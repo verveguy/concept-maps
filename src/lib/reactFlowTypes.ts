@@ -7,6 +7,8 @@ import type { Concept, Relationship } from '@/lib/schema'
 export interface ConceptNodeData {
   label: string
   concept: Concept
+  isInPerspective?: boolean // Whether this concept is included in the current perspective
+  isEditingPerspective?: boolean // Whether we're currently editing a perspective
 }
 
 /**
@@ -14,6 +16,8 @@ export interface ConceptNodeData {
  */
 export interface RelationshipEdgeData {
   relationship: Relationship
+  isInPerspective?: boolean // Whether this relationship is included in the current perspective
+  isEditingPerspective?: boolean // Whether we're currently editing a perspective
 }
 
 /**

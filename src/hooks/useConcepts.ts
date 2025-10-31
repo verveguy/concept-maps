@@ -57,3 +57,40 @@ export function useConcepts() {
 
   return concepts
 }
+
+/**
+ * Hook to get ALL concepts for the current map (no perspective filtering)
+ * Uses InstantDB useQuery() for real-time updates
+ * Used when editing perspectives to show all concepts
+ */
+export function useAllConcepts() {
+  const currentMapId = useMapStore((state) => state.currentMapId)
+
+  // Get ALL concepts for the map (no perspective filter)
+  const { data } = db.useQuery(
+    currentMapId
+      ? {
+          concepts: {
+            $: {
+              where: { mapId: currentMapId },
+            },
+          },
+        }
+      : null
+  )
+
+  // Transform InstantDB data to schema format
+  const concepts: Concept[] =
+    data?.concepts?.map((c: any) => ({
+      id: c.id,
+      mapId: c.mapId,
+      label: c.label,
+      position: { x: c.positionX, y: c.positionY },
+      notes: c.notes,
+      metadata: c.metadata ? JSON.parse(c.metadata) : {},
+      createdAt: new Date(c.createdAt),
+      updatedAt: new Date(c.updatedAt),
+    })) || []
+
+  return concepts
+}

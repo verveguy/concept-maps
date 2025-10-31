@@ -44,6 +44,7 @@ const _schema = i.schema({
       userId: i.string().indexed(),
       permission: i.string(), // 'view' | 'edit'
       createdAt: i.number().indexed(),
+      acceptedAt: i.number().optional(), // Timestamp when user accepted the share
     }),
   },
   links: {

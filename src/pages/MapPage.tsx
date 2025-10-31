@@ -1,19 +1,25 @@
 import { useState, useCallback, useRef } from 'react'
-import { Plus, X, Share2 } from 'lucide-react'
+import { Plus, X, Share2, Eye, Edit } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ConceptMapCanvas, type ConceptMapCanvasRef } from '@/components/graph/ConceptMapCanvas'
-import { ConceptEditor } from '@/components/concept/ConceptEditor'
-import { RelationshipEditor } from '@/components/relationship/RelationshipEditor'
+import { UnifiedEditor } from '@/components/editor/UnifiedEditor'
+import { PerspectiveEditor } from '@/components/perspective/PerspectiveEditor'
 import { ShareDialog } from '@/components/share/ShareDialog'
 import { useMapStore } from '@/stores/mapStore'
-import { useUIStore } from '@/stores/uiStore'
 import { useConceptActions } from '@/hooks/useConceptActions'
 import { useMap } from '@/hooks/useMap'
+import { usePerspectives } from '@/hooks/usePerspectives'
 
 export function MapPage() {
   const currentMapId = useMapStore((state) => state.currentMapId)
+  const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
+  const isEditingPerspective = useMapStore((state) => state.isEditingPerspective)
+  const setIsEditingPerspective = useMapStore((state) => state.setIsEditingPerspective)
   const map = useMap()
+  const perspectives = usePerspectives()
+  const currentPerspective = perspectives.find((p) => p.id === currentPerspectiveId)
   const { createConcept } = useConceptActions()
+  const [isCreatingConcept, setIsCreatingConcept] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [conceptLabel, setConceptLabel] = useState('')
@@ -79,8 +85,44 @@ export function MapPage() {
       <div className="h-full w-full flex flex-col">
         {/* Toolbar */}
         <div className="border-b bg-card px-4 py-2 flex items-center gap-2">
-          <h1 className="text-lg font-semibold">{map?.name || 'Untitled Map'}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-semibold">{map?.name || 'Untitled Map'}</h1>
+            {currentPerspective && (
+              <>
+                <span className="text-muted-foreground">/</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm text-muted-foreground">{currentPerspective.name}</span>
+                  {isEditingPerspective && (
+                    <span 
+                      title="Editing perspective - Shift+Click concepts to toggle inclusion"
+                      className="inline-flex items-center"
+                    >
+                      <Eye className="h-4 w-4 text-primary" />
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
           <div className="flex-1" />
+          {currentPerspective && !isEditingPerspective && (
+            <button
+              onClick={() => setIsEditingPerspective(true)}
+              className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 flex items-center gap-2"
+              title="Edit perspective"
+            >
+              <Edit className="h-4 w-4" />
+              Edit Perspective
+            </button>
+          )}
+          <button
+            onClick={() => setShowShareDialog(true)}
+            className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 flex items-center gap-2"
+            title="Share map"
+          >
+            <Share2 className="h-4 w-4" />
+            Share
+          </button>
           <button
             onClick={() => handleCreateConcept({ x: 250, y: 250 })}
             disabled={isCreatingConcept}
@@ -140,14 +182,19 @@ export function MapPage() {
           </div>
         )}
 
+        {/* Share Dialog */}
+        {showShareDialog && (
+          <ShareDialog mapId={currentMapId} onClose={() => setShowShareDialog(false)} />
+        )}
+
         {/* Canvas or Text View */}
         <div className="flex-1 overflow-hidden relative">
           <ConceptMapCanvas ref={canvasRef} onCreateConcept={handleCreateConcept} />
+          {/* Unified Editor - show when no perspective OR when viewing (not editing) a perspective */}
+          {(!currentPerspectiveId || !isEditingPerspective) && <UnifiedEditor />}
+          {/* Perspective Editor - only show when actively editing a perspective */}
+          {currentPerspectiveId && isEditingPerspective && <PerspectiveEditor />}
         </div>
-
-        {/* Editors */}
-        <ConceptEditor />
-        <RelationshipEditor />
       </div>
     </AppLayout>
   )
