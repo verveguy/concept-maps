@@ -1,0 +1,292 @@
+{
+  "entities": {
+    "maps": {
+      "attrs": {
+        "name": {
+          "valueType": "string",
+          "required": true,
+          "isIndexed": true
+        },
+        "createdBy": {
+          "valueType": "string",
+          "required": true,
+          "isIndexed": true
+        },
+        "createdAt": {
+          "valueType": "number",
+          "required": true,
+          "isIndexed": true
+        },
+        "updatedAt": {
+          "valueType": "number",
+          "required": true,
+          "isIndexed": true
+        }
+      },
+      "links": {}
+    },
+    "concepts": {
+      "attrs": {
+        "mapId": {
+          "valueType": "string",
+          "required": true,
+          "isIndexed": true
+        },
+        "label": {
+          "valueType": "string",
+          "required": true,
+          "isIndexed": true
+        },
+        "positionX": {
+          "valueType": "number",
+          "required": true,
+          "isIndexed": false
+        },
+        "positionY": {
+          "valueType": "number",
+          "required": true,
+          "isIndexed": false
+        },
+        "notes": {
+          "valueType": "string",
+          "required": false,
+          "isIndexed": false
+        },
+        "metadata": {
+          "valueType": "string",
+          "required": false,
+          "isIndexed": false
+        },
+        "createdAt": {
+          "valueType": "number",
+          "required": true,
+          "isIndexed": true
+        },
+        "updatedAt": {
+          "valueType": "number",
+          "required": true,
+          "isIndexed": true
+        }
+      },
+      "links": {
+        "map": {
+          "entityName": "maps",
+          "cardinality": "one"
+        }
+      }
+    },
+    "relationships": {
+      "attrs": {
+        "mapId": {
+          "valueType": "string",
+          "required": true,
+          "isIndexed": true
+        },
+        "fromConceptId": {
+          "valueType": "string",
+          "required": true,
+          "isIndexed": true
+        },
+        "toConceptId": {
+          "valueType": "string",
+          "required": true,
+          "isIndexed": true
+        },
+        "primaryLabel": {
+          "valueType": "string",
+          "required": true,
+          "isIndexed": false
+        },
+        "reverseLabel": {
+          "valueType": "string",
+          "required": true,
+          "isIndexed": false
+        },
+        "notes": {
+          "valueType": "string",
+          "required": false,
+          "isIndexed": false
+        },
+        "metadata": {
+          "valueType": "string",
+          "required": false,
+          "isIndexed": false
+        },
+        "createdAt": {
+          "valueType": "number",
+          "required": true,
+          "isIndexed": true
+        },
+        "updatedAt": {
+          "valueType": "number",
+          "required": true,
+          "isIndexed": true
+        }
+      },
+      "links": {
+        "map": {
+          "entityName": "maps",
+          "cardinality": "one"
+        },
+        "fromConcept": {
+          "entityName": "concepts",
+          "cardinality": "one"
+        },
+        "toConcept": {
+          "entityName": "concepts",
+          "cardinality": "one"
+        }
+      }
+    },
+    "perspectives": {
+      "attrs": {
+        "mapId": {
+          "valueType": "string",
+          "required": true,
+          "isIndexed": true
+        },
+        "name": {
+          "valueType": "string",
+          "required": true,
+          "isIndexed": true
+        },
+        "conceptIds": {
+          "valueType": "string",
+          "required": false,
+          "isIndexed": false
+        },
+        "relationshipIds": {
+          "valueType": "string",
+          "required": false,
+          "isIndexed": false
+        },
+        "createdBy": {
+          "valueType": "string",
+          "required": true,
+          "isIndexed": true
+        },
+        "createdAt": {
+          "valueType": "number",
+          "required": true,
+          "isIndexed": true
+        }
+      },
+      "links": {
+        "map": {
+          "entityName": "maps",
+          "cardinality": "one"
+        }
+      }
+    },
+    "shares": {
+      "attrs": {
+        "mapId": {
+          "valueType": "string",
+          "required": true,
+          "isIndexed": true
+        },
+        "userId": {
+          "valueType": "string",
+          "required": true,
+          "isIndexed": true
+        },
+        "permission": {
+          "valueType": "string",
+          "required": true,
+          "isIndexed": false
+        },
+        "createdAt": {
+          "valueType": "number",
+          "required": true,
+          "isIndexed": true
+        }
+      },
+      "links": {
+        "map": {
+          "entityName": "maps",
+          "cardinality": "one"
+        }
+      }
+    }
+  },
+  "links": {
+    "conceptsMap": {
+      "forward": {
+        "on": "concepts",
+        "has": "many",
+        "label": "map",
+        "onDelete": "cascade"
+      },
+      "reverse": {
+        "on": "maps",
+        "has": "many",
+        "label": "concepts"
+      }
+    },
+    "relationshipsMap": {
+      "forward": {
+        "on": "relationships",
+        "has": "many",
+        "label": "map",
+        "onDelete": "cascade"
+      },
+      "reverse": {
+        "on": "maps",
+        "has": "many",
+        "label": "relationships"
+      }
+    },
+    "relationshipsFromConcept": {
+      "forward": {
+        "on": "relationships",
+        "has": "many",
+        "label": "fromConcept",
+        "onDelete": "cascade"
+      },
+      "reverse": {
+        "on": "concepts",
+        "has": "many",
+        "label": "outgoingRelationships"
+      }
+    },
+    "relationshipsToConcept": {
+      "forward": {
+        "on": "relationships",
+        "has": "many",
+        "label": "toConcept",
+        "onDelete": "cascade"
+      },
+      "reverse": {
+        "on": "concepts",
+        "has": "many",
+        "label": "incomingRelationships"
+      }
+    },
+    "perspectivesMap": {
+      "forward": {
+        "on": "perspectives",
+        "has": "many",
+        "label": "map",
+        "onDelete": "cascade"
+      },
+      "reverse": {
+        "on": "maps",
+        "has": "many",
+        "label": "perspectives"
+      }
+    },
+    "sharesMap": {
+      "forward": {
+        "on": "shares",
+        "has": "many",
+        "label": "map",
+        "onDelete": "cascade"
+      },
+      "reverse": {
+        "on": "maps",
+        "has": "many",
+        "label": "shares"
+      }
+    }
+  }
+}
