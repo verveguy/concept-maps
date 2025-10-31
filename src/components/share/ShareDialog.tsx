@@ -177,9 +177,23 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                     className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
                   >
                     <div className="flex-1">
-                      <div className="text-sm font-medium">{share.userId}</div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-sm font-medium">{share.userId}</div>
+                        {share.acceptedAt ? (
+                          <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
+                            Accepted
+                          </span>
+                        ) : (
+                          <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full">
+                            Pending
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-gray-500">
                         Shared {format(share.createdAt, 'MMM d, yyyy')}
+                        {share.acceptedAt && (
+                          <> • Accepted {format(share.acceptedAt, 'MMM d, yyyy')}</>
+                        )}
                       </div>
                     </div>
                     {isOwner && (

@@ -1,12 +1,36 @@
 import { memo, useState, useRef, useEffect, useMemo } from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { ConceptNodeData } from '@/lib/reactFlowTypes'
 import { useUIStore } from '@/stores/uiStore'
+import { useMapStore } from '@/stores/mapStore'
 import { useConceptActions } from '@/hooks/useConceptActions'
+import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
 import { usePresence } from '@/hooks/usePresence'
+import { usePerspectives } from '@/hooks/usePerspectives'
+import { useAllRelationships } from '@/hooks/useRelationships'
 import { EditingHighlight } from '@/components/presence/EditingHighlight'
 import { PresenceAvatar } from '@/components/presence/PresenceAvatar'
+
+/**
+ * Style attribute keys that should be treated as built-in attributes, not metadata
+ */
+const NODE_STYLE_ATTRIBUTES = ['fillColor', 'borderColor', 'borderStyle', 'textColor']
+
+/**
+ * Filter out style attributes from metadata
+ */
+function getNonStyleMetadata(metadata: Record<string, unknown>): Record<string, unknown> {
+  const filtered: Record<string, unknown> = {}
+  Object.entries(metadata).forEach(([key, value]) => {
+    if (!NODE_STYLE_ATTRIBUTES.includes(key)) {
+      filtered[key] = value
+    }
+  })
+  return filtered
+}
 
 /**
  * Custom node component for Concept nodes
@@ -15,8 +39,16 @@ import { PresenceAvatar } from '@/components/presence/PresenceAvatar'
 export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>) => {
   const setSelectedConceptId = useUIStore((state) => state.setSelectedConceptId)
   const setConceptEditorOpen = useUIStore((state) => state.setConceptEditorOpen)
+  const setSelectedRelationshipId = useUIStore((state) => state.setSelectedRelationshipId)
+  const setRelationshipEditorOpen = useUIStore((state) => state.setRelationshipEditorOpen)
   const { updateConcept } = useConceptActions()
+  const { toggleConceptInPerspective } = usePerspectiveActions()
   const { otherUsersPresence } = usePresence()
+  const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
+  const isEditingPerspective = data.isEditingPerspective ?? false
+  const isInPerspective = data.isInPerspective ?? true
+  const perspectives = usePerspectives()
+  const allRelationships = useAllRelationships()
   const [isEditing, setIsEditing] = useState(false)
   const [editLabel, setEditLabel] = useState(data.label)
   const [isMetadataExpanded, setIsMetadataExpanded] = useState(false)
@@ -24,9 +56,12 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   
   // Get users editing this node
-  const editingUsers = otherUsersPresence.filter(
-    (p) => p.editingNodeId === data.concept.id && p.userName && p.color
-  ) as Array<{ userId: string; userName: string; color: string; editingNodeId: string }>
+  const editingUsers = otherUsersPresence
+    .filter((p) => p.editingNodeId === data.concept.id && p.userName && p.color && p.userId)
+    .filter((presence, index, self) => 
+      // Ensure unique userIds
+      index === self.findIndex((p) => p.userId === presence.userId)
+    ) as Array<{ userId: string; userName: string; color: string; editingNodeId: string }>
 
   // Extract node style from metadata
   const metadataKey = data.concept?.metadata ? JSON.stringify(data.concept.metadata) : ''
@@ -62,7 +97,35 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
     }
   }, [])
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    // If editing perspective and Shift+Click, toggle concept inclusion
+    if (isEditingPerspective && e.shiftKey && currentPerspectiveId) {
+      e.stopPropagation()
+      // Cancel any pending click handler
+      if (clickTimerRef.current) {
+        clearTimeout(clickTimerRef.current)
+        clickTimerRef.current = null
+      }
+      
+      const currentPerspective = perspectives.find((p) => p.id === currentPerspectiveId)
+      if (currentPerspective) {
+        toggleConceptInPerspective(
+          currentPerspectiveId,
+          data.concept.id,
+          currentPerspective.conceptIds,
+          currentPerspective.relationshipIds,
+          allRelationships.map((r) => ({
+            id: r.id,
+            fromConceptId: r.fromConceptId,
+            toConceptId: r.toConceptId,
+          }))
+        ).catch((error) => {
+          console.error('Failed to toggle concept in perspective:', error)
+        })
+      }
+      return
+    }
+    
     // Clear any pending timer
     if (clickTimerRef.current) {
       clearTimeout(clickTimerRef.current)
@@ -71,6 +134,10 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
     // Delay opening editor to allow double-click detection
     clickTimerRef.current = setTimeout(() => {
       if (!isEditing) {
+        // Close relationship editor and clear relationship selection when selecting a concept
+        setSelectedRelationshipId(null)
+        setRelationshipEditorOpen(false)
+        // Open concept editor
         setSelectedConceptId(data.concept.id)
         setConceptEditorOpen(true)
       }
@@ -122,6 +189,11 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
     }
   }
 
+  // Apply greyed-out styling when editing perspective and concept is not included
+  const isGreyedOut = isEditingPerspective && !isInPerspective
+  const nodeOpacity = isGreyedOut ? 0.3 : 1
+  const nodeFilter = isGreyedOut ? 'grayscale(0.5)' : 'none'
+
   return (
     <div
       className="px-4 py-3 rounded-lg shadow-md cursor-pointer transition-all hover:shadow-lg min-w-[120px] relative"
@@ -131,6 +203,8 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
         borderStyle: nodeStyle.borderStyle,
         borderColor: selected ? '#6366f1' : nodeStyle.borderColor,
         boxShadow: selected ? '0 0 0 2px rgba(99, 102, 241, 0.2)' : undefined,
+        opacity: nodeOpacity,
+        filter: nodeFilter,
       }}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
@@ -191,12 +265,16 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
       )}
       
       {data.concept.notes && (
-        <div className="text-xs mt-1 line-clamp-2" style={{ color: nodeStyle.textColor, opacity: 0.7 }}>
-          {data.concept.notes.substring(0, 50)}
-          {data.concept.notes.length > 50 && '...'}
+        <div 
+          className="text-xs mt-1 line-clamp-2 [&_*]:text-inherit [&_*]:text-xs [&_strong]:font-bold [&_em]:italic [&_code]:font-mono [&_a]:underline" 
+          style={{ color: nodeStyle.textColor, opacity: 0.7 }}
+        >
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {data.concept.notes}
+          </ReactMarkdown>
         </div>
       )}
-      {Object.keys(data.concept.metadata || {}).length > 0 && (
+      {Object.keys(getNonStyleMetadata(data.concept.metadata || {})).length > 0 && (
         <div className="mt-2">
           <button
             onClick={(e) => {
@@ -212,21 +290,23 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
               <ChevronDown className="h-3 w-3" />
             )}
             <span>
-              {Object.keys(data.concept.metadata || {}).length} metadata field(s)
+              {Object.keys(getNonStyleMetadata(data.concept.metadata || {})).length} metadata field(s)
             </span>
           </button>
           {isMetadataExpanded && (
             <div className="mt-2 pt-2 border-t space-y-1" style={{ borderColor: nodeStyle.borderColor }}>
-              {Object.entries(data.concept.metadata || {}).map(([key, value]) => (
-                <div key={key} className="text-xs">
-                  <span className="font-medium" style={{ color: nodeStyle.textColor, opacity: 0.8 }}>
-                    {key}:
-                  </span>{' '}
-                  <span style={{ color: nodeStyle.textColor, opacity: 0.7 }}>
-                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                  </span>
-                </div>
-              ))}
+              {Object.entries(getNonStyleMetadata(data.concept.metadata || {}))
+                .filter(([key]) => key) // Filter out empty keys
+                .map(([key, value]) => (
+                  <div key={key} className="text-xs">
+                    <span className="font-medium" style={{ color: nodeStyle.textColor, opacity: 0.8 }}>
+                      {key}:
+                    </span>{' '}
+                    <span style={{ color: nodeStyle.textColor, opacity: 0.7 }}>
+                      {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                    </span>
+                  </div>
+                ))}
             </div>
           )}
         </div>

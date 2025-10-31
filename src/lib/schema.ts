@@ -46,4 +46,5 @@ export interface Share {
   userId: string
   permission: 'view' | 'edit'
   createdAt: Date
+  acceptedAt: Date | null // Timestamp when user accepted the share
 }

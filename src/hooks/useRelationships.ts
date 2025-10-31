@@ -59,3 +59,42 @@ export function useRelationships() {
 
   return relationships
 }
+
+/**
+ * Hook to get ALL relationships for the current map (no perspective filtering)
+ * Uses InstantDB useQuery() for real-time updates
+ * Used when editing perspectives to show all relationships
+ */
+export function useAllRelationships() {
+  const currentMapId = useMapStore((state) => state.currentMapId)
+
+  // Get ALL relationships for the map (no perspective filter)
+  const { data } = db.useQuery(
+    currentMapId
+      ? {
+          relationships: {
+            $: {
+              where: { mapId: currentMapId },
+            },
+          },
+        }
+      : null
+  )
+
+  // Transform InstantDB data to schema format
+  const relationships: Relationship[] =
+    data?.relationships?.map((r: any) => ({
+      id: r.id,
+      mapId: r.mapId,
+      fromConceptId: r.fromConceptId,
+      toConceptId: r.toConceptId,
+      primaryLabel: r.primaryLabel,
+      reverseLabel: r.reverseLabel,
+      notes: r.notes,
+      metadata: r.metadata ? JSON.parse(r.metadata) : {},
+      createdAt: new Date(r.createdAt),
+      updatedAt: new Date(r.updatedAt),
+    })) || []
+
+  return relationships
+}

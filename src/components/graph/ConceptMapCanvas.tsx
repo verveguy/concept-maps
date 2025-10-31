@@ -13,8 +13,9 @@ import ReactFlow, {
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { conceptsToNodes, relationshipsToEdges } from '@/lib/data'
-import { useConcepts } from '@/hooks/useConcepts'
-import { useRelationships } from '@/hooks/useRelationships'
+import { useConcepts, useAllConcepts } from '@/hooks/useConcepts'
+import { useRelationships, useAllRelationships } from '@/hooks/useRelationships'
+import { usePerspectives } from '@/hooks/usePerspectives'
 import { useConceptActions } from '@/hooks/useConceptActions'
 import { useRelationshipActions } from '@/hooks/useRelationshipActions'
 import { useUIStore } from '@/stores/uiStore'
@@ -45,9 +46,37 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const nodeTypesRef = useRef(nodeTypes)
   const edgeTypesRef = useRef(edgeTypes)
   
-  const concepts = useConcepts()
-  const relationships = useRelationships()
   const currentMapId = useMapStore((state) => state.currentMapId)
+  const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
+  const isEditingPerspective = useMapStore((state) => state.isEditingPerspective)
+  
+  // Get perspectives to check which concepts are included
+  const perspectives = usePerspectives()
+  const currentPerspective = currentPerspectiveId
+    ? perspectives.find((p) => p.id === currentPerspectiveId)
+    : null
+  // Memoize perspectiveConceptIds to ensure stable reference when contents don't change
+  const perspectiveConceptIds = useMemo(() => {
+    return currentPerspective
+      ? new Set(currentPerspective.conceptIds)
+      : undefined
+  }, [currentPerspective ? [...currentPerspective.conceptIds].sort().join(',') : undefined])
+  
+  // Memoize perspectiveRelationshipIds to ensure stable reference when contents don't change
+  const perspectiveRelationshipIds = useMemo(() => {
+    return currentPerspective
+      ? new Set(currentPerspective.relationshipIds)
+      : undefined
+  }, [currentPerspective ? [...currentPerspective.relationshipIds].sort().join(',') : undefined])
+  
+  // Use all concepts/relationships when editing perspective, filtered otherwise
+  const filteredConcepts = useConcepts()
+  const filteredRelationships = useRelationships()
+  const allConcepts = useAllConcepts()
+  const allRelationships = useAllRelationships()
+  
+  const concepts = isEditingPerspective ? allConcepts : filteredConcepts
+  const relationships = isEditingPerspective ? allRelationships : filteredRelationships
   const { updateConcept } = useConceptActions()
   const { createRelationship } = useRelationshipActions()
   const { 
@@ -130,10 +159,23 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   } | null>(null)
 
   // Convert InstantDB data to React Flow format
-  const newNodes = useMemo(() => conceptsToNodes(concepts), [concepts])
+  const newNodes = useMemo(
+    () =>
+      conceptsToNodes(
+        concepts,
+        perspectiveConceptIds,
+        isEditingPerspective
+      ),
+    [concepts, perspectiveConceptIds, isEditingPerspective]
+  )
   const newEdges = useMemo(
-    () => relationshipsToEdges(relationships),
-    [relationships]
+    () =>
+      relationshipsToEdges(
+        relationships,
+        perspectiveRelationshipIds,
+        isEditingPerspective
+      ),
+    [relationships, perspectiveRelationshipIds, isEditingPerspective]
   )
 
   // Add text view node if visible
@@ -156,6 +198,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const prevConceptsRef = useRef(concepts)
   const prevRelationshipsRef = useRef(relationships)
   const prevTextViewVisibleRef = useRef(textViewVisible)
+  const prevPerspectiveConceptIdsRef = useRef<string | undefined>(perspectiveConceptIds ? Array.from(perspectiveConceptIds).sort().join(',') : undefined)
+  const prevPerspectiveRelationshipIdsRef = useRef<string | undefined>(perspectiveRelationshipIds ? Array.from(perspectiveRelationshipIds).sort().join(',') : undefined)
+  const prevIsEditingPerspectiveRef = useRef(isEditingPerspective)
 
   // React Flow state management - initialize with data
   const [nodes, setNodes, onNodesChange] = useNodesState(allNodes)
@@ -276,12 +321,20 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         return metadataChanged
       })
 
-    if (conceptsChanged || textViewVisible !== prevTextViewVisibleRef.current) {
+    // Check if perspective inclusion state changed
+    const currentPerspectiveKey = perspectiveConceptIds ? Array.from(perspectiveConceptIds).sort().join(',') : undefined
+    const perspectiveChanged = 
+      currentPerspectiveKey !== prevPerspectiveConceptIdsRef.current ||
+      isEditingPerspective !== prevIsEditingPerspectiveRef.current
+
+    if (conceptsChanged || perspectiveChanged || textViewVisible !== prevTextViewVisibleRef.current) {
       setNodes(allNodes)
       prevConceptsRef.current = concepts
       prevTextViewVisibleRef.current = textViewVisible
+      prevPerspectiveConceptIdsRef.current = currentPerspectiveKey
+      prevIsEditingPerspectiveRef.current = isEditingPerspective
     }
-  }, [allNodes, concepts, textViewVisible, setNodes])
+  }, [allNodes, concepts, textViewVisible, perspectiveConceptIds, isEditingPerspective, setNodes])
 
   useEffect(() => {
     // Only update if relationships actually changed
@@ -300,11 +353,19 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         return metadataChanged
       })
 
-    if (relationshipsChanged) {
+    // Check if perspective inclusion state changed for relationships
+    const currentPerspectiveRelationshipKey = perspectiveRelationshipIds ? Array.from(perspectiveRelationshipIds).sort().join(',') : undefined
+    const perspectiveRelationshipChanged = 
+      currentPerspectiveRelationshipKey !== prevPerspectiveRelationshipIdsRef.current ||
+      isEditingPerspective !== prevIsEditingPerspectiveRef.current
+
+    if (relationshipsChanged || perspectiveRelationshipChanged) {
       setEdges(newEdges)
       prevRelationshipsRef.current = relationships
+      prevPerspectiveRelationshipIdsRef.current = currentPerspectiveRelationshipKey
+      prevIsEditingPerspectiveRef.current = isEditingPerspective
     }
-  }, [newEdges, relationships, setEdges])
+  }, [newEdges, relationships, perspectiveRelationshipIds, isEditingPerspective, setEdges])
 
   // When a new concept appears, check if we need to create a relationship
   useEffect(() => {
@@ -418,7 +479,53 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     ]
   )
 
-  // Handle node drag end - update position in InstantDB or text view position
+  // Track last update time for each node to throttle updates
+  const lastUpdateTimeRef = useRef<Map<string, number>>(new Map())
+  const THROTTLE_MS = 100 // Update every 100ms maximum
+
+  // Handle node drag - update position in database with throttling
+  const onNodeDrag = useCallback(
+    async (_event: React.MouseEvent, node: Node) => {
+      if (!currentMapId) return
+
+      // Handle text view node position update (no throttling needed for UI state)
+      if (node.id === 'text-view-node') {
+        setTextViewPosition(node.position)
+        return
+      }
+
+      const concept = concepts.find((c) => c.id === node.id)
+      if (!concept) return
+
+      // Update cursor position during drag to keep remote viewers' cursors in sync
+      const flowPosition = screenToFlowPosition({
+        x: _event.clientX,
+        y: _event.clientY,
+      })
+      setCursor(flowPosition)
+
+      // Check if enough time has passed since last update
+      const now = Date.now()
+      const lastUpdate = lastUpdateTimeRef.current.get(node.id) || 0
+      const timeSinceLastUpdate = now - lastUpdate
+
+      // Only update if throttle interval has passed
+      if (timeSinceLastUpdate >= THROTTLE_MS) {
+        lastUpdateTimeRef.current.set(node.id, now)
+        
+        try {
+          await updateConcept(node.id, {
+            position: { x: node.position.x, y: node.position.y },
+          })
+        } catch (error) {
+          console.error(`Failed to update concept ${node.id} position:`, error)
+        }
+      }
+    },
+    [currentMapId, concepts, updateConcept, setTextViewPosition, screenToFlowPosition, setCursor]
+  )
+
+  // Handle node drag end - ensure final position is saved
   const onNodeDragStop = useCallback(
     async (_event: React.MouseEvent, node: Node) => {
       if (!currentMapId) return
@@ -432,7 +539,14 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       const concept = concepts.find((c) => c.id === node.id)
       if (!concept) return
 
-      // Only update if position actually changed
+      // Update cursor position to final position
+      const flowPosition = screenToFlowPosition({
+        x: _event.clientX,
+        y: _event.clientY,
+      })
+      setCursor(flowPosition)
+
+      // Always save final position immediately on drag stop
       if (
         concept.position.x !== node.position.x ||
         concept.position.y !== node.position.y
@@ -441,12 +555,14 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
           await updateConcept(node.id, {
             position: { x: node.position.x, y: node.position.y },
           })
+          // Update last update time so we don't trigger another update unnecessarily
+          lastUpdateTimeRef.current.set(node.id, Date.now())
         } catch (error) {
           console.error('Failed to update concept position:', error)
         }
       }
     },
-    [concepts, currentMapId, updateConcept, setTextViewPosition]
+    [concepts, currentMapId, updateConcept, setTextViewPosition, screenToFlowPosition, setCursor]
   )
 
   // Handle node click - let ConceptNode handle clicks (to distinguish single vs double-click)
@@ -462,10 +578,14 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   // Note: Double-click is handled by RelationshipEdge for inline editing
   const onEdgeClick = useCallback(
     (_event: React.MouseEvent, edge: Edge) => {
+      // Close concept editor and clear concept selection when selecting a relationship
+      setSelectedConceptId(null)
+      setConceptEditorOpen(false)
+      // Open relationship editor
       setSelectedRelationshipId(edge.id)
       setRelationshipEditorOpen(true)
     },
-    [setSelectedRelationshipId, setRelationshipEditorOpen]
+    [setSelectedConceptId, setConceptEditorOpen, setSelectedRelationshipId, setRelationshipEditorOpen]
   )
 
   // Handle connection creation - create new relationship between existing nodes
@@ -550,6 +670,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         onConnect={onConnect}
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
+        onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}

@@ -199,6 +199,11 @@
           "valueType": "number",
           "required": true,
           "isIndexed": true
+        },
+        "acceptedAt": {
+          "valueType": "number",
+          "required": false,
+          "isIndexed": false
         }
       },
       "links": {

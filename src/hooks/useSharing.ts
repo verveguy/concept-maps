@@ -1,11 +1,15 @@
 import { db, tx, id } from '@/lib/instant'
 import type { Share } from '@/lib/schema'
+import { useEffect, useCallback, useMemo } from 'react'
 
 /**
  * Hook for managing map sharing and permissions
  * Uses db.useQuery() for reading shares and db.transact() for mutations
  */
 export function useSharing(mapId: string | null) {
+  const currentUser = db.auth?.user
+  const userId = currentUser?.id || null
+
   // Query shares for this map
   const { data } = db.useQuery(
     mapId
@@ -27,7 +31,33 @@ export function useSharing(mapId: string | null) {
       userId: s.userId,
       permission: s.permission as 'view' | 'edit',
       createdAt: new Date(s.createdAt),
+      acceptedAt: s.acceptedAt ? new Date(s.acceptedAt) : null,
     })) || []
+
+  const acceptShare = useCallback(async (shareId: string) => {
+    await db.transact([
+      tx.shares[shareId].update({
+        acceptedAt: Date.now(),
+      }),
+    ])
+  }, [])
+
+  // Find unaccepted share for current user (memoized)
+  const unacceptedShareId = useMemo(() => {
+    if (!mapId || !userId) return null
+    const userShare = shares.find((s) => s.userId === userId && !s.acceptedAt)
+    return userShare?.id || null
+  }, [mapId, userId, shares.length, shares.find((s) => s.userId === userId && !s.acceptedAt)?.id])
+
+  // Auto-accept share when user accesses a shared map
+  useEffect(() => {
+    if (!unacceptedShareId) return
+
+    // Automatically accept the share
+    acceptShare(unacceptedShareId).catch((error) => {
+      console.error('Failed to auto-accept share:', error)
+    })
+  }, [unacceptedShareId, acceptShare])
 
   const shareMap = async (userId: string, permission: 'view' | 'edit') => {
     if (!mapId) throw new Error('Map ID is required')
@@ -38,6 +68,7 @@ export function useSharing(mapId: string | null) {
         userId,
         permission,
         createdAt: Date.now(),
+        acceptedAt: null, // Not accepted yet
       }),
     ])
   }
@@ -60,6 +91,7 @@ export function useSharing(mapId: string | null) {
   return {
     shares,
     shareMap,
+    acceptShare,
     updateSharePermission,
     removeShare,
   }

@@ -6,7 +6,6 @@ import {
   getSmoothStepPath,
   getStraightPath,
   type EdgeProps,
-  useReactFlow,
 } from 'reactflow'
 import type { RelationshipEdgeData } from '@/lib/reactFlowTypes'
 import { useRelationshipActions } from '@/hooks/useRelationshipActions'
@@ -17,7 +16,6 @@ import { useRelationshipActions } from '@/hooks/useRelationshipActions'
  */
 export const RelationshipEdge = memo(
   ({
-    id,
     sourceX,
     sourceY,
     targetX,
@@ -31,6 +29,8 @@ export const RelationshipEdge = memo(
     const { updateRelationship } = useRelationshipActions()
     const relationship = data?.relationship
     const label = relationship?.primaryLabel || ''
+    const isEditingPerspective = data?.isEditingPerspective ?? false
+    const isInPerspective = data?.isInPerspective ?? true
     
     // Extract edge style from metadata
     // Use JSON.stringify to ensure we detect changes to nested metadata
@@ -38,12 +38,23 @@ export const RelationshipEdge = memo(
     const edgeStyle = useMemo(() => {
       const metadata = relationship?.metadata || {}
       const baseColor = (metadata.edgeColor as string) || '#94a3b8'
+      
+      // Apply greyed-out styling when editing perspective and relationship is not included
+      const isGreyedOut = isEditingPerspective && !isInPerspective
+      let color = selected ? '#6366f1' : baseColor
+      
+      if (isGreyedOut) {
+        // Apply greyed-out effect
+        color = '#d1d5db' // Light grey color
+      }
+      
       return {
         type: (metadata.edgeType as 'bezier' | 'smoothstep' | 'step' | 'straight') || 'bezier',
-        color: selected ? '#6366f1' : baseColor, // Highlight selected edges with primary color
+        color,
         style: (metadata.edgeStyle as 'solid' | 'dashed') || 'solid',
+        opacity: isGreyedOut ? 0.3 : 1,
       }
-    }, [metadataKey, selected])
+    }, [metadataKey, selected, isEditingPerspective, isInPerspective])
     
     const [isEditing, setIsEditing] = useState(false)
     const [editLabel, setEditLabel] = useState(label)
@@ -138,6 +149,7 @@ export const RelationshipEdge = memo(
             stroke: edgeStyle.color,
             strokeWidth: selected ? 3 : 2,
             strokeDasharray: edgeStyle.style === 'dashed' ? '5,5' : undefined,
+            opacity: edgeStyle.opacity,
           }}
         />
         <EdgeLabelRenderer>
@@ -168,6 +180,9 @@ export const RelationshipEdge = memo(
                     ? 'border-primary bg-primary/5'
                     : 'border-gray-300'
                 } cursor-pointer hover:bg-gray-50`}
+                style={{
+                  opacity: isEditingPerspective && !isInPerspective ? 0.5 : 1,
+                }}
               >
                 {label}
               </div>
