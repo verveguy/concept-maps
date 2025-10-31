@@ -33,8 +33,14 @@ function getNonStyleMetadata(metadata: Record<string, unknown>): Record<string, 
 }
 
 /**
+ * Maximum number of handles per side for distributing multiple edges
+ */
+const MAX_HANDLES_PER_SIDE = 5
+
+/**
  * Custom node component for Concept nodes
  * Supports inline editing on double-click
+ * Includes multiple handles on top and bottom to support multiple edges between the same nodes
  */
 export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>) => {
   const setSelectedConceptId = useUIStore((state) => state.setSelectedConceptId)
@@ -244,7 +250,28 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
         </div>
       )}
       
-      <Handle type="target" position={Position.Top} className="bg-gray-400! w-2! h-2!" />
+      {/* Multiple target handles at top, distributed horizontally */}
+      {/* Handles are spaced evenly from -40% to +40% of node width */}
+      {Array.from({ length: MAX_HANDLES_PER_SIDE }, (_, i) => {
+        // Calculate horizontal position: evenly spaced from 10% to 90% (centered around 50%)
+        const spacing = MAX_HANDLES_PER_SIDE > 1 ? 80 / (MAX_HANDLES_PER_SIDE - 1) : 0
+        const offset = (i - (MAX_HANDLES_PER_SIDE - 1) / 2) * spacing
+        return (
+          <Handle
+            key={`top-${i}`}
+            type="target"
+            position={Position.Top}
+            id={`top-${i}`}
+            style={{
+              left: `${50 + offset}%`,
+            }}
+            className="bg-gray-300! w-1! h-1! opacity-30"
+          />
+        )
+      })}
+      
+      {/* Keep a default handle for backwards compatibility */}
+      <Handle type="target" position={Position.Top} className="bg-gray-300! w-1! h-1! opacity-30" />
       
       {isEditing ? (
         <input
@@ -311,7 +338,29 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
           )}
         </div>
       )}
-      <Handle type="source" position={Position.Bottom} className="bg-gray-400! w-2! h-2!" />
+      
+      {/* Multiple source handles at bottom, distributed horizontally */}
+      {/* Handles are spaced evenly from -40% to +40% of node width */}
+      {Array.from({ length: MAX_HANDLES_PER_SIDE }, (_, i) => {
+        // Calculate horizontal position: evenly spaced from 10% to 90% (centered around 50%)
+        const spacing = MAX_HANDLES_PER_SIDE > 1 ? 80 / (MAX_HANDLES_PER_SIDE - 1) : 0
+        const offset = (i - (MAX_HANDLES_PER_SIDE - 1) / 2) * spacing
+        return (
+          <Handle
+            key={`bottom-${i}`}
+            type="source"
+            position={Position.Bottom}
+            id={`bottom-${i}`}
+            style={{
+              left: `${50 + offset}%`,
+            }}
+            className="bg-gray-300! w-1! h-1! opacity-30"
+          />
+        )
+      })}
+      
+      {/* Keep a default handle for backwards compatibility */}
+      <Handle type="source" position={Position.Bottom} className="bg-gray-300! w-1! h-1! opacity-30" />
     </div>
   )
 })
