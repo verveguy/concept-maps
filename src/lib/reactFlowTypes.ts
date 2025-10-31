@@ -18,6 +18,8 @@ export interface RelationshipEdgeData {
   relationship: Relationship
   isInPerspective?: boolean // Whether this relationship is included in the current perspective
   isEditingPerspective?: boolean // Whether we're currently editing a perspective
+  hasMultipleEdges?: boolean // Whether there are multiple edges between the same two nodes
+  edgeIndex?: number // Index of this edge within a group of edges between the same nodes
 }
 
 /**

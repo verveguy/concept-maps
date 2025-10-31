@@ -6,9 +6,157 @@ import {
   getSmoothStepPath,
   getStraightPath,
   type EdgeProps,
+  Position,
 } from 'reactflow'
 import type { RelationshipEdgeData } from '@/lib/reactFlowTypes'
 import { useRelationshipActions } from '@/hooks/useRelationshipActions'
+
+/**
+ * Calculate control point offset based on source/target positions
+ * This mimics React Flow's internal bezier calculation
+ */
+function getControlPointOffset(
+  sourcePosition: Position,
+  targetPosition: Position,
+  sourceX: number,
+  sourceY: number,
+  targetX: number,
+  targetY: number
+): number {
+  const dx = targetX - sourceX
+  const dy = targetY - sourceY
+  const length = Math.sqrt(dx * dx + dy * dy)
+  
+  // Base offset similar to React Flow's default
+  const baseOffset = length * 0.25
+  
+  // Adjust based on position
+  if (sourcePosition === Position.Right || sourcePosition === Position.Left) {
+    return Math.max(50, baseOffset)
+  }
+  return Math.max(50, baseOffset)
+}
+
+/**
+ * Extract handle index from handle ID (e.g., "bottom-2" -> 2)
+ */
+function getHandleIndex(handleId: string | null | undefined): number {
+  if (!handleId) return 2 // Default to middle handle
+  const match = handleId.match(/(?:top|bottom)-(\d+)/)
+  return match ? parseInt(match[1], 10) : 2
+}
+
+/**
+ * Custom bezier path with offset control points for separating overlapping edges
+ * Bends left for left handles, right for right handles (matching handle selection logic)
+ */
+function getBezierPathWithOffset(
+  sourceX: number,
+  sourceY: number,
+  targetX: number,
+  targetY: number,
+  sourcePosition: Position,
+  targetPosition: Position,
+  sourceHandle: string | null | undefined,
+  targetHandle: string | null | undefined
+): [string, number, number] {
+  const offset = getControlPointOffset(sourcePosition, targetPosition, sourceX, sourceY, targetX, targetY)
+  
+  // Extract handle indices to determine bend direction
+  const sourceHandleIndex = getHandleIndex(sourceHandle)
+  const targetHandleIndex = getHandleIndex(targetHandle)
+  const handleIndex = Math.max(sourceHandleIndex, targetHandleIndex)
+  
+  // Determine bend direction based on handle position relative to center
+  // Middle handle (index 2) = no bend, left handles (< 2) = bend left, right handles (> 2) = bend right
+  const MAX_HANDLES_PER_SIDE = 5
+  const middleHandleIndex = Math.floor(MAX_HANDLES_PER_SIDE / 2) // 2
+  const offsetFromCenter = handleIndex - middleHandleIndex
+  
+  // Calculate control points with directional offset
+  let controlX1: number
+  let controlY1: number
+  let controlX2: number
+  let controlY2: number
+  
+  // Calculate direction vector
+  const dx = targetX - sourceX
+  const dy = targetY - sourceY
+  const length = Math.sqrt(dx * dx + dy * dy)
+  
+  if (length === 0) {
+    // Fallback for zero-length edges
+    controlX1 = sourceX
+    controlY1 = sourceY
+    controlX2 = targetX
+    controlY2 = targetY
+  } else {
+    // Calculate perpendicular vector for offset (points left when looking from source to target)
+    const perpX = -dy / length
+    const perpY = dx / length
+    
+    // Calculate bend amount - stronger bend for handles further from center
+    const bendAmount = 50 // Base pixels of bend
+    const controlPointOffset = offsetFromCenter * bendAmount
+    
+    // Apply perpendicular offset to control points (negative = left, positive = right)
+    const offsetX = perpX * controlPointOffset
+    const offsetY = perpY * controlPointOffset
+    
+    // Calculate control points based on position, with bend offset
+    switch (sourcePosition) {
+      case Position.Right:
+        controlX1 = sourceX + offset + offsetX
+        controlY1 = sourceY + offsetY
+        break
+      case Position.Left:
+        controlX1 = sourceX - offset + offsetX
+        controlY1 = sourceY + offsetY
+        break
+      case Position.Top:
+        controlX1 = sourceX + offsetX
+        controlY1 = sourceY - offset + offsetY
+        break
+      case Position.Bottom:
+      default:
+        controlX1 = sourceX + offsetX
+        controlY1 = sourceY + offset + offsetY
+        break
+    }
+    
+    switch (targetPosition) {
+      case Position.Right:
+        controlX2 = targetX + offset + offsetX
+        controlY2 = targetY + offsetY
+        break
+      case Position.Left:
+        controlX2 = targetX - offset + offsetX
+        controlY2 = targetY + offsetY
+        break
+      case Position.Top:
+        controlX2 = targetX + offsetX
+        controlY2 = targetY - offset + offsetY
+        break
+      case Position.Bottom:
+      default:
+        controlX2 = targetX + offsetX
+        controlY2 = targetY + offset + offsetY
+        break
+    }
+  }
+  
+  // Calculate label position (midpoint of the curve)
+  // Approximate midpoint of cubic bezier curve
+  const t = 0.5
+  const mt = 1 - t
+  const labelX = mt * mt * mt * sourceX + 3 * mt * mt * t * controlX1 + 3 * mt * t * t * controlX2 + t * t * t * targetX
+  const labelY = mt * mt * mt * sourceY + 3 * mt * mt * t * controlY1 + 3 * mt * t * t * controlY2 + t * t * t * targetY
+  
+  // Create SVG path for cubic bezier curve
+  const path = `M ${sourceX},${sourceY} C ${controlX1},${controlY1} ${controlX2},${controlY2} ${targetX},${targetY}`
+  
+  return [path, labelX, labelY]
+}
 
 /**
  * Custom edge component for Relationship edges
@@ -22,6 +170,8 @@ export const RelationshipEdge = memo(
     targetY,
     sourcePosition,
     targetPosition,
+    sourceHandle,
+    targetHandle,
     data,
     selected,
     markerEnd,
@@ -74,7 +224,8 @@ export const RelationshipEdge = memo(
     }, [isEditing])
 
     // Calculate edge path based on edge type
-    const [edgePath, labelX, labelY] = useMemo(() => {
+    // For bezier edges with multiple edges between same nodes, use custom path with offset control points
+    const [edgePath, labelX, labelY, labelOffsetX, labelOffsetY] = useMemo(() => {
       const params = {
         sourceX,
         sourceY,
@@ -84,22 +235,70 @@ export const RelationshipEdge = memo(
         targetPosition,
       }
       
+      const hasMultipleEdges = data?.hasMultipleEdges ?? false
+      const edgeIndex = data?.edgeIndex ?? 0
+      
+      let pathResult: [string, number, number]
+      
       switch (edgeStyle.type) {
         case 'smoothstep':
-          return getSmoothStepPath(params)
+          pathResult = getSmoothStepPath(params)
+          break
         case 'step':
           // Step is smoothstep with borderRadius 0
-          return getSmoothStepPath({
+          pathResult = getSmoothStepPath({
             ...params,
             borderRadius: 0,
           } as any)
+          break
         case 'straight':
-          return getStraightPath(params)
+          pathResult = getStraightPath(params)
+          break
         case 'bezier':
         default:
-          return getBezierPath(params)
+          // Use custom bezier path with offset control points for multiple edges
+          // This ensures edges bend in opposite directions based on handle positions
+          if (hasMultipleEdges && edgeStyle.type === 'bezier') {
+            pathResult = getBezierPathWithOffset(
+              sourceX,
+              sourceY,
+              targetX,
+              targetY,
+              sourcePosition,
+              targetPosition,
+              sourceHandle,
+              targetHandle
+            )
+          } else {
+            // Use standard bezier path for single edges
+            pathResult = getBezierPath(params)
+          }
+          break
       }
-    }, [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, edgeStyle.type])
+      
+      const [path, labelXPos, labelYPos] = pathResult
+      
+      // Apply small label offset if needed (for non-bezier edge types with multiple edges)
+      if (hasMultipleEdges && edgeStyle.type !== 'bezier') {
+        const maxHandles = 5
+        const offsetAmount = 25 // pixels of offset per edge index
+        const offset = (edgeIndex - (maxHandles - 1) / 2) * offsetAmount
+        
+        const dx = targetX - sourceX
+        const dy = targetY - sourceY
+        const length = Math.sqrt(dx * dx + dy * dy)
+        
+        if (length > 0) {
+          const perpX = -dy / length
+          const perpY = dx / length
+          const labelOffsetX = perpX * offset
+          const labelOffsetY = perpY * offset
+          return [path, labelXPos, labelYPos, labelOffsetX, labelOffsetY]
+        }
+      }
+      
+      return [path, labelXPos, labelYPos, 0, 0]
+    }, [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, data?.hasMultipleEdges, data?.edgeIndex, edgeStyle.type])
 
     const handleDoubleClick = (e: React.MouseEvent) => {
       e.stopPropagation()
@@ -156,7 +355,7 @@ export const RelationshipEdge = memo(
           <div
             style={{
               position: 'absolute',
-              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              transform: `translate(-50%, -50%) translate(${labelX + labelOffsetX}px,${labelY + labelOffsetY}px)`,
               pointerEvents: 'all',
             }}
             className="nodrag nopan"
