@@ -1,30 +1,45 @@
 /**
  * Search box component for searching concepts and relationships across all maps.
  * Displays a search input in the top right with dropdown results.
+ * Uses debouncing and conditional mounting to avoid unnecessary reactive updates.
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Search, MapPin, Link2 } from 'lucide-react'
-import { useSearch, type SearchResult } from '@/hooks/useSearch'
+import { useSearchQuery, useAccessibleMapIds, type SearchResult } from '@/hooks/useSearch'
 import { useMapStore } from '@/stores/mapStore'
 
 /**
  * Search box component.
  * Provides a search input with dropdown results that allows navigation to concepts/relationships.
+ * Uses debouncing to limit query frequency and only queries when there's an active search query.
  * 
  * @returns The search box JSX
  */
 export function SearchBox() {
   const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const results = useSearch(query)
+  const accessibleMapIds = useAccessibleMapIds()
   const { setCurrentMapId, setCurrentPerspectiveId } = useMapStore()
+  
+  // Get search results - only queries when debouncedQuery is set (hook handles null/empty query)
+  const results = useSearchQuery(debouncedQuery, accessibleMapIds)
 
-  // Filter results based on query
-  const filteredResults = query.trim() ? results : []
+  // Debounce the search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query)
+    }, 300) // 300ms debounce delay
+
+    return () => clearTimeout(timer)
+  }, [query])
+
+  // Filter results based on debounced query
+  const filteredResults = debouncedQuery.trim() ? results : []
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -43,19 +58,25 @@ export function SearchBox() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Open dropdown when there are results
+  // Open dropdown when there are results or when query is active
   useEffect(() => {
-    if (filteredResults.length > 0 && query.trim()) {
+    if (debouncedQuery.trim()) {
       setIsOpen(true)
     } else {
       setIsOpen(false)
     }
     setSelectedIndex(0)
-  }, [filteredResults.length, query])
+  }, [debouncedQuery, filteredResults.length])
 
   // Handle keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!isOpen || filteredResults.length === 0) return
+    if (!isOpen || filteredResults.length === 0) {
+      if (e.key === 'Escape') {
+        setIsOpen(false)
+        searchInputRef.current?.blur()
+      }
+      return
+    }
 
     switch (e.key) {
       case 'ArrowDown':
@@ -83,15 +104,16 @@ export function SearchBox() {
    * Handle selecting a search result.
    * Navigates to the map and selects the concept or relationship.
    */
-  const handleSelectResult = (result: SearchResult) => {
+  const handleSelectResult = useCallback((result: SearchResult) => {
     setCurrentMapId(result.mapId)
     setCurrentPerspectiveId(null) // Clear perspective when navigating
     setQuery('')
+    setDebouncedQuery('')
     setIsOpen(false)
     
     // The concept/relationship will be displayed in the map canvas
     // The map store handles switching to the correct map
-  }
+  }, [setCurrentMapId, setCurrentPerspectiveId])
 
   return (
     <div className="relative">
@@ -113,7 +135,7 @@ export function SearchBox() {
       </div>
 
       {/* Results Dropdown */}
-      {isOpen && filteredResults.length > 0 && (
+      {isOpen && debouncedQuery.trim() && filteredResults.length > 0 && (
         <div
           ref={dropdownRef}
           className="absolute top-full right-0 mt-1 w-96 max-h-96 overflow-y-auto bg-card border rounded-md shadow-lg z-50"
@@ -163,12 +185,12 @@ export function SearchBox() {
       )}
 
       {/* No Results */}
-      {isOpen && query.trim() && filteredResults.length === 0 && (
+      {isOpen && debouncedQuery.trim() && filteredResults.length === 0 && (
         <div
           ref={dropdownRef}
           className="absolute top-full right-0 mt-1 w-96 bg-card border rounded-md shadow-lg z-50 p-4 text-center text-sm text-muted-foreground"
         >
-          No results found for &quot;{query}&quot;
+          No results found for &quot;{debouncedQuery}&quot;
         </div>
       )}
     </div>
