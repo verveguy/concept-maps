@@ -56,6 +56,22 @@ const _schema = i.schema({
       permission: i.string(), // 'view' | 'edit'
       createdAt: i.number().indexed(),
       acceptedAt: i.number().optional(), // Timestamp when user accepted the share
+      status: i.string().indexed(), // 'active' | 'revoked'
+      revokedAt: i.number().optional(),
+      invitationId: i.string().optional().indexed(),
+    }),
+    shareInvitations: i.entity({
+      mapId: i.string().indexed(),
+      invitedEmail: i.string().indexed(),
+      invitedUserId: i.string().optional().indexed(),
+      permission: i.string(), // 'view' | 'edit'
+      token: i.string().indexed(),
+      status: i.string().indexed(), // 'pending' | 'accepted' | 'declined' | 'revoked' | 'expired'
+      createdBy: i.string().indexed(),
+      createdAt: i.number().indexed(),
+      expiresAt: i.number().optional().indexed(),
+      respondedAt: i.number().optional(),
+      revokedAt: i.number().optional(),
     }),
   },
   links: {
@@ -129,6 +145,18 @@ const _schema = i.schema({
         on: 'maps',
         has: 'many',
         label: 'shares',
+      },
+    },
+    shareInvitationsMap: {
+      forward: {
+        on: 'shareInvitations',
+        has: 'many',
+        label: 'map',
+      },
+      reverse: {
+        on: 'maps',
+        has: 'many',
+        label: 'shareInvitations',
       },
     },
   },

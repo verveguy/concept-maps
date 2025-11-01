@@ -28,14 +28,22 @@ interface ShareDialogProps {
  * @returns The share dialog JSX
  */
 export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
-  const { shares, shareMap, updateSharePermission, removeShare } = useSharing(mapId)
+  const {
+    shares,
+    invitations,
+    createInvitation,
+    updateSharePermission,
+    revokeShare,
+    revokeInvitation,
+  } = useSharing(mapId)
   const map = useMap()
   const currentUser = db.auth?.user
   
   const [emailInput, setEmailInput] = useState('')
   const [permissionInput, setPermissionInput] = useState<'view' | 'edit'>('edit')
   const [isSharing, setIsSharing] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [lastShareLink, setLastShareLink] = useState<string | null>(null)
+  const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null)
 
   // Check if current user is the map owner
   const isOwner = map?.createdBy === currentUser?.id
@@ -48,9 +56,10 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
     try {
       // For now, we'll use email as userId (in a real app, you'd look up userId by email)
       // This is a simplified implementation - in production, you'd need user lookup
-      const userId = emailInput.trim().toLowerCase()
-      
-      await shareMap(userId, permissionInput)
+      const inviteEmail = emailInput.trim().toLowerCase()
+
+      const token = await createInvitation(inviteEmail, permissionInput)
+      setLastShareLink(generateShareLink(mapId, token))
       setEmailInput('')
       setPermissionInput('edit')
     } catch (error) {
@@ -61,14 +70,14 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
     }
   }
 
-  const handleCopyLink = async () => {
+  const handleCopyLink = async (invitationId: string, token: string) => {
     if (!mapId) return
-    
-    const link = generateShareLink(mapId)
+
+    const link = generateShareLink(mapId, token)
     try {
       await navigator.clipboard.writeText(link)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      setCopiedInvitationId(invitationId)
+      setTimeout(() => setCopiedInvitationId(null), 2000)
     } catch (error) {
       console.error('Failed to copy link:', error)
       alert('Failed to copy link. Please try again.')
@@ -84,20 +93,29 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
     }
   }
 
-  const handleRemoveShare = async (shareId: string) => {
-    if (!confirm('Are you sure you want to remove this share?')) return
+  const handleRevokeShare = async (shareId: string) => {
+    if (!confirm('Are you sure you want to revoke this share? This will immediately remove access.')) return
 
     try {
-      await removeShare(shareId)
+      await revokeShare(shareId)
     } catch (error) {
-      console.error('Failed to remove share:', error)
-      alert('Failed to remove share. Please try again.')
+      console.error('Failed to revoke share:', error)
+      alert('Failed to revoke share. Please try again.')
+    }
+  }
+
+  const handleRevokeInvitation = async (invitationId: string) => {
+    if (!confirm('Revoke this invitation? This action will cancel the link and remove any associated access.')) return
+
+    try {
+      await revokeInvitation(invitationId)
+    } catch (error) {
+      console.error('Failed to revoke invitation:', error)
+      alert('Failed to revoke invitation. Please try again.')
     }
   }
 
   if (!mapId || !map) return null
-
-  const shareLink = generateShareLink(mapId)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -116,30 +134,39 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Share Link Section */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Share Link
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={shareLink}
-                readOnly
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm"
-              />
-              <button
-                onClick={handleCopyLink}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
-              >
-                <Copy className="h-4 w-4" />
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
+          {/* Last Generated Invitation Link */}
+          {lastShareLink && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Most Recent Invitation Link
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={lastShareLink}
+                  readOnly
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm"
+                />
+                <button
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(lastShareLink)
+                    } catch (error) {
+                      console.error('Failed to copy link:', error)
+                      alert('Failed to copy link. Please try again.')
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                  <Copy className="h-4 w-4" />
+                  Copy
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                Share this link with the invitee. Links are tied to individual invitations and become invalid if revoked.
+              </p>
             </div>
-            <p className="mt-2 text-xs text-gray-500">
-              Anyone with this link can access the map
-            </p>
-          </div>
+          )}
 
           {/* Share with User Section */}
           {isOwner && (
@@ -176,6 +203,61 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
             </div>
           )}
 
+          {/* Invitation List */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Invitations ({invitations.length})
+            </label>
+            {invitations.length === 0 ? (
+              <p className="text-sm text-gray-500">No invitations created yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {invitations.map((invitation) => (
+                  <div
+                    key={invitation.id}
+                    className="p-3 bg-gray-50 rounded-md border border-gray-100 flex flex-col gap-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-medium">{invitation.invitedEmail}</div>
+                        <div className="text-xs text-gray-500">
+                          Permission: {invitation.permission} • Status: {invitation.status}
+                        </div>
+                        <div className="text-xs text-gray-400 mt-0.5">
+                          Created {format(invitation.createdAt, 'MMM d, yyyy h:mm a')}
+                          {invitation.respondedAt && (
+                            <> • Responded {format(invitation.respondedAt, 'MMM d, yyyy h:mm a')}</>
+                          )}
+                          {invitation.revokedAt && (
+                            <> • Revoked {format(invitation.revokedAt, 'MMM d, yyyy h:mm a')}</>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleCopyLink(invitation.id, invitation.token)}
+                          className="px-2 py-1 text-xs border rounded-md flex items-center gap-1 hover:bg-gray-100"
+                          disabled={invitation.status === 'revoked'}
+                        >
+                          <Copy className="h-3 w-3" />
+                          {copiedInvitationId === invitation.id ? 'Copied' : 'Copy Link'}
+                        </button>
+                        {isOwner && invitation.status !== 'revoked' && (
+                          <button
+                            onClick={() => handleRevokeInvitation(invitation.id)}
+                            className="px-2 py-1 text-xs text-red-600 border border-red-200 rounded-md hover:bg-red-50"
+                          >
+                            Revoke
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Shared Users List */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -193,20 +275,25 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <div className="text-sm font-medium">{share.userId}</div>
-                        {share.acceptedAt ? (
-                          <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">
-                            Accepted
-                          </span>
-                        ) : (
-                          <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full">
-                            Pending
-                          </span>
-                        )}
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full ${
+                            share.status === 'active'
+                              ? 'bg-green-100 text-green-700'
+                              : share.status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-red-100 text-red-700'
+                          }`}
+                        >
+                          {share.status === 'active' ? 'Active' : share.status === 'pending' ? 'Pending' : 'Revoked'}
+                        </span>
                       </div>
                       <div className="text-xs text-gray-500">
                         Shared {format(share.createdAt, 'MMM d, yyyy')}
-                        {share.acceptedAt && (
+                        {share.acceptedAt && share.status !== 'revoked' && (
                           <> • Accepted {format(share.acceptedAt, 'MMM d, yyyy')}</>
+                        )}
+                        {share.revokedAt && (
+                          <> • Revoked {format(share.revokedAt, 'MMM d, yyyy')}</>
                         )}
                       </div>
                     </div>
@@ -221,14 +308,16 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                             )
                           }
                           className="px-2 py-1 text-xs border border-gray-300 rounded-md"
+                          disabled={share.status !== 'active'}
                         >
                           <option value="view">View</option>
                           <option value="edit">Edit</option>
                         </select>
                         <button
-                          onClick={() => handleRemoveShare(share.id)}
+                          onClick={() => handleRevokeShare(share.id)}
                           className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                          aria-label="Remove share"
+                          aria-label="Revoke share"
+                          disabled={share.status === 'revoked'}
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>

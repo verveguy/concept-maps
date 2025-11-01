@@ -5,8 +5,8 @@
  */
 
 import { db, tx, id } from '@/lib/instant'
-import type { Share } from '@/lib/schema'
-import { useEffect, useCallback, useMemo } from 'react'
+import type { Share, ShareInvitation } from '@/lib/schema'
+import { useCallback, useMemo } from 'react'
 
 /**
  * Hook for managing map sharing and permissions.
@@ -16,10 +16,11 @@ import { useEffect, useCallback, useMemo } from 'react'
  * @returns Object containing shares array and sharing management functions
  */
 export function useSharing(mapId: string | null) {
-  const currentUser = db.auth?.user
+  const auth = db.useAuth()
+  const currentUser = auth.user || null
   const userId = currentUser?.id || null
 
-  // Query shares for this map
+  // Query share invitations and share records for the provided map
   const { data } = db.useQuery(
     mapId
       ? {
@@ -28,104 +29,242 @@ export function useSharing(mapId: string | null) {
               where: { mapId },
             },
           },
+          shareInvitations: {
+            $: {
+              where: { mapId },
+            },
+          },
         }
       : null
   )
 
-  // Transform InstantDB data to schema format
-  const shares: Share[] =
-    data?.shares?.map((s: any) => ({
-      id: s.id,
-      mapId: s.mapId,
-      userId: s.userId,
-      permission: s.permission as 'view' | 'edit',
-      createdAt: new Date(s.createdAt),
-      acceptedAt: s.acceptedAt ? new Date(s.acceptedAt) : null,
-    })) || []
+  // Transform InstantDB data to domain schema format
+  const shares: Share[] = useMemo(
+    () =>
+      data?.shares?.map((s: any) => ({
+        id: s.id,
+        mapId: s.mapId,
+        userId: s.userId,
+        permission: s.permission as 'view' | 'edit',
+        createdAt: new Date(s.createdAt),
+        acceptedAt: s.acceptedAt ? new Date(s.acceptedAt) : null,
+        status: (s.status ?? 'pending') as Share['status'],
+        revokedAt: s.revokedAt ? new Date(s.revokedAt) : null,
+        invitationId: s.invitationId ?? null,
+      })) || [],
+    [data?.shares]
+  )
+
+  const invitations: ShareInvitation[] = useMemo(
+    () =>
+      data?.shareInvitations?.map((inv: any) => ({
+        id: inv.id,
+        mapId: inv.mapId,
+        invitedEmail: inv.invitedEmail,
+        invitedUserId: inv.invitedUserId ?? null,
+        permission: inv.permission as 'view' | 'edit',
+        token: inv.token,
+        status: inv.status as ShareInvitation['status'],
+        createdBy: inv.createdBy,
+        createdAt: new Date(inv.createdAt),
+        expiresAt: inv.expiresAt ? new Date(inv.expiresAt) : null,
+        respondedAt: inv.respondedAt ? new Date(inv.respondedAt) : null,
+        revokedAt: inv.revokedAt ? new Date(inv.revokedAt) : null,
+      })) || [],
+    [data?.shareInvitations]
+  )
 
   /**
-   * Accept a share invitation.
-   * 
-   * @param shareId - ID of the share to accept
+   * Create a new invitation for a map collaborator.
+   * Generates a secure token and stores the invitation for later acceptance.
+   *
+   * @param targetEmail - Email address (and expected user identifier) of the invitee
+   * @param permission - Requested permission level ('view' | 'edit')
+   * @returns The invitation token for sharing with the invitee
    */
-  const acceptShare = useCallback(async (shareId: string) => {
-    await db.transact([
-      tx.shares[shareId].update({
-        acceptedAt: Date.now(),
-      }),
-    ])
-  }, [])
+  const createInvitation = useCallback(
+    async (targetEmail: string, permission: 'view' | 'edit'): Promise<string> => {
+      if (!mapId) throw new Error('Map ID is required')
+      if (!currentUser?.id) throw new Error('Current user must be authenticated')
 
-  // Find unaccepted share for current user (memoized)
-  const unacceptedShareId = useMemo(() => {
-    if (!mapId || !userId) return null
-    const userShare = shares.find((s) => s.userId === userId && !s.acceptedAt)
-    return userShare?.id || null
-  }, [mapId, userId, shares.length, shares.find((s) => s.userId === userId && !s.acceptedAt)?.id])
+      const invitationId = id()
+      const token = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
 
-  // Auto-accept share when user accesses a shared map
-  useEffect(() => {
-    if (!unacceptedShareId) return
+      await db.transact([
+        tx.shareInvitations[invitationId].update({
+          mapId,
+          invitedEmail: targetEmail.toLowerCase(),
+          invitedUserId: null,
+          permission,
+          token,
+          status: 'pending',
+          createdBy: currentUser.id,
+          createdAt: Date.now(),
+          expiresAt: null,
+          respondedAt: null,
+          revokedAt: null,
+        }),
+      ])
 
-    // Automatically accept the share
-    acceptShare(unacceptedShareId).catch((error) => {
-      console.error('Failed to auto-accept share:', error)
-    })
-  }, [unacceptedShareId, acceptShare])
+      return token
+    },
+    [mapId, currentUser?.id]
+  )
 
   /**
-   * Share a map with a user.
-   * 
-   * @param userId - ID of the user to share with
-   * @param permission - Permission level ('view' or 'edit')
-   * @throws Error if mapId is not provided
+   * Accept a collaboration invitation.
+   * Updates the invitation record to accepted and creates an active share entry.
+   *
+   * @param invitationId - ID of the invitation to accept
    */
-  const shareMap = async (userId: string, permission: 'view' | 'edit') => {
-    if (!mapId) throw new Error('Map ID is required')
+  const acceptInvitation = useCallback(
+    async (invitationId: string) => {
+      if (!userId) throw new Error('Authentication required to accept invitations')
 
-    await db.transact([
-      tx.shares[id()].update({
-        mapId,
-        userId,
-        permission,
-        createdAt: Date.now(),
-        acceptedAt: null, // Not accepted yet
-      }),
-    ])
-  }
+      const invitation = invitations.find((inv) => inv.id === invitationId)
+      if (!invitation) throw new Error('Invitation not found')
+      if (invitation.status !== 'pending') {
+        throw new Error('Only pending invitations can be accepted')
+      }
+
+      await db.transact([
+        tx.shareInvitations[invitationId].update({
+          status: 'accepted',
+          invitedUserId: userId,
+          respondedAt: Date.now(),
+          revokedAt: null,
+        }),
+      ])
+
+      await db.transact([
+        tx.shares[invitation.id].update({
+          mapId: invitation.mapId,
+          userId,
+          permission: invitation.permission,
+          createdAt: Date.now(),
+          acceptedAt: Date.now(),
+          status: 'active',
+          revokedAt: null,
+          invitationId: invitation.id,
+        }),
+      ])
+    },
+    [invitations, userId]
+  )
 
   /**
-   * Update the permission level for a share.
-   * 
+   * Decline a collaboration invitation.
+   *
+   * @param invitationId - ID of the invitation to decline
+   */
+  const declineInvitation = useCallback(
+    async (invitationId: string) => {
+      if (!userId) throw new Error('Authentication required to decline invitations')
+
+      const invitation = invitations.find((inv) => inv.id === invitationId)
+      if (!invitation) throw new Error('Invitation not found')
+      if (invitation.status !== 'pending') {
+        throw new Error('Only pending invitations can be declined')
+      }
+
+      await db.transact([
+        tx.shareInvitations[invitationId].update({
+          status: 'declined',
+          invitedUserId: userId,
+          respondedAt: Date.now(),
+        }),
+      ])
+    },
+    [invitations, userId]
+  )
+
+  /**
+   * Revoke an invitation (owner action) and expire any linked shares.
+   *
+   * @param invitationId - ID of the invitation to revoke
+   */
+  const revokeInvitation = useCallback(
+    async (invitationId: string) => {
+      if (!currentUser?.id) throw new Error('Authentication required to revoke invitations')
+
+      const invitationShares = shares.filter((share) => share.invitationId === invitationId)
+
+      await db.transact([
+        tx.shareInvitations[invitationId].update({
+          status: 'revoked',
+          revokedAt: Date.now(),
+        }),
+        ...invitationShares.map((share) =>
+          tx.shares[share.id].update({
+            status: 'revoked',
+            revokedAt: Date.now(),
+          })
+        ),
+      ])
+    },
+    [currentUser?.id, shares]
+  )
+
+  /**
+   * Update the permission level for an active share (owner action).
+   *
    * @param shareId - ID of the share to update
-   * @param permission - New permission level ('view' or 'edit')
+   * @param permission - New permission level
    */
-  const updateSharePermission = async (
-    shareId: string,
-    permission: 'view' | 'edit'
-  ) => {
-    await db.transact([
-      tx.shares[shareId].update({
-        permission,
-      }),
-    ])
-  }
+  const updateSharePermission = useCallback(
+    async (shareId: string, permission: 'view' | 'edit') => {
+      await db.transact([
+        tx.shares[shareId].update({
+          permission,
+        }),
+      ])
+    },
+    []
+  )
 
   /**
-   * Remove a share (revoke access).
-   * 
-   * @param shareId - ID of the share to remove
+   * Revoke a share (owner action) and flag the underlying invitation as revoked.
+   *
+   * @param shareId - ID of the share to revoke
    */
-  const removeShare = async (shareId: string) => {
-    await db.transact([tx.shares[shareId].delete()])
-  }
+  const revokeShare = useCallback(
+    async (shareId: string) => {
+      const share = shares.find((s) => s.id === shareId)
+      if (!share) throw new Error('Share not found')
+
+      const updates = [
+        tx.shares[shareId].update({
+          status: 'revoked',
+          revokedAt: Date.now(),
+        }),
+      ]
+
+      if (share.invitationId) {
+        updates.push(
+          tx.shareInvitations[share.invitationId].update({
+            status: 'revoked',
+            revokedAt: Date.now(),
+          })
+        )
+      }
+
+      await db.transact(updates)
+    },
+    [shares]
+  )
 
   return {
+    currentUser,
     shares,
-    shareMap,
-    acceptShare,
+    invitations,
+    createInvitation,
+    acceptInvitation,
+    declineInvitation,
+    revokeInvitation,
     updateSharePermission,
-    removeShare,
+    revokeShare,
   }
 }
 
@@ -134,10 +273,13 @@ export function useSharing(mapId: string | null) {
  * Creates a URL that can be used to access the map.
  * 
  * @param mapId - ID of the map to generate a link for
+ * @param token - Invitation token that authenticates access to the invitation
  * @returns URL string for accessing the map
  */
-export function generateShareLink(mapId: string): string {
+export function generateShareLink(mapId: string, token: string): string {
   const baseUrl = window.location.origin
-  return `${baseUrl}/map/${mapId}`
+  const url = new URL(`${baseUrl}/map/${mapId}`)
+  url.searchParams.set('inviteToken', token)
+  return url.toString()
 }
 
