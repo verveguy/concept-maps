@@ -15,18 +15,26 @@ import type { Map } from '@/lib/schema'
  */
 export function useMaps() {
   const auth = db.useAuth()
+  const userId = auth.user?.id
 
-  const { data } = db.useQuery(
-    auth.user?.id
+  const { data: ownedMapsData } = db.useQuery(
+    userId
       ? {
           maps: {
             $: {
-              where: { createdBy: auth.user.id },
+              where: { createdBy: userId },
             },
           },
-          sharedMaps: {
+        }
+      : null
+  )
+
+  const { data: sharedMapsData } = db.useQuery(
+    userId
+      ? {
+          shares: {
             $: {
-              where: { userId: auth.user.id, status: 'active' },
+              where: { userId, status: 'active' },
             },
             map: {},
           },
@@ -34,23 +42,22 @@ export function useMaps() {
       : null
   )
 
-  // Transform InstantDB data to schema format
   const ownedMaps: Map[] = useMemo(
     () =>
-      data?.maps?.map((m: any) => ({
+      ownedMapsData?.maps?.map((m: any) => ({
         id: m.id,
         name: m.name,
         createdBy: m.createdBy,
         createdAt: new Date(m.createdAt),
         updatedAt: new Date(m.updatedAt),
       })) || [],
-    [data?.maps]
+    [ownedMapsData?.maps]
   )
 
   const sharedMaps: Map[] = useMemo(() => {
-    if (!data?.sharedMaps) return []
+    if (!sharedMapsData?.shares) return []
 
-    return data.sharedMaps
+    return sharedMapsData.shares
       .map((share: any) => share.map)
       .filter(Boolean)
       .map((map: any) => ({
@@ -60,7 +67,7 @@ export function useMaps() {
         createdAt: new Date(map.createdAt),
         updatedAt: new Date(map.updatedAt),
       }))
-  }, [data?.sharedMaps])
+  }, [sharedMapsData?.shares])
 
   const combinedMaps = useMemo(() => {
     const deduped = new Map<string, Map>()

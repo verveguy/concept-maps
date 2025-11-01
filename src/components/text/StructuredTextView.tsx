@@ -9,15 +9,12 @@ import { useState, useCallback } from 'react'
 import { Plus } from 'lucide-react'
 import { useConcepts } from '@/hooks/useConcepts'
 import { useRelationships } from '@/hooks/useRelationships'
-import { useConceptActions } from '@/hooks/useConceptActions'
 import { useRelationshipActions } from '@/hooks/useRelationshipActions'
 import { useMapStore } from '@/stores/mapStore'
 import {
   conceptsToTriples,
   findOrphanConcepts,
   parseTripleText,
-  formatTripleText,
-  type TextTriple,
 } from '@/lib/textRepresentation'
 import { EditableTriple } from './EditableTriple'
 import { db, tx, id } from '@/lib/instant'
@@ -34,7 +31,6 @@ export function StructuredTextView() {
   const concepts = useConcepts()
   const relationships = useRelationships()
   const currentMapId = useMapStore((state) => state.currentMapId)
-  const { createConcept } = useConceptActions()
   const { createRelationship } = useRelationshipActions()
 
   const triples = conceptsToTriples(concepts, relationships)

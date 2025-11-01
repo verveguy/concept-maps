@@ -11,7 +11,9 @@ import ReactFlow, {
   MiniMap,
   type Node,
   type Edge,
-  type OnConnect,
+  type Connection,
+  type OnConnectStart,
+  ConnectionLineType,
   useNodesState,
   useEdgesState,
   ReactFlowProvider,
@@ -30,7 +32,7 @@ import { db, tx, id } from '@/lib/instant'
 import { nodeTypes, edgeTypes } from './reactFlowTypes'
 import type { LayoutType } from '@/lib/layouts'
 import { applyForceDirectedLayout, applyHierarchicalLayout } from '@/lib/layouts'
-import { Network, Layers, Network as NetworkIcon, FileText } from 'lucide-react'
+import { Network, Layers, FileText } from 'lucide-react'
 import { usePresence } from '@/hooks/usePresence'
 import { PresenceCursor } from '@/components/presence/PresenceCursor'
 
@@ -109,7 +111,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     textViewPosition,
     setTextViewPosition,
   } = useUIStore()
-  const { screenToFlowPosition, flowToScreenPosition, fitView, getViewport } = useReactFlow()
+  const { screenToFlowPosition, flowToScreenPosition, fitView } = useReactFlow()
   
   // Presence tracking
   const { otherUsersPresence, setCursor, setEditingNode, setEditingEdge } = usePresence()
@@ -119,7 +121,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   // Track cursor movement on the React Flow pane
   // Convert screen coordinates to flow coordinates for storage
   useEffect(() => {
-    const reactFlowPane = document.querySelector('.react-flow')
+    const reactFlowPane = document.querySelector<HTMLElement>('.react-flow')
     if (!reactFlowPane) return
     
     const handleMouseMove = (event: MouseEvent) => {
@@ -419,11 +421,13 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   }, [concepts, currentMapId, createRelationship])
 
   // Handle connection start - track source node for drag-to-create
-  const onConnectStart = useCallback(
-    (_event: React.MouseEvent, { nodeId }: { nodeId: string | null }) => {
-      if (!nodeId) return
+  const onConnectStart = useCallback<OnConnectStart>(
+    (_event, params) => {
+      const nodeId = params.nodeId
+      if (!nodeId) {
+        return
+      }
 
-      // Get the node position and store connection start info
       const node = nodes.find((n) => n.id === nodeId)
       if (node) {
         setConnectionStart({
@@ -449,9 +453,15 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
 
       if (!targetNode) {
         // Connection ended on empty space - create new concept and relationship
+        const pointer = 'clientX' in event ? event : event.touches?.[0]
+        if (!pointer) {
+          setConnectionStart(null)
+          return
+        }
+
         const position = screenToFlowPosition({
-          x: event.clientX,
-          y: event.clientY,
+          x: pointer.clientX,
+          y: pointer.clientY,
         })
 
         try {
@@ -587,7 +597,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
 
   // Handle node click - let ConceptNode handle clicks (to distinguish single vs double-click)
   const onNodeClick = useCallback(
-    (_event: React.MouseEvent, node: Node) => {
+    (_event: React.MouseEvent, _node: Node) => {
       // ConceptNode handles its own clicks to distinguish single vs double-click
       // This handler is kept for selection tracking but ConceptNode opens editor
     },
@@ -609,24 +619,27 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   )
 
   // Handle connection creation - create new relationship between existing nodes
-  const onConnect = useCallback(
-    async (connection: OnConnect) => {
-      if (!currentMapId || !connection.source || !connection.target) return
+  const onConnectHandler = useCallback(
+    (connection: Connection) => {
+      if (!currentMapId || !connection.source || !connection.target) {
+        return
+      }
 
-      // Reset connection start tracking
       setConnectionStart(null)
 
-      try {
-        await createRelationship({
-          mapId: currentMapId,
-          fromConceptId: connection.source,
-          toConceptId: connection.target,
-          primaryLabel: 'related to',
-          reverseLabel: 'related from',
-        })
-      } catch (error) {
-        console.error('Failed to create relationship:', error)
-      }
+      void (async () => {
+        try {
+          await createRelationship({
+            mapId: currentMapId,
+            fromConceptId: connection.source!,
+            toConceptId: connection.target!,
+            primaryLabel: 'related to',
+            reverseLabel: 'related from',
+          })
+        } catch (error) {
+          console.error('Failed to create relationship:', error)
+        }
+      })()
     },
     [currentMapId, createRelationship]
   )
@@ -687,7 +700,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         edgeTypes={edgeTypesRef.current}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
+        onConnect={onConnectHandler}
         onConnectStart={onConnectStart}
         onConnectEnd={onConnectEnd}
         onNodeDrag={onNodeDrag}
@@ -698,7 +711,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         fitView
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2 }}
-        connectionLineType="smoothstep"
+        connectionLineType={ConnectionLineType.SmoothStep}
       >
         <Background />
         <Controls className="!bg-white !border !border-gray-300 !rounded-md !shadow-md">
@@ -720,7 +733,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
           <div className="h-px bg-gray-300" />
           <button
             onClick={() => handleApplyLayout('force-directed')}
-            disabled={nodes.filter(n => n.type === 'concept').length === 0}
+            disabled={conceptNodes.length === 0}
             className="react-flow__controls-button"
             title="Force-directed layout (spreads nodes evenly)"
           >
@@ -728,7 +741,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
           </button>
           <button
             onClick={() => handleApplyLayout('hierarchical')}
-            disabled={nodes.filter(n => n.type === 'concept').length === 0}
+            disabled={conceptNodes.length === 0}
             className="react-flow__controls-button"
             title="Hierarchical layout (top-to-bottom tree)"
           >

@@ -38,52 +38,53 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
             $: {
               where: { token: inviteToken },
             },
-            map: {
-              id: true,
-              name: true,
-              createdBy: true,
+          },
+        }
+      : null
+  )
+
+  const invitationRecord = invitationQuery?.data?.shareInvitations?.[0] ?? null
+  const isLoading = invitationQuery?.isLoading ?? false
+
+  const mapQuery = db.useQuery(
+    invitationRecord?.mapId
+      ? {
+          maps: {
+            $: {
+              where: { id: invitationRecord.mapId },
             },
           },
         }
-      : null,
-    inviteToken
-      ? {
-          params: {
-            token: inviteToken,
-          },
-        }
-      : undefined
+      : null
   )
 
-  const data = invitationQuery?.data
-  const isLoading = invitationQuery?.isLoading ?? false
-
   const invitation: (ShareInvitation & { map?: { id: string; name: string; createdBy: string } }) | null = useMemo(() => {
-    const rawInvitation = data?.shareInvitations?.[0]
-    if (!rawInvitation) return null
+    if (!invitationRecord) return null
+
+    const map = mapQuery?.data?.maps?.[0]
 
     return {
-      id: rawInvitation.id,
-      mapId: rawInvitation.mapId,
-      invitedEmail: rawInvitation.invitedEmail,
-      invitedUserId: rawInvitation.invitedUserId ?? null,
-      permission: rawInvitation.permission as ShareInvitation['permission'],
-      token: rawInvitation.token,
-      status: rawInvitation.status as ShareInvitation['status'],
-      createdBy: rawInvitation.createdBy,
-      createdAt: new Date(rawInvitation.createdAt),
-      expiresAt: rawInvitation.expiresAt ? new Date(rawInvitation.expiresAt) : null,
-      respondedAt: rawInvitation.respondedAt ? new Date(rawInvitation.respondedAt) : null,
-      revokedAt: rawInvitation.revokedAt ? new Date(rawInvitation.revokedAt) : null,
-      map: rawInvitation.map
+      id: invitationRecord.id,
+      mapId: invitationRecord.mapId,
+      invitedEmail: invitationRecord.invitedEmail,
+      invitedUserId: invitationRecord.invitedUserId ?? null,
+      permission: invitationRecord.permission as ShareInvitation['permission'],
+      token: invitationRecord.token,
+      status: invitationRecord.status as ShareInvitation['status'],
+      createdBy: invitationRecord.createdBy,
+      createdAt: new Date(invitationRecord.createdAt),
+      expiresAt: invitationRecord.expiresAt ? new Date(invitationRecord.expiresAt) : null,
+      respondedAt: invitationRecord.respondedAt ? new Date(invitationRecord.respondedAt) : null,
+      revokedAt: invitationRecord.revokedAt ? new Date(invitationRecord.revokedAt) : null,
+      map: map
         ? {
-            id: rawInvitation.map.id,
-            name: rawInvitation.map.name,
-            createdBy: rawInvitation.map.createdBy,
+            id: map.id,
+            name: map.name,
+            createdBy: map.createdBy,
           }
         : undefined,
     }
-  }, [data?.shareInvitations])
+  }, [invitationRecord, mapQuery?.data?.maps])
 
   /**
    * Utility to clear the invitation token from the URL after the flow finishes.

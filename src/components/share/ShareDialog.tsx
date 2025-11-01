@@ -7,7 +7,6 @@ import { useState } from 'react'
 import { X, Copy, Mail, Trash2 } from 'lucide-react'
 import { useSharing, generateShareLink } from '@/hooks/useSharing'
 import { useMap } from '@/hooks/useMap'
-import { db } from '@/lib/instant'
 import { format } from 'date-fns'
 
 /**
@@ -29,6 +28,7 @@ interface ShareDialogProps {
  */
 export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
   const {
+    currentUser,
     shares,
     invitations,
     createInvitation,
@@ -37,7 +37,6 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
     revokeInvitation,
   } = useSharing(mapId)
   const map = useMap()
-  const currentUser = db.auth?.user
   
   const [emailInput, setEmailInput] = useState('')
   const [permissionInput, setPermissionInput] = useState<'view' | 'edit'>('edit')
@@ -221,15 +220,15 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                       <div>
                         <div className="text-sm font-medium">{invitation.invitedEmail}</div>
                         <div className="text-xs text-gray-500">
-                          Permission: {invitation.permission} • Status: {invitation.status}
+                          Permission: {invitation.permission} ? Status: {invitation.status}
                         </div>
                         <div className="text-xs text-gray-400 mt-0.5">
                           Created {format(invitation.createdAt, 'MMM d, yyyy h:mm a')}
                           {invitation.respondedAt && (
-                            <> • Responded {format(invitation.respondedAt, 'MMM d, yyyy h:mm a')}</>
+                            <> ? Responded {format(invitation.respondedAt, 'MMM d, yyyy h:mm a')}</>
                           )}
                           {invitation.revokedAt && (
-                            <> • Revoked {format(invitation.revokedAt, 'MMM d, yyyy h:mm a')}</>
+                            <> ? Revoked {format(invitation.revokedAt, 'MMM d, yyyy h:mm a')}</>
                           )}
                         </div>
                       </div>
@@ -290,10 +289,10 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                       <div className="text-xs text-gray-500">
                         Shared {format(share.createdAt, 'MMM d, yyyy')}
                         {share.acceptedAt && share.status !== 'revoked' && (
-                          <> • Accepted {format(share.acceptedAt, 'MMM d, yyyy')}</>
+                          <> ? Accepted {format(share.acceptedAt, 'MMM d, yyyy')}</>
                         )}
                         {share.revokedAt && (
-                          <> • Revoked {format(share.revokedAt, 'MMM d, yyyy')}</>
+                          <> ? Revoked {format(share.revokedAt, 'MMM d, yyyy')}</>
                         )}
                       </div>
                     </div>

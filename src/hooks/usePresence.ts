@@ -119,7 +119,10 @@ export function usePresence() {
   const currentMapId = useMapStore((state) => state.currentMapId)
   
   // Get current user info
-  const currentUser = db.auth?.user
+  const auth = db.useAuth()
+  const currentUser = auth.user || null
+  const currentUserName = currentUser && typeof (currentUser as any).name === 'string' ? ((currentUser as any).name as string) : undefined
+  const currentUserEmail = currentUser && typeof (currentUser as any).email === 'string' ? ((currentUser as any).email as string) : undefined
   
   // Create a room for this map
   const room = currentMapId ? db.room('map', currentMapId) : null
@@ -133,10 +136,10 @@ export function usePresence() {
     {
       initialPresence: {
         userId,
-        userName: currentUser?.name || currentUser?.email || generateNameForUser(userId),
+        userName: currentUserName || currentUserEmail || generateNameForUser(userId),
         cursor: null,
-        editingNodeId: null,
-        editingEdgeId: null,
+        editingNodeId: undefined,
+        editingEdgeId: undefined,
         color: generateColorForUser(userId),
       },
     }
@@ -147,7 +150,7 @@ export function usePresence() {
     if (publishPresence) {
       // Always ensure user info is present in presence
       const finalUserId = currentUser?.id || generateAnonymousUserId()
-      const userName = currentUser?.name || currentUser?.email || generateNameForUser(finalUserId)
+      const userName = currentUserName || currentUserEmail || generateNameForUser(finalUserId)
       const color = generateColorForUser(finalUserId)
       
       // If we don't have presence yet, or if user info changed, update it
@@ -157,9 +160,9 @@ export function usePresence() {
           userName,
           color,
           // Preserve existing cursor/editing state
-          cursor: myPresence?.cursor || null,
-          editingNodeId: myPresence?.editingNodeId || null,
-          editingEdgeId: myPresence?.editingEdgeId || null,
+          cursor: myPresence?.cursor ?? null,
+          editingNodeId: myPresence?.editingNodeId ?? undefined,
+          editingEdgeId: myPresence?.editingEdgeId ?? undefined,
         })
       }
     }
@@ -200,7 +203,7 @@ export function usePresence() {
       (cursor: { x: number; y: number } | null) => {
         if (!publishPresence) return
         // publishPresence merges, so we only need to update cursor
-        publishPresence({ cursor })
+        publishPresence({ cursor: cursor ?? null })
       },
       [publishPresence]
     ),
@@ -208,7 +211,7 @@ export function usePresence() {
       (nodeId: string | null) => {
         if (!publishPresence) return
         // publishPresence merges, so we only need to update editingNodeId
-        publishPresence({ editingNodeId: nodeId })
+        publishPresence({ editingNodeId: nodeId ?? undefined })
       },
       [publishPresence]
     ),
@@ -216,7 +219,7 @@ export function usePresence() {
       (edgeId: string | null) => {
         if (!publishPresence) return
         // publishPresence merges, so we only need to update editingEdgeId
-        publishPresence({ editingEdgeId: edgeId })
+        publishPresence({ editingEdgeId: edgeId ?? undefined })
       },
       [publishPresence]
     ),

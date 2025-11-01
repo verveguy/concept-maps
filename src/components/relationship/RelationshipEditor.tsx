@@ -332,7 +332,9 @@ export function RelationshipEditor() {
                     onFocus={() => {
                       isEditingRef.current = true
                     }}
-                    onBlur={handleSaveEdgeStyle}
+                    onBlur={() => {
+                      void handleSaveEdgeStyle()
+                    }}
                     placeholder="#94a3b8"
                     className="flex-1 px-3 py-2 text-sm border rounded-md font-mono"
                     disabled={isDeleting || isSaving}

@@ -28,13 +28,6 @@ import type { InstantRules } from '@instantdb/react'
  */
 const rules = {
   /**
-   * Global helpers shared across entity rule definitions.
-   */
-  $globals: {
-    isAuthenticated: 'auth.id != null',
-  },
-
-  /**
    * Permission model for concept maps.
    * Owners always have full access, collaborators inherit access through
    * accepted shares or invitations with matching permissions.
@@ -42,7 +35,7 @@ const rules = {
   maps: {
     allow: {
       view: 'isOwnerOrReader',
-      create: 'isAuthenticated',
+      create: 'auth.id != null',
       update: 'isOwnerOrEditor',
       delete: 'isOwner',
     },
@@ -177,7 +170,7 @@ const rules = {
    */
   shareInvitations: {
     allow: {
-      view: 'mapOwnerOrInviteeOrTokenMatch',
+      view: 'mapOwnerOrInvitee',
       create: 'mapOwnerCreator',
       update: 'mapOwnerOrInvitee',
       delete: 'mapOwnerCreator',
@@ -187,12 +180,8 @@ const rules = {
       'auth.id != null && auth.id == data.createdBy',
       'authMatchesInvitee',
       '(auth.id != null && (auth.id == data.invitedEmail || auth.id == data.invitedUserId)) || (auth.email != null && (auth.email == data.invitedEmail || auth.email == data.invitedUserId))',
-      'tokenMatchesParams',
-      'params.token != null && params.token == data.token',
       'mapOwnerOrInvitee',
       'mapOwnerCreator || authMatchesInvitee',
-      'mapOwnerOrInviteeOrTokenMatch',
-      'mapOwnerCreator || authMatchesInvitee || tokenMatchesParams',
     ],
   },
 } satisfies InstantRules
