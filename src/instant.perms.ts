@@ -56,6 +56,7 @@ const rules = {
     },
     bind: [
       // User can view a concept if they can view the map it belongs to
+      // Traverse the map link to check map ownership or shares
       [
         'canViewConcept',
         'auth.id != null && (data.map.createdBy == auth.id || exists(shares, share => share.mapId == data.mapId && share.userId == auth.id))',
