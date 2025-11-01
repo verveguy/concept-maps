@@ -1,6 +1,7 @@
 /**
  * Hook for searching concepts and relationships across all accessible maps.
  * Uses server-side InstantDB queries with the $like operator for text search.
+ * Permissions automatically filter results to only accessible maps.
  * Only queries when there's an active search query to avoid unnecessary reactive updates.
  */
 
@@ -20,48 +21,16 @@ export interface SearchResult {
 }
 
 /**
- * Hook to get accessible map IDs for the current user.
- * Returns map IDs for maps created by the user and maps shared with the user.
+ * Hook to get map names for search results.
+ * Only queries maps that are in the search results.
  */
-export function useAccessibleMapIds() {
-  const auth = db.useAuth()
-  const userId = auth.user?.id
+function useMapNamesForResults(results: Array<{ mapId: string }>) {
+  const mapIds = useMemo(() => {
+    const uniqueMapIds = new Set<string>()
+    results.forEach((r) => uniqueMapIds.add(r.mapId))
+    return Array.from(uniqueMapIds)
+  }, [results])
 
-  // Get all maps accessible to the user (created by user or shared with user)
-  const { data: mapsData } = db.useQuery(
-    userId
-      ? {
-          maps: {
-            $: {
-              where: { createdBy: userId },
-            },
-          },
-          shares: {
-            $: {
-              where: { userId },
-            },
-          },
-        }
-      : null
-  )
-
-  // Get map IDs that the user has access to
-  const accessibleMapIds = useMemo(() => {
-    if (!mapsData || !userId) return []
-    const createdMapIds = (mapsData.maps || []).map((m: any) => m.id)
-    const sharedMapIds = (mapsData.shares || [])
-      .map((s: any) => s.mapId)
-      .filter((id: string) => id) // Filter out null/undefined
-    return [...new Set([...createdMapIds, ...sharedMapIds])]
-  }, [mapsData, userId])
-
-  return accessibleMapIds
-}
-
-/**
- * Hook to get map names for given map IDs.
- */
-export function useMapNames(mapIds: string[]) {
   const { data: mapsData } = db.useQuery(
     mapIds.length > 0
       ? {
@@ -89,9 +58,10 @@ export function useMapNames(mapIds: string[]) {
 
 /**
  * Hook that performs the actual search query using InstantDB's $like operator.
+ * Permissions automatically filter results to only accessible maps.
  * Only queries when there's an active search query to avoid unnecessary reactive updates.
  */
-export function useSearchQuery(query: string, accessibleMapIds: string[]) {
+export function useSearchQuery(query: string) {
   // Escape special characters for the like pattern
   // InstantDB $like uses SQL LIKE syntax, so we need to escape % and _
   const escapeLikePattern = (pattern: string) => {
@@ -102,13 +72,13 @@ export function useSearchQuery(query: string, accessibleMapIds: string[]) {
   const searchPattern = query.trim() ? `%${escapeLikePattern(query.trim())}%` : ''
 
   // Query concepts with server-side filtering using $like operator
+  // Permissions automatically filter to only accessible maps
   const { data: conceptsData } = db.useQuery(
-    searchPattern && accessibleMapIds.length > 0
+    searchPattern
       ? {
           concepts: {
             $: {
               where: {
-                mapId: { $in: accessibleMapIds },
                 label: { $like: searchPattern },
               },
             },
@@ -119,14 +89,13 @@ export function useSearchQuery(query: string, accessibleMapIds: string[]) {
 
   // Query relationships with server-side filtering using $like operator
   // Need to match either primaryLabel OR reverseLabel, so we need two queries
-  // or use $or if InstantDB supports it
+  // Permissions automatically filter to only accessible maps
   const { data: relationshipsDataPrimary } = db.useQuery(
-    searchPattern && accessibleMapIds.length > 0
+    searchPattern
       ? {
           relationships: {
             $: {
               where: {
-                mapId: { $in: accessibleMapIds },
                 primaryLabel: { $like: searchPattern },
               },
             },
@@ -136,12 +105,11 @@ export function useSearchQuery(query: string, accessibleMapIds: string[]) {
   )
 
   const { data: relationshipsDataReverse } = db.useQuery(
-    searchPattern && accessibleMapIds.length > 0
+    searchPattern
       ? {
           relationships: {
             $: {
               where: {
-                mapId: { $in: accessibleMapIds },
                 reverseLabel: { $like: searchPattern },
               },
             },
@@ -150,36 +118,66 @@ export function useSearchQuery(query: string, accessibleMapIds: string[]) {
       : null
   )
 
-  const mapNames = useMapNames(accessibleMapIds)
-
   // Merge and deduplicate relationship results
   const allRelationships = useMemo(() => {
     const relationshipMap = new Map<string, any>()
-    
+
     // Add relationships from primaryLabel query
     if (relationshipsDataPrimary?.relationships) {
       relationshipsDataPrimary.relationships.forEach((r: any) => {
         relationshipMap.set(r.id, r)
       })
     }
-    
+
     // Add relationships from reverseLabel query
     if (relationshipsDataReverse?.relationships) {
       relationshipsDataReverse.relationships.forEach((r: any) => {
         relationshipMap.set(r.id, r)
       })
     }
-    
+
     return Array.from(relationshipMap.values())
   }, [relationshipsDataPrimary, relationshipsDataReverse])
 
-  // Transform search results
+  // Build initial results (without map names)
+  const resultsWithoutMapNames = useMemo(() => {
+    if (!query.trim()) return []
+
+    const results: Array<{ type: 'concept' | 'relationship'; id: string; mapId: string }> = []
+
+    // Add concepts - already filtered by permissions and label
+    if (conceptsData?.concepts) {
+      conceptsData.concepts.forEach((c: any) => {
+        results.push({
+          type: 'concept',
+          id: c.id,
+          mapId: c.mapId,
+        })
+      })
+    }
+
+    // Add relationships - already filtered by permissions and label
+    allRelationships.forEach((r: any) => {
+      results.push({
+        type: 'relationship',
+        id: r.id,
+        mapId: r.mapId,
+      })
+    })
+
+    return results
+  }, [query, conceptsData, allRelationships])
+
+  // Get map names for the results
+  const mapNames = useMapNamesForResults(resultsWithoutMapNames)
+
+  // Transform search results with map names
   const results = useMemo(() => {
-    if (!query.trim() || accessibleMapIds.length === 0) return []
+    if (!query.trim()) return []
 
     const results: SearchResult[] = []
 
-    // Add concepts - already filtered server-side by mapId and label
+    // Add concepts - already filtered by permissions and label
     if (conceptsData?.concepts) {
       conceptsData.concepts.forEach((c: any) => {
         results.push({
@@ -192,7 +190,7 @@ export function useSearchQuery(query: string, accessibleMapIds: string[]) {
       })
     }
 
-    // Add relationships - already filtered server-side by mapId and label
+    // Add relationships - already filtered by permissions and label
     allRelationships.forEach((r: any) => {
       results.push({
         type: 'relationship',
@@ -213,7 +211,7 @@ export function useSearchQuery(query: string, accessibleMapIds: string[]) {
     })
 
     return results
-  }, [query, conceptsData, allRelationships, mapNames, accessibleMapIds])
+  }, [query, conceptsData, allRelationships, mapNames])
 
   return results
 }

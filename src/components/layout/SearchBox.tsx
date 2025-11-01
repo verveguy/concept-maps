@@ -6,7 +6,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Search, MapPin, Link2 } from 'lucide-react'
-import { useSearchQuery, useAccessibleMapIds, type SearchResult } from '@/hooks/useSearch'
+import { useSearchQuery, type SearchResult } from '@/hooks/useSearch'
 import { useMapStore } from '@/stores/mapStore'
 
 /**
@@ -23,11 +23,11 @@ export function SearchBox() {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const accessibleMapIds = useAccessibleMapIds()
   const { setCurrentMapId, setCurrentPerspectiveId } = useMapStore()
   
   // Get search results - only queries when debouncedQuery is set (hook handles null/empty query)
-  const results = useSearchQuery(debouncedQuery, accessibleMapIds)
+  // Permissions automatically filter to only accessible maps
+  const results = useSearchQuery(debouncedQuery)
 
   // Debounce the search query
   useEffect(() => {
