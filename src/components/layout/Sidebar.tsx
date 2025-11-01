@@ -1,3 +1,9 @@
+/**
+ * Sidebar component for browsing maps and perspectives.
+ * Displays list of maps, allows creating new maps, and selecting a map.
+ * Also provides perspective management within each map.
+ */
+
 import { useState, useEffect } from 'react'
 import { X, Plus, Play, ChevronRight, ChevronDown, Eye, Settings, Sun, Moon } from 'lucide-react'
 import { useMaps } from '@/hooks/useMaps'
@@ -10,8 +16,10 @@ import { format } from 'date-fns'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 
 /**
- * Sidebar component for browsing maps and perspectives
- * Displays list of maps, allows creating new maps, and selecting a map
+ * Sidebar component for browsing maps and perspectives.
+ * Displays list of maps, allows creating new maps, and selecting a map.
+ * 
+ * @returns The sidebar JSX
  */
 export function Sidebar() {
   const maps = useMaps()
@@ -225,7 +233,7 @@ export function Sidebar() {
                         <div className="font-medium">{map.name}</div>
                         <div className="text-xs text-muted-foreground mt-1">
                           Updated {format(map.updatedAt, 'MMM d, yyyy')}
-                          {perspectives.length > 0 && ` • ${perspectives.length} perspective${perspectives.length === 1 ? '' : 's'}`}
+                          {perspectives.length > 0 && ` ? ${perspectives.length} perspective${perspectives.length === 1 ? '' : 's'}`}
                         </div>
                       </div>
                     </button>
@@ -252,7 +260,7 @@ export function Sidebar() {
                                 <div className="flex-1 min-w-0">
                                   <div className="text-sm font-medium">{perspective.name}</div>
                                   <div className="text-xs text-muted-foreground mt-0.5">
-                                    {perspective.conceptIds.length} concept{perspective.conceptIds.length === 1 ? '' : 's'} • {perspective.relationshipIds.length} relationship{perspective.relationshipIds.length === 1 ? '' : 's'}
+                                    {perspective.conceptIds.length} concept{perspective.conceptIds.length === 1 ? '' : 's'} ? {perspective.relationshipIds.length} relationship{perspective.relationshipIds.length === 1 ? '' : 's'}
                                   </div>
                                 </div>
                                 <Settings className={`h-3 w-3 text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ${

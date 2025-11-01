@@ -1,7 +1,15 @@
+/**
+ * Component to display a user's avatar.
+ * Typically shown near nodes being edited to indicate who is editing.
+ */
+
 import type { PresenceData } from '@/hooks/usePresence'
 
 /**
- * Component to display a user's avatar (typically shown near nodes being edited)
+ * Component to display a user's avatar (typically shown near nodes being edited).
+ * 
+ * @param presence - Presence data containing user information
+ * @returns The avatar component JSX
  */
 export function PresenceAvatar({ presence }: { presence: PresenceData }) {
   // Get initials from user name

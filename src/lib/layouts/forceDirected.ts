@@ -1,3 +1,9 @@
+/**
+ * Force-directed layout algorithm implementation.
+ * Uses d3-force to position nodes based on physics simulation with forces
+ * between connected nodes.
+ */
+
 import {
   forceSimulation,
   forceLink,
@@ -8,19 +14,34 @@ import {
 import type { Node, Edge } from 'reactflow'
 
 /**
- * Force-directed layout algorithm using d3-force
- * Positions nodes based on forces between connected nodes
+ * Configuration options for force-directed layout.
+ */
+export interface ForceDirectedLayoutOptions {
+  /** Canvas width in pixels (default: 1000) */
+  width?: number
+  /** Canvas height in pixels (default: 1000) */
+  height?: number
+  /** Charge strength for repulsion between nodes (default: -300) */
+  strength?: number
+  /** Ideal distance between connected nodes (default: 150) */
+  distance?: number
+  /** Number of simulation iterations (default: 300) */
+  iterations?: number
+}
+
+/**
+ * Force-directed layout algorithm using d3-force.
+ * Positions nodes based on forces between connected nodes.
+ * 
+ * @param nodes - React Flow nodes to position
+ * @param edges - React Flow edges connecting the nodes
+ * @param options - Layout configuration options
+ * @returns Updated nodes with new positions
  */
 export function applyForceDirectedLayout(
   nodes: Node[],
   edges: Edge[],
-  options: {
-    width?: number
-    height?: number
-    strength?: number
-    distance?: number
-    iterations?: number
-  } = {}
+  options: ForceDirectedLayoutOptions = {}
 ): Node[] {
   const {
     width = 1000,

@@ -1,10 +1,19 @@
+/**
+ * Hook for managing map sharing and permissions.
+ * Provides functionality to share maps with other users and manage access permissions.
+ * Uses db.useQuery() for reading shares and db.transact() for mutations.
+ */
+
 import { db, tx, id } from '@/lib/instant'
 import type { Share } from '@/lib/schema'
 import { useEffect, useCallback, useMemo } from 'react'
 
 /**
- * Hook for managing map sharing and permissions
- * Uses db.useQuery() for reading shares and db.transact() for mutations
+ * Hook for managing map sharing and permissions.
+ * Uses db.useQuery() for reading shares and db.transact() for mutations.
+ * 
+ * @param mapId - ID of the map to manage sharing for, or null
+ * @returns Object containing shares array and sharing management functions
  */
 export function useSharing(mapId: string | null) {
   const currentUser = db.auth?.user
@@ -34,6 +43,11 @@ export function useSharing(mapId: string | null) {
       acceptedAt: s.acceptedAt ? new Date(s.acceptedAt) : null,
     })) || []
 
+  /**
+   * Accept a share invitation.
+   * 
+   * @param shareId - ID of the share to accept
+   */
   const acceptShare = useCallback(async (shareId: string) => {
     await db.transact([
       tx.shares[shareId].update({
@@ -59,6 +73,13 @@ export function useSharing(mapId: string | null) {
     })
   }, [unacceptedShareId, acceptShare])
 
+  /**
+   * Share a map with a user.
+   * 
+   * @param userId - ID of the user to share with
+   * @param permission - Permission level ('view' or 'edit')
+   * @throws Error if mapId is not provided
+   */
   const shareMap = async (userId: string, permission: 'view' | 'edit') => {
     if (!mapId) throw new Error('Map ID is required')
 
@@ -73,6 +94,12 @@ export function useSharing(mapId: string | null) {
     ])
   }
 
+  /**
+   * Update the permission level for a share.
+   * 
+   * @param shareId - ID of the share to update
+   * @param permission - New permission level ('view' or 'edit')
+   */
   const updateSharePermission = async (
     shareId: string,
     permission: 'view' | 'edit'
@@ -84,6 +111,11 @@ export function useSharing(mapId: string | null) {
     ])
   }
 
+  /**
+   * Remove a share (revoke access).
+   * 
+   * @param shareId - ID of the share to remove
+   */
   const removeShare = async (shareId: string) => {
     await db.transact([tx.shares[shareId].delete()])
   }
@@ -98,8 +130,11 @@ export function useSharing(mapId: string | null) {
 }
 
 /**
- * Generate a shareable link for a map
- * This creates a URL that can be used to access the map
+ * Generate a shareable link for a map.
+ * Creates a URL that can be used to access the map.
+ * 
+ * @param mapId - ID of the map to generate a link for
+ * @returns URL string for accessing the map
  */
 export function generateShareLink(mapId: string): string {
   const baseUrl = window.location.origin

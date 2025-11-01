@@ -27,8 +27,10 @@ function getNonStyleMetadata(metadata: Record<string, unknown>, styleAttributes:
 }
 
 /**
- * Unified Editor component that switches between Concept and Relationship editing
- * Shows the editor for the most recently selected item (concept or relationship)
+ * Unified Editor component that switches between Concept and Relationship editing.
+ * Shows the editor for the most recently selected item (concept or relationship).
+ * 
+ * @returns The unified editor JSX
  */
 export function UnifiedEditor() {
   const selectedConceptId = useUIStore((state) => state.selectedConceptId)

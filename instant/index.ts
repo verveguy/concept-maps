@@ -1,7 +1,20 @@
+/**
+ * InstantDB schema reference definition.
+ * 
+ * This file provides a reference schema structure for InstantDB setup.
+ * The actual schema should be defined in your InstantDB dashboard.
+ * Use this as a guide when setting up your InstantDB app schema.
+ * 
+ * @see src/instant.schema.ts for the actual schema implementation
+ */
+
 import { db } from '@/lib/instant'
 
-// Define schema for InstantDB
-// This will be used when you set up your InstantDB app
+/**
+ * Schema definition for InstantDB entities.
+ * This is a reference structure - the actual schema should be configured
+ * in your InstantDB dashboard.
+ */
 export const schema = {
   maps: {
     name: { type: 'string' },

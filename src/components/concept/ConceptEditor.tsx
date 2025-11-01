@@ -1,3 +1,9 @@
+/**
+ * ConceptEditor component - Side panel for editing concept properties.
+ * Opens when a concept is selected via conceptEditorOpen state.
+ * Auto-saves on field blur.
+ */
+
 import { useState, useEffect, useRef } from 'react'
 import { Trash2, X, Plus } from 'lucide-react'
 import { useConceptActions } from '@/hooks/useConceptActions'
@@ -5,9 +11,11 @@ import { useConcepts } from '@/hooks/useConcepts'
 import { useUIStore } from '@/stores/uiStore'
 
 /**
- * ConceptEditor component - Side panel for editing concept properties
- * Opens when a concept is selected via conceptEditorOpen state
- * Auto-saves on field blur
+ * ConceptEditor component - Side panel for editing concept properties.
+ * Opens when a concept is selected via conceptEditorOpen state.
+ * Auto-saves on field blur.
+ * 
+ * @returns The concept editor JSX
  */
 export function ConceptEditor() {
   const selectedConceptId = useUIStore((state) => state.selectedConceptId)

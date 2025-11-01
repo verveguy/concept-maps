@@ -1,3 +1,8 @@
+/**
+ * EditableTriple component - Individual triple editor in text view.
+ * Uses a single text field with Noun <verb phrase> Noun format.
+ */
+
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
 import { useConceptActions } from '@/hooks/useConceptActions'
@@ -6,14 +11,23 @@ import { useUIStore } from '@/stores/uiStore'
 import { parseTripleText, formatTriple, type TextTriple } from '@/lib/textRepresentation'
 
 /**
- * EditableTriple component - Individual triple editor in text view
- * Uses a single text field with Noun <verb phrase> Noun format
+ * Props for EditableTriple component.
  */
 interface EditableTripleProps {
+  /** The triple data to edit */
   triple: TextTriple
+  /** Callback when triple is updated */
   onUpdate: () => void
 }
 
+/**
+ * EditableTriple component - Individual triple editor in text view.
+ * Uses a single text field with Noun <verb phrase> Noun format.
+ * 
+ * @param triple - The triple data to edit
+ * @param onUpdate - Callback when triple is updated
+ * @returns The editable triple component JSX
+ */
 export function EditableTriple({ triple, onUpdate }: EditableTripleProps) {
   const { updateConcept } = useConceptActions()
   const { updateRelationship, deleteRelationship } = useRelationshipActions()

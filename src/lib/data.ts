@@ -1,12 +1,45 @@
+/**
+ * Data transformation utilities for converting between domain models
+ * and React Flow visualization types.
+ */
+
 import type { Node, Edge } from 'reactflow'
 import { MarkerType } from 'reactflow'
 import type { Concept, Relationship } from '@/lib/schema'
 
 /**
- * Convert Concept entities to React Flow nodes
+ * Options for converting concepts to nodes.
+ */
+export interface ConceptsToNodesOptions {
+  /** Optional set of concept IDs included in perspective (for styling) */
+  perspectiveConceptIds?: Set<string>
+  /** Whether we're editing a perspective (affects styling) */
+  isEditingPerspective?: boolean
+}
+
+/**
+ * Options for converting relationships to edges.
+ */
+export interface RelationshipsToEdgesOptions {
+  /** Optional set of relationship IDs included in perspective (for styling) */
+  perspectiveRelationshipIds?: Set<string>
+  /** Whether we're editing a perspective (affects styling) */
+  isEditingPerspective?: boolean
+}
+
+/**
+ * Maximum number of handles per side for distributing multiple edges.
+ * Used to prevent edge overlap when multiple relationships connect the same nodes.
+ */
+const MAX_HANDLES_PER_SIDE = 5
+
+/**
+ * Convert Concept entities to React Flow nodes.
+ * 
  * @param concepts - Array of concepts to convert
  * @param perspectiveConceptIds - Optional set of concept IDs included in perspective (for styling)
  * @param isEditingPerspective - Whether we're editing a perspective (affects styling)
+ * @returns Array of React Flow nodes
  */
 export function conceptsToNodes(
   concepts: Concept[],
@@ -31,18 +64,15 @@ export function conceptsToNodes(
 }
 
 /**
- * Maximum number of handles per side for distributing multiple edges
- */
-const MAX_HANDLES_PER_SIDE = 5
-
-/**
- * Convert Relationship entities to React Flow edges
- * Uses custom RelationshipEdge component for inline editing
- * Adds arrow markers to show directionality
- * Assigns handles to edges to prevent overlap when multiple edges connect the same nodes
+ * Convert Relationship entities to React Flow edges.
+ * Uses custom RelationshipEdge component for inline editing.
+ * Adds arrow markers to show directionality.
+ * Assigns handles to edges to prevent overlap when multiple edges connect the same nodes.
+ * 
  * @param relationships - Array of relationships to convert
  * @param perspectiveRelationshipIds - Optional set of relationship IDs included in perspective (for styling)
  * @param isEditingPerspective - Whether we're editing a perspective (affects styling)
+ * @returns Array of React Flow edges
  */
 export function relationshipsToEdges(
   relationships: Relationship[],
@@ -145,7 +175,11 @@ export function relationshipsToEdges(
 }
 
 /**
- * Convert React Flow nodes to Concept entities
+ * Convert React Flow nodes to Concept entities.
+ * Extracts position data from nodes for updating concept positions.
+ * 
+ * @param nodes - React Flow nodes to convert
+ * @returns Array of partial Concept objects with id and position
  */
 export function nodesToConcepts(nodes: Node[]): Partial<Concept>[] {
   return nodes.map((node) => ({

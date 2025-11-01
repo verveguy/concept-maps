@@ -1,12 +1,34 @@
+/**
+ * Popover UI component.
+ * A wrapper around Radix UI Popover primitive with custom styling.
+ * Provides a floating content panel that appears relative to a trigger element.
+ */
+
 import * as React from "react"
 import * as PopoverPrimitive from "@radix-ui/react-popover"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Popover root component.
+ * Manages the popover state and behavior.
+ */
 const Popover = PopoverPrimitive.Root
 
+/**
+ * Popover trigger component.
+ * Element that toggles the popover when clicked.
+ */
 const PopoverTrigger = PopoverPrimitive.Trigger
 
+/**
+ * Popover content component.
+ * The floating panel that displays popover content.
+ * 
+ * @param className - Additional CSS classes
+ * @param align - Alignment relative to trigger ('center' | 'start' | 'end')
+ * @param sideOffset - Offset distance from trigger in pixels
+ */
 const PopoverContent = React.forwardRef<
   React.ElementRef<typeof PopoverPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>

@@ -33,14 +33,18 @@ function getNonStyleMetadata(metadata: Record<string, unknown>): Record<string, 
 }
 
 /**
- * Maximum number of handles per side for distributing multiple edges
+ * Maximum number of handles per side for distributing multiple edges.
  */
 const MAX_HANDLES_PER_SIDE = 5
 
 /**
- * Custom node component for Concept nodes
- * Supports inline editing on double-click
- * Includes multiple handles on top and bottom to support multiple edges between the same nodes
+ * Custom node component for Concept nodes.
+ * Supports inline editing on double-click.
+ * Includes multiple handles on top and bottom to support multiple edges between the same nodes.
+ * 
+ * @param data - Node data containing concept information
+ * @param selected - Whether the node is currently selected
+ * @returns The concept node JSX
  */
 export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>) => {
   const setSelectedConceptId = useUIStore((state) => state.setSelectedConceptId)

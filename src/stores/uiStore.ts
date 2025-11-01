@@ -1,35 +1,62 @@
+/**
+ * UI store for managing application UI state.
+ * Uses Zustand for state management.
+ */
+
 import { create } from 'zustand'
 
+/**
+ * View mode options for displaying the concept map.
+ */
+export type ViewMode = 'graph' | 'text' | 'both'
+
+/**
+ * State interface for UI-related state.
+ */
 interface UIState {
-  // View mode: 'graph' | 'text' | 'both'
-  viewMode: 'graph' | 'text' | 'both'
-  setViewMode: (mode: 'graph' | 'text' | 'both') => void
+  /** Current view mode: 'graph' | 'text' | 'both' */
+  viewMode: ViewMode
+  /** Set the view mode */
+  setViewMode: (mode: ViewMode) => void
   
-  // Text view visibility (for toggling independently)
+  /** Text view visibility (for toggling independently) */
   textViewVisible: boolean
+  /** Set text view visibility */
   setTextViewVisible: (visible: boolean) => void
   
-  // Text view node position
+  /** Text view node position */
   textViewPosition: { x: number; y: number }
+  /** Set text view node position */
   setTextViewPosition: (position: { x: number; y: number }) => void
 
-  // Selected entities
+  /** Currently selected concept ID */
   selectedConceptId: string | null
+  /** Currently selected relationship ID */
   selectedRelationshipId: string | null
+  /** Set the selected concept ID */
   setSelectedConceptId: (id: string | null) => void
+  /** Set the selected relationship ID */
   setSelectedRelationshipId: (id: string | null) => void
 
-  // Sidebar state
+  /** Whether the sidebar is open */
   sidebarOpen: boolean
+  /** Set sidebar open state */
   setSidebarOpen: (open: boolean) => void
 
-  // UI panels
+  /** Whether the concept editor panel is open */
   conceptEditorOpen: boolean
+  /** Whether the relationship editor panel is open */
   relationshipEditorOpen: boolean
+  /** Set concept editor open state */
   setConceptEditorOpen: (open: boolean) => void
+  /** Set relationship editor open state */
   setRelationshipEditorOpen: (open: boolean) => void
 }
 
+/**
+ * Zustand store for UI state management.
+ * Provides reactive state for view modes, selections, and panel visibility.
+ */
 export const useUIStore = create<UIState>((set) => ({
   viewMode: 'graph',
   setViewMode: (mode) => {

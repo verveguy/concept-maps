@@ -1,6 +1,18 @@
+/**
+ * Application layout component.
+ * Provides the main application shell with sidebar and content area.
+ */
+
 import { useUIStore } from '@/stores/uiStore'
 import { Sidebar } from './Sidebar'
 
+/**
+ * Application layout component.
+ * Renders a collapsible sidebar and main content area.
+ * 
+ * @param children - React children to render in the main content area
+ * @returns The application layout JSX
+ */
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const sidebarOpen = useUIStore((state) => state.sidebarOpen)
 

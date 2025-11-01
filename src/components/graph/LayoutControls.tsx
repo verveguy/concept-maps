@@ -1,13 +1,27 @@
+/**
+ * LayoutControls component - UI for selecting and applying layout algorithms.
+ * Provides buttons for applying different layout types to the concept map.
+ */
+
 import { Layout } from 'lucide-react'
 import type { LayoutType } from '@/lib/layouts'
 
+/**
+ * Props for LayoutControls component.
+ */
 interface LayoutControlsProps {
+  /** Callback when a layout is selected */
   onApplyLayout: (layoutType: LayoutType) => void
+  /** Whether controls are disabled */
   disabled?: boolean
 }
 
 /**
- * LayoutControls component - UI for selecting and applying layout algorithms
+ * LayoutControls component - UI for selecting and applying layout algorithms.
+ * 
+ * @param onApplyLayout - Callback when a layout is selected
+ * @param disabled - Whether controls are disabled (default: false)
+ * @returns The layout controls JSX
  */
 export function LayoutControls({ onApplyLayout, disabled = false }: LayoutControlsProps) {
   return (

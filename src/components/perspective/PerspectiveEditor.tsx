@@ -1,3 +1,8 @@
+/**
+ * Perspective Editor component.
+ * Allows editing which concepts and relationships are included in a perspective.
+ */
+
 import { useState, useEffect, useCallback } from 'react'
 import { X, Trash2, Eye, Edit } from 'lucide-react'
 import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
@@ -7,8 +12,10 @@ import { useAllRelationships } from '@/hooks/useRelationships'
 import { db } from '@/lib/instant'
 
 /**
- * Perspective Editor component
- * Allows editing which concepts and relationships are included in a perspective
+ * Perspective Editor component.
+ * Allows editing which concepts and relationships are included in a perspective.
+ * 
+ * @returns The perspective editor JSX
  */
 export function PerspectiveEditor() {
   const currentMapId = useMapStore((state) => state.currentMapId)

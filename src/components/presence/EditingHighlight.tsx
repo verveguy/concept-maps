@@ -1,7 +1,17 @@
+/**
+ * Component to highlight nodes/areas being edited by other users.
+ * Provides visual feedback for collaborative editing.
+ */
+
 import type { PresenceData } from '@/hooks/usePresence'
 
 /**
- * Component to highlight nodes/areas being edited by other users
+ * Component to highlight nodes/areas being edited by other users.
+ * 
+ * @param presence - Presence data containing editing state
+ * @param nodeId - Optional node ID to check if being edited
+ * @param edgeId - Optional edge ID to check if being edited
+ * @returns The highlight component JSX, or null if not editing
  */
 export function EditingHighlight({
   presence,

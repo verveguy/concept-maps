@@ -1,20 +1,42 @@
+/**
+ * Markdown editor component with preview mode.
+ * Supports editing markdown text and previewing rendered markdown.
+ */
+
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Eye, EyeOff } from 'lucide-react'
 
+/**
+ * Props for MarkdownEditor component.
+ */
 interface MarkdownEditorProps {
+  /** Current markdown text value */
   value: string
+  /** Callback when value changes */
   onChange: (value: string) => void
+  /** Optional callback when editor loses focus */
   onBlur?: () => void
+  /** Placeholder text */
   placeholder?: string
+  /** Whether editing is disabled */
   disabled?: boolean
+  /** Additional CSS classes */
   className?: string
 }
 
 /**
- * Markdown editor component with preview mode
- * Supports editing markdown text and previewing rendered markdown
+ * Markdown editor component with preview mode.
+ * Supports editing markdown text and previewing rendered markdown.
+ * 
+ * @param value - Current markdown text value
+ * @param onChange - Callback when value changes
+ * @param onBlur - Optional callback when editor loses focus
+ * @param placeholder - Placeholder text (default: 'Add notes...')
+ * @param disabled - Whether editing is disabled (default: false)
+ * @param className - Additional CSS classes (default: '')
+ * @returns The markdown editor JSX
  */
 export function MarkdownEditor({
   value,

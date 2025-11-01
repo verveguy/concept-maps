@@ -1,3 +1,9 @@
+/**
+ * Application entry point.
+ * Initializes React and renders the root App component.
+ * Also sets up React Scan for performance debugging in development mode.
+ */
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
@@ -13,6 +19,10 @@ if (import.meta.env.DEV) {
   })
 }
 
+/**
+ * Render the React application to the DOM.
+ * Uses React.StrictMode for additional development checks.
+ */
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />

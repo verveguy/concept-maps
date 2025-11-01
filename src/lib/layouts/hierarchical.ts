@@ -1,20 +1,40 @@
+/**
+ * Hierarchical layout algorithm implementation.
+ * Uses dagre to arrange nodes in a top-to-bottom hierarchy.
+ */
+
 import dagre from 'dagre'
 import type { Node, Edge } from 'reactflow'
 
 /**
- * Hierarchical layout algorithm using dagre
- * Arranges nodes in a top-to-bottom hierarchy
+ * Configuration options for hierarchical layout.
+ */
+export interface HierarchicalLayoutOptions {
+  /** Layout direction (default: 'TB' - Top to Bottom) */
+  direction?: 'TB' | 'BT' | 'LR' | 'RL'
+  /** Node width in pixels (default: 150) */
+  nodeWidth?: number
+  /** Node height in pixels (default: 100) */
+  nodeHeight?: number
+  /** Vertical spacing between ranks (default: 100) */
+  ranksep?: number
+  /** Horizontal spacing between nodes (default: 50) */
+  nodesep?: number
+}
+
+/**
+ * Hierarchical layout algorithm using dagre.
+ * Arranges nodes in a top-to-bottom hierarchy.
+ * 
+ * @param nodes - React Flow nodes to position
+ * @param edges - React Flow edges connecting the nodes
+ * @param options - Layout configuration options
+ * @returns Updated nodes with new positions
  */
 export function applyHierarchicalLayout(
   nodes: Node[],
   edges: Edge[],
-  options: {
-    direction?: 'TB' | 'BT' | 'LR' | 'RL'
-    nodeWidth?: number
-    nodeHeight?: number
-    ranksep?: number
-    nodesep?: number
-  } = {}
+  options: HierarchicalLayoutOptions = {}
 ): Node[] {
   const {
     direction = 'TB', // Top to Bottom

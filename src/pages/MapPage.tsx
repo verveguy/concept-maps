@@ -1,3 +1,9 @@
+/**
+ * Main map page component.
+ * Provides the primary interface for viewing and editing concept maps.
+ * Includes concept creation, perspective management, and sharing functionality.
+ */
+
 import { useState, useCallback, useRef } from 'react'
 import { Plus, X, Share2, Eye, Edit } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
@@ -10,6 +16,13 @@ import { useConceptActions } from '@/hooks/useConceptActions'
 import { useMap } from '@/hooks/useMap'
 import { usePerspectives } from '@/hooks/usePerspectives'
 
+/**
+ * Main map page component.
+ * Renders the concept map canvas and provides UI for creating concepts,
+ * managing perspectives, and sharing maps.
+ * 
+ * @returns The map page JSX
+ */
 export function MapPage() {
   const currentMapId = useMapStore((state) => state.currentMapId)
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)

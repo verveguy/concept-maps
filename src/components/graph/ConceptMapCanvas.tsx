@@ -1,3 +1,9 @@
+/**
+ * Concept map canvas component.
+ * Main React Flow-based visualization component for displaying and interacting with concept maps.
+ * Provides node/edge rendering, drag-and-drop, layout algorithms, and real-time collaboration.
+ */
+
 import React, { useCallback, useMemo, useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react'
 import ReactFlow, {
   Background,
@@ -28,16 +34,30 @@ import { Network, Layers, Network as NetworkIcon, FileText } from 'lucide-react'
 import { usePresence } from '@/hooks/usePresence'
 import { PresenceCursor } from '@/components/presence/PresenceCursor'
 
+/**
+ * Props for ConceptMapCanvas component.
+ */
 interface ConceptMapCanvasProps {
+  /** Callback when user requests to create a new concept at a position */
   onCreateConcept?: (position: { x: number; y: number }) => void
 }
 
+/**
+ * Ref interface for ConceptMapCanvas component.
+ * Provides imperative API for layout operations.
+ */
 export interface ConceptMapCanvasRef {
+  /** Apply a layout algorithm to the current nodes */
   applyLayout: (layoutType: LayoutType) => Promise<void>
 }
 
 /**
- * Inner component that uses ReactFlow hooks
+ * Inner component that uses ReactFlow hooks.
+ * Must be wrapped in ReactFlowProvider to access ReactFlow context.
+ * 
+ * @param props - Component props
+ * @param ref - Forwarded ref for imperative API
+ * @returns The concept map canvas JSX
  */
 const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasProps>(
   ({ onCreateConcept }, ref) => {
@@ -724,8 +744,12 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
 ConceptMapCanvasInner.displayName = 'ConceptMapCanvasInner'
 
 /**
- * Main React Flow canvas component wrapper
- * Provides ReactFlowProvider context
+ * Main React Flow canvas component wrapper.
+ * Provides ReactFlowProvider context for React Flow hooks.
+ * 
+ * @param props - Component props
+ * @param ref - Forwarded ref for imperative API
+ * @returns The concept map canvas wrapper JSX
  */
 export const ConceptMapCanvas = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasProps>(
   (props, ref) => {

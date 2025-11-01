@@ -1,17 +1,54 @@
+/**
+ * Hook for concept CRUD operations.
+ * Provides actions for creating, updating, and deleting concepts.
+ * Uses db.transact() with tx objects for all mutations.
+ */
+
 import { db, tx, id } from '@/lib/instant'
 
 /**
- * Hook for concept CRUD operations
- * Uses db.transact() with tx objects for all mutations
+ * Data structure for creating a new concept.
+ */
+export interface CreateConceptData {
+  /** Map ID this concept belongs to */
+  mapId: string
+  /** Display label for the concept */
+  label: string
+  /** Position coordinates on the canvas */
+  position: { x: number; y: number }
+  /** Optional markdown notes */
+  notes?: string
+  /** Optional metadata as key-value pairs */
+  metadata?: Record<string, unknown>
+}
+
+/**
+ * Data structure for updating a concept.
+ */
+export interface UpdateConceptData {
+  /** New display label */
+  label?: string
+  /** New position coordinates */
+  position?: { x: number; y: number }
+  /** New markdown notes */
+  notes?: string
+  /** New metadata */
+  metadata?: Record<string, unknown>
+}
+
+/**
+ * Hook for concept CRUD operations.
+ * Uses db.transact() with tx objects for all mutations.
+ * 
+ * @returns Object containing createConcept, updateConcept, and deleteConcept functions
  */
 export function useConceptActions() {
-  const createConcept = async (concept: {
-    mapId: string
-    label: string
-    position: { x: number; y: number }
-    notes?: string
-    metadata?: Record<string, unknown>
-  }) => {
+  /**
+   * Create a new concept.
+   * 
+   * @param concept - Concept data to create
+   */
+  const createConcept = async (concept: CreateConceptData) => {
     await db.transact([
       tx.concepts[id()].update({
         mapId: concept.mapId,
@@ -26,14 +63,15 @@ export function useConceptActions() {
     ])
   }
 
+  /**
+   * Update an existing concept.
+   * 
+   * @param conceptId - ID of the concept to update
+   * @param updates - Partial concept data to update
+   */
   const updateConcept = async (
     conceptId: string,
-    updates: {
-      label?: string
-      position?: { x: number; y: number }
-      notes?: string
-      metadata?: Record<string, unknown>
-    }
+    updates: UpdateConceptData
   ) => {
     const updateData: Record<string, unknown> = {
       updatedAt: Date.now(),
@@ -52,6 +90,11 @@ export function useConceptActions() {
     await db.transact([tx.concepts[conceptId].update(updateData)])
   }
 
+  /**
+   * Delete a concept.
+   * 
+   * @param conceptId - ID of the concept to delete
+   */
   const deleteConcept = async (conceptId: string) => {
     await db.transact([tx.concepts[conceptId].delete()])
   }
