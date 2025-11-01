@@ -1,8 +1,17 @@
+/**
+ * Component to display a user's cursor on the canvas.
+ * Converts flow coordinates to screen coordinates for display.
+ */
+
 import type { PresenceData } from '@/hooks/usePresence'
 
 /**
- * Component to display a user's cursor on the canvas
- * Converts flow coordinates to screen coordinates for display
+ * Component to display a user's cursor on the canvas.
+ * Converts flow coordinates to screen coordinates for display.
+ * 
+ * @param presence - Presence data containing cursor position
+ * @param flowToScreenPosition - Function to convert flow coordinates to screen coordinates
+ * @returns The cursor component JSX, or null if no cursor position
  */
 export function PresenceCursor({
   presence,

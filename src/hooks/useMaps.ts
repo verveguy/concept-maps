@@ -1,10 +1,17 @@
+/**
+ * Hook for querying maps from InstantDB.
+ * Provides reactive data fetching with real-time updates.
+ */
+
 import { db } from '@/lib/instant'
 import { useMemo } from 'react'
 import type { Map } from '@/lib/schema'
 
 /**
- * Hook to get all maps created by the current user
- * Uses InstantDB useQuery() for real-time updates
+ * Hook to get all maps created by the current user.
+ * Uses InstantDB useQuery() for real-time updates.
+ * 
+ * @returns Array of maps created by the authenticated user
  */
 export function useMaps() {
   const auth = db.useAuth()

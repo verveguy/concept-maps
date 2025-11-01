@@ -1,11 +1,18 @@
+/**
+ * Hooks for querying concepts from InstantDB.
+ * Provides reactive data fetching with real-time updates.
+ */
+
 import { db } from '@/lib/instant'
 import { useMapStore } from '@/stores/mapStore'
 import type { Concept } from '@/lib/schema'
 
 /**
- * Hook to get concepts for the current map/perspective
- * Uses InstantDB useQuery() for real-time updates
- * Filters by mapId and optionally by perspective conceptIds
+ * Hook to get concepts for the current map/perspective.
+ * Uses InstantDB useQuery() for real-time updates.
+ * Filters by mapId and optionally by perspective conceptIds.
+ * 
+ * @returns Array of concepts filtered by current map and perspective (if selected)
  */
 export function useConcepts() {
   const currentMapId = useMapStore((state) => state.currentMapId)
@@ -59,9 +66,11 @@ export function useConcepts() {
 }
 
 /**
- * Hook to get ALL concepts for the current map (no perspective filtering)
- * Uses InstantDB useQuery() for real-time updates
- * Used when editing perspectives to show all concepts
+ * Hook to get ALL concepts for the current map (no perspective filtering).
+ * Uses InstantDB useQuery() for real-time updates.
+ * Used when editing perspectives to show all concepts.
+ * 
+ * @returns Array of all concepts for the current map
  */
 export function useAllConcepts() {
   const currentMapId = useMapStore((state) => state.currentMapId)

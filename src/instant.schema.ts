@@ -1,7 +1,18 @@
-// Docs: https://www.instantdb.com/docs/modeling-data
+/**
+ * InstantDB schema definition for the concept mapping application.
+ * 
+ * This schema defines the data model including entities (maps, concepts, relationships,
+ * perspectives, shares) and their relationships (links), as well as real-time presence
+ * data in rooms.
+ * 
+ * @see https://www.instantdb.com/docs/modeling-data
+ */
 
 import { i } from '@instantdb/react'
 
+/**
+ * Internal schema definition before type extraction
+ */
 const _schema = i.schema({
   entities: {
     maps: i.entity({
@@ -135,9 +146,21 @@ const _schema = i.schema({
   },
 })
 
-// This helps Typescript display nicer intellisense
+/**
+ * Type helper to improve TypeScript IntelliSense display
+ * @internal
+ */
 type _AppSchema = typeof _schema
+
+/**
+ * Application schema type that extends the internal schema type
+ * Provides improved TypeScript type inference and IntelliSense
+ */
 interface AppSchema extends _AppSchema {}
+
+/**
+ * Exported schema instance for use throughout the application
+ */
 const schema: AppSchema = _schema
 
 export type { AppSchema }

@@ -1,8 +1,19 @@
+/**
+ * Main application component.
+ * Handles authentication routing and renders the appropriate view based on auth state.
+ */
+
 import { useEffect } from 'react'
 import { db } from '@/lib/instant'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { MapPage } from '@/pages/MapPage'
 
+/**
+ * Root application component.
+ * Shows login form if not authenticated, otherwise shows the main map page.
+ * 
+ * @returns The login form or map page based on authentication state
+ */
 function App() {
   const auth = db.useAuth()
 

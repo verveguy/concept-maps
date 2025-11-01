@@ -1,25 +1,44 @@
+/**
+ * Map store for managing current map and perspective state.
+ * Uses Zustand for state management.
+ */
+
 import { create } from 'zustand'
 
+/**
+ * State interface for map-related UI and data state.
+ */
 interface MapState {
-  // Current map and perspective
+  /** Current active map ID */
   currentMapId: string | null
+  /** Current active perspective ID */
   currentPerspectiveId: string | null
+  /** Set the current map ID */
   setCurrentMapId: (id: string | null) => void
+  /** Set the current perspective ID */
   setCurrentPerspectiveId: (id: string | null) => void
 
-  // Perspective editing UI flags
+  /** Whether perspective selection mode is active */
   perspectiveSelectionMode: boolean
+  /** Set perspective selection mode */
   setPerspectiveSelectionMode: (on: boolean) => void
+  /** Whether to hide concepts/relationships not in the current perspective */
   hideNonPerspective: boolean
+  /** Set whether to hide non-perspective items */
   setHideNonPerspective: (on: boolean) => void
-  // Flag to indicate if we're editing a perspective (show all concepts, grey out non-selected)
+  /** Flag to indicate if we're editing a perspective (show all concepts, grey out non-selected) */
   isEditingPerspective: boolean
+  /** Set whether we're editing a perspective */
   setIsEditingPerspective: (on: boolean) => void
 
-  // Clear state when navigating away
+  /** Clear all map state when navigating away */
   clearMapState: () => void
 }
 
+/**
+ * Zustand store for map-related state management.
+ * Provides reactive state for current map, perspective, and editing modes.
+ */
 export const useMapStore = create<MapState>((set) => ({
   currentMapId: null,
   currentPerspectiveId: null,

@@ -1,3 +1,8 @@
+/**
+ * Custom edge component for Relationship edges.
+ * Provides inline editing capabilities and supports multiple edge types.
+ */
+
 import { memo, useState, useRef, useEffect, useMemo } from 'react'
 import {
   BaseEdge,
@@ -12,8 +17,16 @@ import type { RelationshipEdgeData } from '@/lib/reactFlowTypes'
 import { useRelationshipActions } from '@/hooks/useRelationshipActions'
 
 /**
- * Calculate control point offset based on source/target positions
- * This mimics React Flow's internal bezier calculation
+ * Calculate control point offset based on source/target positions.
+ * This mimics React Flow's internal bezier calculation.
+ * 
+ * @param sourcePosition - Source handle position
+ * @param targetPosition - Target handle position
+ * @param sourceX - Source X coordinate
+ * @param sourceY - Source Y coordinate
+ * @param targetX - Target X coordinate
+ * @param targetY - Target Y coordinate
+ * @returns Control point offset value
  */
 function getControlPointOffset(
   sourcePosition: Position,
@@ -159,8 +172,22 @@ function getBezierPathWithOffset(
 }
 
 /**
- * Custom edge component for Relationship edges
- * Supports inline editing on double-click
+ * Custom edge component for Relationship edges.
+ * Supports inline editing on double-click.
+ * Handles multiple edge types (bezier, smoothstep, step, straight) and styling.
+ * 
+ * @param sourceX - Source X coordinate
+ * @param sourceY - Source Y coordinate
+ * @param targetX - Target X coordinate
+ * @param targetY - Target Y coordinate
+ * @param sourcePosition - Source handle position
+ * @param targetPosition - Target handle position
+ * @param sourceHandle - Source handle ID
+ * @param targetHandle - Target handle ID
+ * @param data - Edge data containing relationship information
+ * @param selected - Whether the edge is selected
+ * @param markerEnd - Arrow marker configuration
+ * @returns The relationship edge component JSX
  */
 export const RelationshipEdge = memo(
   ({

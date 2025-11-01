@@ -1,17 +1,27 @@
+/**
+ * TextViewNode - Custom React Flow node that displays the structured text view.
+ * This allows the text view to be positioned and moved on the canvas alongside the graph.
+ */
+
 import { memo } from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import { StructuredTextView } from '@/components/text/StructuredTextView'
 
 /**
- * TextViewNodeData - Data structure for text view node
+ * TextViewNodeData - Data structure for text view node.
  */
 export interface TextViewNodeData {
+  /** Node type identifier */
   type: 'text-view'
 }
 
 /**
- * TextViewNode - Custom React Flow node that displays the structured text view
- * This allows the text view to be positioned and moved on the canvas alongside the graph
+ * TextViewNode - Custom React Flow node that displays the structured text view.
+ * This allows the text view to be positioned and moved on the canvas alongside the graph.
+ * 
+ * @param data - Node data
+ * @param selected - Whether the node is selected
+ * @returns The text view node JSX
  */
 export const TextViewNode = memo(({ data, selected }: NodeProps<TextViewNodeData>) => {
   return (

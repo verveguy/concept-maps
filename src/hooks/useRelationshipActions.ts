@@ -1,19 +1,58 @@
+/**
+ * Hook for relationship CRUD operations.
+ * Provides actions for creating, updating, and deleting relationships.
+ * Uses db.transact() with tx objects for all mutations.
+ */
+
 import { db, tx, id } from '@/lib/instant'
 
 /**
- * Hook for relationship CRUD operations
- * Uses db.transact() with tx objects for all mutations
+ * Data structure for creating a new relationship.
+ */
+export interface CreateRelationshipData {
+  /** Map ID this relationship belongs to */
+  mapId: string
+  /** Source concept ID */
+  fromConceptId: string
+  /** Target concept ID */
+  toConceptId: string
+  /** Primary label (direction: from -> to) */
+  primaryLabel: string
+  /** Reverse label (direction: to -> from), defaults to primaryLabel */
+  reverseLabel?: string
+  /** Optional markdown notes */
+  notes?: string
+  /** Optional metadata as key-value pairs */
+  metadata?: Record<string, unknown>
+}
+
+/**
+ * Data structure for updating a relationship.
+ */
+export interface UpdateRelationshipData {
+  /** New primary label */
+  primaryLabel?: string
+  /** New reverse label */
+  reverseLabel?: string
+  /** New markdown notes */
+  notes?: string
+  /** New metadata */
+  metadata?: Record<string, unknown>
+}
+
+/**
+ * Hook for relationship CRUD operations.
+ * Uses db.transact() with tx objects for all mutations.
+ * 
+ * @returns Object containing createRelationship, updateRelationship, and deleteRelationship functions
  */
 export function useRelationshipActions() {
-  const createRelationship = async (relationship: {
-    mapId: string
-    fromConceptId: string
-    toConceptId: string
-    primaryLabel: string
-    reverseLabel?: string
-    notes?: string
-    metadata?: Record<string, unknown>
-  }) => {
+  /**
+   * Create a new relationship.
+   * 
+   * @param relationship - Relationship data to create
+   */
+  const createRelationship = async (relationship: CreateRelationshipData) => {
     await db.transact([
       tx.relationships[id()].update({
         mapId: relationship.mapId,
@@ -29,14 +68,15 @@ export function useRelationshipActions() {
     ])
   }
 
+  /**
+   * Update an existing relationship.
+   * 
+   * @param relationshipId - ID of the relationship to update
+   * @param updates - Partial relationship data to update
+   */
   const updateRelationship = async (
     relationshipId: string,
-    updates: {
-      primaryLabel?: string
-      reverseLabel?: string
-      notes?: string
-      metadata?: Record<string, unknown>
-    }
+    updates: UpdateRelationshipData
   ) => {
     const updateData: Record<string, unknown> = {
       updatedAt: Date.now(),
@@ -54,6 +94,11 @@ export function useRelationshipActions() {
     await db.transact([tx.relationships[relationshipId].update(updateData)])
   }
 
+  /**
+   * Delete a relationship.
+   * 
+   * @param relationshipId - ID of the relationship to delete
+   */
   const deleteRelationship = async (relationshipId: string) => {
     await db.transact([tx.relationships[relationshipId].delete()])
   }

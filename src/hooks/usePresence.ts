@@ -1,21 +1,36 @@
+/**
+ * Hook for managing real-time presence and collaboration.
+ * Tracks cursor positions, editing state, and user information for collaborative editing.
+ * Based on InstantDB presence API.
+ * 
+ * @see https://www.instantdb.com/docs/presence-and-topics
+ */
+
 import { useEffect, useCallback } from 'react'
 import { db } from '@/lib/instant'
 import { useMapStore } from '@/stores/mapStore'
 
 /**
- * Presence data structure for a user
+ * Presence data structure for a user.
+ * Tracks their cursor position and what they're currently editing.
  */
 export interface PresenceData {
+  /** Unique user identifier */
   userId: string
+  /** Display name for the user */
   userName: string
+  /** Current cursor position on the canvas, or null if not hovering */
   cursor: { x: number; y: number } | null
+  /** ID of the node currently being edited, or null */
   editingNodeId: string | null
+  /** ID of the edge currently being edited, or null */
   editingEdgeId: string | null
+  /** Color assigned to this user for visual distinction */
   color: string
 }
 
 /**
- * List of adjectives for generating user names
+ * List of adjectives for generating user names.
  */
 const ADJECTIVES = [
   'Stately', 'Gibbous', 'Curious', 'Brilliant', 'Swift', 'Majestic', 'Serene', 'Vibrant',
@@ -25,7 +40,7 @@ const ADJECTIVES = [
 ]
 
 /**
- * List of animals for generating user names
+ * List of animals for generating user names.
  */
 const ANIMALS = [
   'Lama', 'Aardvark', 'Koala', 'Panther', 'Falcon', 'Dolphin', 'Tiger', 'Eagle',
@@ -35,8 +50,10 @@ const ANIMALS = [
 ]
 
 /**
- * Generate a consistent anonymous user ID based on session/localStorage
- * This ensures the same browser session gets the same anonymous ID
+ * Generate a consistent anonymous user ID based on session/localStorage.
+ * This ensures the same browser session gets the same anonymous ID.
+ * 
+ * @returns A consistent anonymous user ID string
  */
 function generateAnonymousUserId(): string {
   // Try to get existing anonymous ID from localStorage
@@ -53,8 +70,11 @@ function generateAnonymousUserId(): string {
 }
 
 /**
- * Generate a consistent random name (Adjective + Animal) for a user based on their ID
- * Uses the same hash-based approach as color generation for consistency
+ * Generate a consistent random name (Adjective + Animal) for a user based on their ID.
+ * Uses the same hash-based approach as color generation for consistency.
+ * 
+ * @param userId - User ID to generate name for
+ * @returns A consistent name string
  */
 function generateNameForUser(userId: string): string {
   // Hash the user ID to get consistent indices
@@ -71,7 +91,11 @@ function generateNameForUser(userId: string): string {
 }
 
 /**
- * Generate a consistent color for a user based on their ID
+ * Generate a consistent color for a user based on their ID.
+ * Uses HSL color space for better color distribution.
+ * 
+ * @param userId - User ID to generate color for
+ * @returns HSL color string
  */
 function generateColorForUser(userId: string): string {
   // Hash the user ID to get a consistent color
@@ -86,9 +110,10 @@ function generateColorForUser(userId: string): string {
 }
 
 /**
- * Hook to track presence for the current map
- * Uses InstantDB presence API to track cursor positions and editing state
- * Based on https://www.instantdb.com/docs/presence-and-topics
+ * Hook to track presence for the current map.
+ * Uses InstantDB presence API to track cursor positions and editing state.
+ * 
+ * @returns Object containing current user info, other users' presence, and setters for cursor/editing state
  */
 export function usePresence() {
   const currentMapId = useMapStore((state) => state.currentMapId)

@@ -1,11 +1,21 @@
+/**
+ * Signup form component.
+ * Uses InstantDB Magic Code authentication.
+ * 
+ * Note: InstantDB automatically creates accounts when a user first signs in
+ * with a magic code. This form provides the same flow but with "Sign Up" branding.
+ */
+
 import { useState } from 'react'
 import { db } from '@/lib/instant'
 
 /**
- * SignupForm component - Uses InstantDB Magic Code authentication
+ * SignupForm component - Uses InstantDB Magic Code authentication.
  * 
  * Note: InstantDB automatically creates accounts when a user first signs in
  * with a magic code. This form provides the same flow but with "Sign Up" branding.
+ * 
+ * @returns The signup form JSX
  */
 export function SignupForm() {
   const [email, setEmail] = useState('')

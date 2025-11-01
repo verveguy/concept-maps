@@ -1,3 +1,9 @@
+/**
+ * RelationshipEditor component - Side panel for editing relationship properties.
+ * Opens when a relationship is selected via relationshipEditorOpen state.
+ * Auto-saves on field blur.
+ */
+
 import { useState, useEffect, useRef } from 'react'
 import { Trash2, X } from 'lucide-react'
 import { useRelationshipActions } from '@/hooks/useRelationshipActions'
@@ -5,9 +11,11 @@ import { useRelationships } from '@/hooks/useRelationships'
 import { useUIStore } from '@/stores/uiStore'
 
 /**
- * RelationshipEditor component - Side panel for editing relationship properties
- * Opens when a relationship is selected via relationshipEditorOpen state
- * Auto-saves on field blur
+ * RelationshipEditor component - Side panel for editing relationship properties.
+ * Opens when a relationship is selected via relationshipEditorOpen state.
+ * Auto-saves on field blur.
+ * 
+ * @returns The relationship editor JSX
  */
 export function RelationshipEditor() {
   const selectedRelationshipId = useUIStore((state) => state.selectedRelationshipId)

@@ -1,6 +1,18 @@
+/**
+ * Login form component.
+ * Handles user authentication using InstantDB magic code authentication.
+ * Provides email input and code verification flow.
+ */
+
 import { useState } from 'react'
 import { db } from '@/lib/instant'
 
+/**
+ * Login form component.
+ * Handles user authentication using InstantDB magic code authentication.
+ * 
+ * @returns The login form JSX
+ */
 export function LoginForm() {
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')

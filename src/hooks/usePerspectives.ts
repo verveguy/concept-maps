@@ -1,10 +1,17 @@
+/**
+ * Hook for querying perspectives from InstantDB.
+ * Provides reactive data fetching with real-time updates.
+ */
+
 import { db } from '@/lib/instant'
 import { useMapStore } from '@/stores/mapStore'
 import type { Perspective } from '@/lib/schema'
 
 /**
- * Hook to get perspectives for the current map
- * Uses InstantDB useQuery() for real-time updates
+ * Hook to get perspectives for the current map.
+ * Uses InstantDB useQuery() for real-time updates.
+ * 
+ * @returns Array of perspectives for the current map
  */
 export function usePerspectives() {
   const currentMapId = useMapStore((state) => state.currentMapId)

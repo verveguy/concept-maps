@@ -1,11 +1,18 @@
+/**
+ * Hooks for querying relationships from InstantDB.
+ * Provides reactive data fetching with real-time updates.
+ */
+
 import { db } from '@/lib/instant'
 import { useMapStore } from '@/stores/mapStore'
 import type { Relationship } from '@/lib/schema'
 
 /**
- * Hook to get relationships for the current map/perspective
- * Uses InstantDB useQuery() for real-time updates
- * Filters by mapId and optionally by perspective relationshipIds
+ * Hook to get relationships for the current map/perspective.
+ * Uses InstantDB useQuery() for real-time updates.
+ * Filters by mapId and optionally by perspective relationshipIds.
+ * 
+ * @returns Array of relationships filtered by current map and perspective (if selected)
  */
 export function useRelationships() {
   const currentMapId = useMapStore((state) => state.currentMapId)
@@ -61,9 +68,11 @@ export function useRelationships() {
 }
 
 /**
- * Hook to get ALL relationships for the current map (no perspective filtering)
- * Uses InstantDB useQuery() for real-time updates
- * Used when editing perspectives to show all relationships
+ * Hook to get ALL relationships for the current map (no perspective filtering).
+ * Uses InstantDB useQuery() for real-time updates.
+ * Used when editing perspectives to show all relationships.
+ * 
+ * @returns Array of all relationships for the current map
  */
 export function useAllRelationships() {
   const currentMapId = useMapStore((state) => state.currentMapId)

@@ -1,3 +1,10 @@
+/**
+ * StructuredTextView component - Text view for concept maps.
+ * Displays Concept->Relationship->Concept triples as editable text.
+ * Format: "Noun verb phrase Noun" (e.g., "Diagrams explain Architecture").
+ * Both views read/write directly to InstantDB (no sync logic needed).
+ */
+
 import { useState, useCallback } from 'react'
 import { Plus } from 'lucide-react'
 import { useConcepts } from '@/hooks/useConcepts'
@@ -16,10 +23,12 @@ import { EditableTriple } from './EditableTriple'
 import { db, tx, id } from '@/lib/instant'
 
 /**
- * StructuredTextView component - Text view for concept maps
- * Displays Concept->Relationship->Concept triples as editable text
- * Format: "Noun verb phrase Noun" (e.g., "Diagrams explain Architecture")
- * Both views read/write directly to InstantDB (no sync logic needed)
+ * StructuredTextView component - Text view for concept maps.
+ * Displays Concept->Relationship->Concept triples as editable text.
+ * Format: "Noun verb phrase Noun" (e.g., "Diagrams explain Architecture").
+ * Both views read/write directly to InstantDB (no sync logic needed).
+ * 
+ * @returns The structured text view JSX
  */
 export function StructuredTextView() {
   const concepts = useConcepts()
