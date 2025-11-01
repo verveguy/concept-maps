@@ -27,7 +27,7 @@ export function useMap() {
           },
         }
       : null,
-    shareToken ? { shareToken } : undefined
+    shareToken ? { rulesParams: { shareToken } } : undefined
   )
 
   return data?.maps?.[0] || null

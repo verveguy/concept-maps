@@ -31,7 +31,7 @@ export function useRelationships() {
           },
         }
       : null,
-    shareToken ? { shareToken } : undefined
+    shareToken ? { rulesParams: { shareToken } } : undefined
   )
 
   const perspective = perspectiveData?.perspectives?.[0]
@@ -52,7 +52,7 @@ export function useRelationships() {
           },
         }
       : null,
-    shareToken ? { shareToken } : undefined
+    shareToken ? { rulesParams: { shareToken } } : undefined
   )
 
   // Transform InstantDB data to schema format
@@ -96,7 +96,7 @@ export function useAllRelationships() {
           },
         }
       : null,
-    shareToken ? { shareToken } : undefined
+    shareToken ? { rulesParams: { shareToken } } : undefined
   )
 
   // Transform InstantDB data to schema format

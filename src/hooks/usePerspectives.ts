@@ -28,7 +28,7 @@ export function usePerspectives() {
           },
         }
       : null,
-    shareToken ? { shareToken } : undefined
+    shareToken ? { rulesParams: { shareToken } } : undefined
   )
 
   // Transform InstantDB data to schema format

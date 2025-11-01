@@ -31,7 +31,7 @@ export function useConcepts() {
           },
         }
       : null,
-    shareToken ? { shareToken } : undefined
+    shareToken ? { rulesParams: { shareToken } } : undefined
   )
 
   const perspective = perspectiveData?.perspectives?.[0]
@@ -52,7 +52,7 @@ export function useConcepts() {
           },
         }
       : null,
-    shareToken ? { shareToken } : undefined
+    shareToken ? { rulesParams: { shareToken } } : undefined
   )
 
   // Transform InstantDB data to schema format
@@ -94,7 +94,7 @@ export function useAllConcepts() {
           },
         }
       : null,
-    shareToken ? { shareToken } : undefined
+    shareToken ? { rulesParams: { shareToken } } : undefined
   )
 
   // Transform InstantDB data to schema format
