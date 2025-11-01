@@ -29,18 +29,14 @@ const rules = {
       update: 'canEditMap',
       delete: 'canEditMap',
     },
-    bind: [
+    bind: {
       // User can view a map if they created it OR if there's a share for them
-      [
-        'canViewMap',
+      canViewMap:
         'auth.id != null && (data.createdBy == auth.id || exists(shares, share => share.mapId == data.id && share.userId == auth.id))',
-      ],
       // User can edit a map if they created it OR if there's a share with edit permission
-      [
-        'canEditMap',
+      canEditMap:
         'auth.id != null && (data.createdBy == auth.id || exists(shares, share => share.mapId == data.id && share.userId == auth.id && share.permission == "edit"))',
-      ],
-    ],
+    },
   },
 
   /**
@@ -54,19 +50,15 @@ const rules = {
       update: 'canEditConcept',
       delete: 'canEditConcept',
     },
-    bind: [
+    bind: {
       // User can view a concept if they can view the map it belongs to
       // Traverse the map link to check map ownership or shares
-      [
-        'canViewConcept',
+      canViewConcept:
         'auth.id != null && (data.map.createdBy == auth.id || exists(shares, share => share.mapId == data.mapId && share.userId == auth.id))',
-      ],
       // User can edit a concept if they can edit the map it belongs to
-      [
-        'canEditConcept',
+      canEditConcept:
         'auth.id != null && (data.map.createdBy == auth.id || exists(shares, share => share.mapId == data.mapId && share.userId == auth.id && share.permission == "edit"))',
-      ],
-    ],
+    },
   },
 
   /**
@@ -80,18 +72,14 @@ const rules = {
       update: 'canEditRelationship',
       delete: 'canEditRelationship',
     },
-    bind: [
+    bind: {
       // User can view a relationship if they can view the map it belongs to
-      [
-        'canViewRelationship',
+      canViewRelationship:
         'auth.id != null && (data.map.createdBy == auth.id || exists(shares, share => share.mapId == data.mapId && share.userId == auth.id))',
-      ],
       // User can edit a relationship if they can edit the map it belongs to
-      [
-        'canEditRelationship',
+      canEditRelationship:
         'auth.id != null && (data.map.createdBy == auth.id || exists(shares, share => share.mapId == data.mapId && share.userId == auth.id && share.permission == "edit"))',
-      ],
-    ],
+    },
   },
 
   /**
@@ -105,18 +93,14 @@ const rules = {
       update: 'canEditPerspective',
       delete: 'canEditPerspective',
     },
-    bind: [
+    bind: {
       // User can view a perspective if they can view the map it belongs to
-      [
-        'canViewPerspective',
+      canViewPerspective:
         'auth.id != null && (data.map.createdBy == auth.id || exists(shares, share => share.mapId == data.mapId && share.userId == auth.id))',
-      ],
       // User can edit a perspective if they can edit the map it belongs to
-      [
-        'canEditPerspective',
+      canEditPerspective:
         'auth.id != null && (data.map.createdBy == auth.id || exists(shares, share => share.mapId == data.mapId && share.userId == auth.id && share.permission == "edit"))',
-      ],
-    ],
+    },
   },
 
   /**
@@ -130,28 +114,16 @@ const rules = {
       update: 'canUpdateShare',
       delete: 'canDeleteShare',
     },
-    bind: [
+    bind: {
       // User can view a share if they own the map OR if the share is for them
-      [
-        'canViewShare',
-        'auth.id != null && (data.map.createdBy == auth.id || data.userId == auth.id)',
-      ],
+      canViewShare: 'auth.id != null && (data.map.createdBy == auth.id || data.userId == auth.id)',
       // User can create a share if they own the map
-      [
-        'canCreateShare',
-        'auth.id != null && data.map.createdBy == auth.id',
-      ],
+      canCreateShare: 'auth.id != null && data.map.createdBy == auth.id',
       // User can update a share if they own the map
-      [
-        'canUpdateShare',
-        'auth.id != null && data.map.createdBy == auth.id',
-      ],
+      canUpdateShare: 'auth.id != null && data.map.createdBy == auth.id',
       // User can delete a share if they own the map
-      [
-        'canDeleteShare',
-        'auth.id != null && data.map.createdBy == auth.id',
-      ],
-    ],
+      canDeleteShare: 'auth.id != null && data.map.createdBy == auth.id',
+    },
   },
 } satisfies InstantRules
 
