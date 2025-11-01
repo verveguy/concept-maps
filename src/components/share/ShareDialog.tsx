@@ -3,7 +3,7 @@
  * Provides UI for sharing maps with other users and managing access.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Copy, Mail, Trash2 } from 'lucide-react'
 import { useSharing, generateShareLink } from '@/hooks/useSharing'
 import { useMap } from '@/hooks/useMap'
@@ -36,9 +36,40 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
   const [permissionInput, setPermissionInput] = useState<'view' | 'edit'>('edit')
   const [isSharing, setIsSharing] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [shareToken, setShareToken] = useState<string | null>(null)
 
   // Check if current user is the map owner
   const isOwner = map?.createdBy === currentUser?.id
+
+  // Get or create a link-based share token
+  const getOrCreateShareToken = async () => {
+    if (!mapId) return null
+
+    // Check if there's already a share with a token for this map
+    const existingShare = shares.find((s) => s.token && !s.userId)
+    if (existingShare?.token) {
+      return existingShare.token
+    }
+
+    // Create a new link-based share (no userId)
+    try {
+      const result = await shareMap(null, permissionInput, true)
+      return result.token || null
+    } catch (error) {
+      console.error('Failed to create share token:', error)
+      return null
+    }
+  }
+
+  // Load or create share token on mount
+  useEffect(() => {
+    if (mapId && isOwner) {
+      getOrCreateShareToken().then((token) => {
+        if (token) setShareToken(token)
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapId, isOwner, shares.length])
 
   const handleShare = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -50,7 +81,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
       // This is a simplified implementation - in production, you'd need user lookup
       const userId = emailInput.trim().toLowerCase()
       
-      await shareMap(userId, permissionInput)
+      await shareMap(userId, permissionInput, false) // Don't generate token for user-based shares
       setEmailInput('')
       setPermissionInput('edit')
     } catch (error) {
@@ -64,7 +95,14 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
   const handleCopyLink = async () => {
     if (!mapId) return
     
-    const link = generateShareLink(mapId)
+    // Get or create share token if we don't have one
+    let token = shareToken
+    if (!token && isOwner) {
+      token = await getOrCreateShareToken()
+      if (token) setShareToken(token)
+    }
+    
+    const link = generateShareLink(mapId, token || undefined)
     try {
       await navigator.clipboard.writeText(link)
       setCopied(true)
@@ -97,7 +135,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
 
   if (!mapId || !map) return null
 
-  const shareLink = generateShareLink(mapId)
+  const shareLink = generateShareLink(mapId, shareToken || undefined)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -206,7 +244,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                       <div className="text-xs text-gray-500">
                         Shared {format(share.createdAt, 'MMM d, yyyy')}
                         {share.acceptedAt && (
-                          <> • Accepted {format(share.acceptedAt, 'MMM d, yyyy')}</>
+                          <> ? Accepted {format(share.acceptedAt, 'MMM d, yyyy')}</>
                         )}
                       </div>
                     </div>

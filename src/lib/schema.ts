@@ -65,12 +65,14 @@ export interface Perspective {
 /**
  * Represents a share (collaboration) on a concept map.
  * Shares define which users have access to a map and what permissions they have.
+ * Can be user-specific (userId) or link-based (token).
  */
 export interface Share {
   id: string
   mapId: string
-  userId: string
+  userId: string | null // null for link-based shares
   permission: 'view' | 'edit'
+  token: string | null // Optional token for link-based sharing
   createdAt: Date
   acceptedAt: Date | null // Timestamp when user accepted the share
 }

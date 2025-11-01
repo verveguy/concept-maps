@@ -54,6 +54,7 @@ const _schema = i.schema({
       mapId: i.string().indexed(),
       userId: i.string().indexed(),
       permission: i.string(), // 'view' | 'edit'
+      token: i.string().indexed().optional(), // Optional share token for link-based access
       createdAt: i.number().indexed(),
       acceptedAt: i.number().optional(), // Timestamp when user accepted the share
     }),
