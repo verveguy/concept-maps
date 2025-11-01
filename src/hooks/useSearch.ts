@@ -1,6 +1,6 @@
 /**
  * Hook for searching concepts and relationships across all accessible maps.
- * Uses server-side InstantDB queries filtered by accessible mapIds.
+ * Uses server-side InstantDB queries with the $like operator for text search.
  * Only queries when there's an active search query to avoid unnecessary reactive updates.
  */
 
@@ -88,30 +88,62 @@ export function useMapNames(mapIds: string[]) {
 }
 
 /**
- * Inner component that performs the actual search query.
- * Only mounted when there's an active search query to avoid unnecessary reactive updates.
+ * Hook that performs the actual search query using InstantDB's $like operator.
+ * Only queries when there's an active search query to avoid unnecessary reactive updates.
  */
 export function useSearchQuery(query: string, accessibleMapIds: string[]) {
-  // Query concepts and relationships filtered by accessible mapIds server-side
-  // Only queries when there's an active search query to avoid unnecessary reactive updates
+  // Escape special characters for the like pattern
+  // InstantDB $like uses SQL LIKE syntax, so we need to escape % and _
+  const escapeLikePattern = (pattern: string) => {
+    return pattern.replace(/[%_]/g, (char) => `\\${char}`)
+  }
+
+  // Build the search pattern - use % for wildcards (matches any sequence of characters)
+  const searchPattern = query.trim() ? `%${escapeLikePattern(query.trim())}%` : ''
+
+  // Query concepts with server-side filtering using $like operator
   const { data: conceptsData } = db.useQuery(
-    query.trim() && accessibleMapIds.length > 0
+    searchPattern && accessibleMapIds.length > 0
       ? {
           concepts: {
             $: {
-              where: { mapId: { $in: accessibleMapIds } },
+              where: {
+                mapId: { $in: accessibleMapIds },
+                label: { $like: searchPattern },
+              },
             },
           },
         }
       : null
   )
 
-  const { data: relationshipsData } = db.useQuery(
-    query.trim() && accessibleMapIds.length > 0
+  // Query relationships with server-side filtering using $like operator
+  // Need to match either primaryLabel OR reverseLabel, so we need two queries
+  // or use $or if InstantDB supports it
+  const { data: relationshipsDataPrimary } = db.useQuery(
+    searchPattern && accessibleMapIds.length > 0
       ? {
           relationships: {
             $: {
-              where: { mapId: { $in: accessibleMapIds } },
+              where: {
+                mapId: { $in: accessibleMapIds },
+                primaryLabel: { $like: searchPattern },
+              },
+            },
+          },
+        }
+      : null
+  )
+
+  const { data: relationshipsDataReverse } = db.useQuery(
+    searchPattern && accessibleMapIds.length > 0
+      ? {
+          relationships: {
+            $: {
+              where: {
+                mapId: { $in: accessibleMapIds },
+                reverseLabel: { $like: searchPattern },
+              },
             },
           },
         }
@@ -120,49 +152,57 @@ export function useSearchQuery(query: string, accessibleMapIds: string[]) {
 
   const mapNames = useMapNames(accessibleMapIds)
 
-  // Filter and transform search results
+  // Merge and deduplicate relationship results
+  const allRelationships = useMemo(() => {
+    const relationshipMap = new Map<string, any>()
+    
+    // Add relationships from primaryLabel query
+    if (relationshipsDataPrimary?.relationships) {
+      relationshipsDataPrimary.relationships.forEach((r: any) => {
+        relationshipMap.set(r.id, r)
+      })
+    }
+    
+    // Add relationships from reverseLabel query
+    if (relationshipsDataReverse?.relationships) {
+      relationshipsDataReverse.relationships.forEach((r: any) => {
+        relationshipMap.set(r.id, r)
+      })
+    }
+    
+    return Array.from(relationshipMap.values())
+  }, [relationshipsDataPrimary, relationshipsDataReverse])
+
+  // Transform search results
   const results = useMemo(() => {
     if (!query.trim() || accessibleMapIds.length === 0) return []
 
-    const searchQuery = query.toLowerCase().trim()
     const results: SearchResult[] = []
 
-    // Search concepts - already filtered by accessible mapIds server-side
+    // Add concepts - already filtered server-side by mapId and label
     if (conceptsData?.concepts) {
       conceptsData.concepts.forEach((c: any) => {
-        const label = c.label || ''
-        if (label.toLowerCase().includes(searchQuery)) {
-          results.push({
-            type: 'concept',
-            id: c.id,
-            mapId: c.mapId,
-            label: label,
-            mapName: mapNames.get(c.mapId),
-          })
-        }
+        results.push({
+          type: 'concept',
+          id: c.id,
+          mapId: c.mapId,
+          label: c.label,
+          mapName: mapNames.get(c.mapId),
+        })
       })
     }
 
-    // Search relationships - already filtered by accessible mapIds server-side
-    if (relationshipsData?.relationships) {
-      relationshipsData.relationships.forEach((r: any) => {
-        const primaryLabel = r.primaryLabel || ''
-        const reverseLabel = r.reverseLabel || ''
-        const matchesPrimary = primaryLabel.toLowerCase().includes(searchQuery)
-        const matchesReverse = reverseLabel.toLowerCase().includes(searchQuery)
-
-        if (matchesPrimary || matchesReverse) {
-          results.push({
-            type: 'relationship',
-            id: r.id,
-            mapId: r.mapId,
-            label: primaryLabel,
-            secondaryLabel: reverseLabel,
-            mapName: mapNames.get(r.mapId),
-          })
-        }
+    // Add relationships - already filtered server-side by mapId and label
+    allRelationships.forEach((r: any) => {
+      results.push({
+        type: 'relationship',
+        id: r.id,
+        mapId: r.mapId,
+        label: r.primaryLabel,
+        secondaryLabel: r.reverseLabel,
+        mapName: mapNames.get(r.mapId),
       })
-    }
+    })
 
     // Sort results: concepts first, then by label
     results.sort((a, b) => {
@@ -173,7 +213,7 @@ export function useSearchQuery(query: string, accessibleMapIds: string[]) {
     })
 
     return results
-  }, [query, conceptsData, relationshipsData, mapNames, accessibleMapIds])
+  }, [query, conceptsData, allRelationships, mapNames, accessibleMapIds])
 
   return results
 }
