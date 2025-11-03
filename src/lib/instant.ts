@@ -7,6 +7,7 @@
 
 import { init, tx, id } from '@instantdb/react'
 import schema from '../instant.schema'
+import rules from '../instant.perms'
 
 /**
  * InstantDB application ID.
@@ -23,10 +24,15 @@ if (!APP_ID) {
 /**
  * Initialized InstantDB database instance.
  * Use this to query and mutate data throughout the application.
+ * Note: Rules are configured in the InstantDB dashboard, not in code.
+ * The rules file is kept for reference but should be configured via the dashboard.
  */
 export const db = init({
   appId: APP_ID,
   schema,
+  // Rules are configured in InstantDB dashboard, not passed here
+  // See: https://www.instantdb.com/docs/permissions
+  // rules,
 })
 
 /**
