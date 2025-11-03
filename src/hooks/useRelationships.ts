@@ -43,8 +43,23 @@ export function useRelationships() {
             relationships: relationshipIds
               ? {
                   $: { where: { id: { $in: relationshipIds } } },
+                  map: {
+                    creator: {},
+                    readPermissions: {},
+                    writePermissions: {},
+                  },
+                  fromConcept: {},
+                  toConcept: {},
                 }
-              : {},
+              : {
+                  map: {
+                    creator: {},
+                    readPermissions: {},
+                    writePermissions: {},
+                  },
+                  fromConcept: {},
+                  toConcept: {},
+                },
           },
         }
       : null
@@ -84,7 +99,15 @@ export function useAllRelationships() {
       ? {
           maps: {
             $: { where: { id: currentMapId } },
-            relationships: {},
+            relationships: {
+              map: {
+                creator: {},
+                readPermissions: {},
+                writePermissions: {},
+              },
+              fromConcept: {},
+              toConcept: {},
+            },
           },
         }
       : null

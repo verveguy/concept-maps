@@ -43,8 +43,19 @@ export function useConcepts() {
             concepts: conceptIds
               ? {
                   $: { where: { id: { $in: conceptIds } } },
+                  map: {
+                    creator: {},
+                    readPermissions: {},
+                    writePermissions: {},
+                  },
                 }
-              : {},
+              : {
+                  map: {
+                    creator: {},
+                    readPermissions: {},
+                    writePermissions: {},
+                  },
+                },
           },
         }
       : null
@@ -82,7 +93,13 @@ export function useAllConcepts() {
       ? {
           maps: {
             $: { where: { id: currentMapId } },
-            concepts: {},
+            concepts: {
+              map: {
+                creator: {},
+                readPermissions: {},
+                writePermissions: {},
+              },
+            },
           },
         }
       : null

@@ -40,8 +40,19 @@ export function PerspectiveEditor() {
       ? {
           maps: {
             $: { where: { id: currentMapId } },
-            concepts: {},
+            concepts: {
+              map: {
+                creator: {},
+                readPermissions: {},
+                writePermissions: {},
+              },
+            },
             relationships: {
+              map: {
+                creator: {},
+                readPermissions: {},
+                writePermissions: {},
+              },
               fromConcept: {},
               toConcept: {},
             },

@@ -21,7 +21,10 @@ export function usePerspectives() {
       ? {
           maps: {
             $: { where: { id: currentMapId } },
-            perspectives: {},
+            perspectives: {
+              map: {},
+              creator: {},
+            },
           },
         }
       : null

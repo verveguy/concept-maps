@@ -82,7 +82,11 @@ export function useSearchQuery(query: string) {
                 label: { $ilike: searchPattern },
               },
             },
-            map: {},
+            map: {
+              creator: {},
+              readPermissions: {},
+              writePermissions: {},
+            },
           },
         }
       : null
@@ -100,7 +104,11 @@ export function useSearchQuery(query: string) {
                 primaryLabel: { $ilike: searchPattern },
               },
             },
-            map: {},
+            map: {
+              creator: {},
+              readPermissions: {},
+              writePermissions: {},
+            },
           },
         }
       : null
@@ -115,7 +123,11 @@ export function useSearchQuery(query: string) {
                 reverseLabel: { $ilike: searchPattern },
               },
             },
-            map: {},
+            map: {
+              creator: {},
+              readPermissions: {},
+              writePermissions: {},
+            },
           },
         }
       : null
