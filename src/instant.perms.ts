@@ -3,162 +3,143 @@
 import type { InstantRules } from '@instantdb/react'
 
 const rules = {
-  /**
-   * Permission model for concept maps.
-   * Owners always have full access, collaborators inherit access through
-   * accepted shares or invitations with matching permissions.
-   */
   maps: {
+    bind: [
+      'isOwner',
+      'auth.id != null && auth.id in data.ref("creator.id")',
+      'hasReadPermission',
+      'auth.id != null && auth.id in data.ref("readPermissions.id")',
+      'hasWritePermission',
+      'auth.id != null && auth.id in data.ref("writePermissions.id")',
+      'hasPendingInvitation',
+      'auth.id != null && ((auth.id in data.ref("shareInvitations.invitedUserId") || (auth.email != null && auth.email in data.ref("shareInvitations.invitedEmail"))) && "pending" in data.ref("shareInvitations.status")) || (auth.email != null && auth.email in data.ref("shareInvitations.invitedEmail") && "pending" in data.ref("shareInvitations.status"))',
+      'isOwnerOrReader',
+      'isOwner || hasReadPermission || hasWritePermission || hasPendingInvitation',
+      // Note: hasPendingInvitation is included to allow users accepting invitations
+      // to link themselves to permission links. This is a necessary security trade-off:
+      // users with pending invitations can update the map, though in practice they should
+      // only be linking permission links (as enforced by application code).
+      // TODO: Consider if InstantDB supports more granular link-level permissions.
+      'isOwnerOrEditor',
+      'isOwner || hasWritePermission || hasPendingInvitation',
+    ],
     allow: {
       view: 'isOwnerOrReader',
       create: 'auth.id != null',
-      update: 'isOwnerOrEditor',
       delete: 'isOwner',
+      update: 'isOwnerOrEditor',
     },
-    bind: [
-      'isOwner',
-      'auth.id != null && auth.id == data.createdBy',
-      'hasActiveShare',
-      'auth.id != null && exists(shares, share => share.mapId == data.id && share.userId == auth.id && share.status == "active")',
-      'hasEditableShare',
-      'auth.id != null && exists(shares, share => share.mapId == data.id && share.userId == auth.id && share.status == "active" && share.permission == "edit")',
-      'hasAcceptedInvitation',
-      'exists(shareInvitations, invitation => invitation.mapId == data.id && invitation.status == "accepted" && ((auth.id != null && (invitation.invitedUserId == auth.id || invitation.invitedEmail == auth.id)) || (auth.email != null && (invitation.invitedUserId == auth.email || invitation.invitedEmail == auth.email))))',
-      'hasEditableInvitation',
-      'exists(shareInvitations, invitation => invitation.mapId == data.id && invitation.status == "accepted" && invitation.permission == "edit" && ((auth.id != null && (invitation.invitedUserId == auth.id || invitation.invitedEmail == auth.id)) || (auth.email != null && (invitation.invitedUserId == auth.email || invitation.invitedEmail == auth.email))))',
-      'isOwnerOrReader',
-      'isOwner || hasActiveShare || hasAcceptedInvitation',
-      'isOwnerOrEditor',
-      'isOwner || hasEditableShare || hasEditableInvitation',
-    ],
   },
-
-  /**
-   * Concepts inherit permissions from their parent map.
-   */
-  concepts: {
-    allow: {
-      view: 'canReadParentMap',
-      create: 'canEditParentMap',
-      update: 'canEditParentMap',
-      delete: 'canEditParentMap',
-    },
-    bind: [
-      'mapIsOwned',
-      'auth.id != null && exists(maps, map => map.id == data.mapId && map.createdBy == auth.id)',
-      'mapHasShareReader',
-      'auth.id != null && exists(shares, share => share.mapId == data.mapId && share.userId == auth.id && share.status == "active")',
-      'mapHasShareEditor',
-      'auth.id != null && exists(shares, share => share.mapId == data.mapId && share.userId == auth.id && share.status == "active" && share.permission == "edit")',
-      'mapHasInvitationReader',
-      'exists(shareInvitations, invitation => invitation.mapId == data.mapId && invitation.status == "accepted" && ((auth.id != null && (invitation.invitedUserId == auth.id || invitation.invitedEmail == auth.id)) || (auth.email != null && (invitation.invitedUserId == auth.email || invitation.invitedEmail == auth.email))))',
-      'mapHasInvitationEditor',
-      'exists(shareInvitations, invitation => invitation.mapId == data.mapId && invitation.status == "accepted" && invitation.permission == "edit" && ((auth.id != null && (invitation.invitedUserId == auth.id || invitation.invitedEmail == auth.id)) || (auth.email != null && (invitation.invitedUserId == auth.email || invitation.invitedEmail == auth.email))))',
-      'canReadParentMap',
-      'mapIsOwned || mapHasShareReader || mapHasInvitationReader',
-      'canEditParentMap',
-      'mapIsOwned || mapHasShareEditor || mapHasInvitationEditor',
-    ],
-  },
-
-  /**
-   * Relationships share the same access pattern as concepts.
-   */
-  relationships: {
-    allow: {
-      view: 'canReadParentMap',
-      create: 'canEditParentMap',
-      update: 'canEditParentMap',
-      delete: 'canEditParentMap',
-    },
-    bind: [
-      'mapIsOwned',
-      'auth.id != null && exists(maps, map => map.id == data.mapId && map.createdBy == auth.id)',
-      'mapHasShareReader',
-      'auth.id != null && exists(shares, share => share.mapId == data.mapId && share.userId == auth.id && share.status == "active")',
-      'mapHasShareEditor',
-      'auth.id != null && exists(shares, share => share.mapId == data.mapId && share.userId == auth.id && share.status == "active" && share.permission == "edit")',
-      'mapHasInvitationReader',
-      'exists(shareInvitations, invitation => invitation.mapId == data.mapId && invitation.status == "accepted" && ((auth.id != null && (invitation.invitedUserId == auth.id || invitation.invitedEmail == auth.id)) || (auth.email != null && (invitation.invitedUserId == auth.email || invitation.invitedEmail == auth.email))))',
-      'mapHasInvitationEditor',
-      'exists(shareInvitations, invitation => invitation.mapId == data.mapId && invitation.status == "accepted" && invitation.permission == "edit" && ((auth.id != null && (invitation.invitedUserId == auth.id || invitation.invitedEmail == auth.id)) || (auth.email != null && (invitation.invitedUserId == auth.email || invitation.invitedEmail == auth.email))))',
-      'canReadParentMap',
-      'mapIsOwned || mapHasShareReader || mapHasInvitationReader',
-      'canEditParentMap',
-      'mapIsOwned || mapHasShareEditor || mapHasInvitationEditor',
-    ],
-  },
-
-  /**
-   * Perspectives are editable and readable following the same rules as their map.
-   */
-  perspectives: {
-    allow: {
-      view: 'canReadParentMap',
-      create: 'canEditParentMap',
-      update: 'canEditParentMap',
-      delete: 'canEditParentMap',
-    },
-    bind: [
-      'mapIsOwned',
-      'auth.id != null && exists(maps, map => map.id == data.mapId && map.createdBy == auth.id)',
-      'mapHasShareReader',
-      'auth.id != null && exists(shares, share => share.mapId == data.mapId && share.userId == auth.id && share.status == "active")',
-      'mapHasShareEditor',
-      'auth.id != null && exists(shares, share => share.mapId == data.mapId && share.userId == auth.id && share.status == "active" && share.permission == "edit")',
-      'mapHasInvitationReader',
-      'exists(shareInvitations, invitation => invitation.mapId == data.mapId && invitation.status == "accepted" && ((auth.id != null && (invitation.invitedUserId == auth.id || invitation.invitedEmail == auth.id)) || (auth.email != null && (invitation.invitedUserId == auth.email || invitation.invitedEmail == auth.email))))',
-      'mapHasInvitationEditor',
-      'exists(shareInvitations, invitation => invitation.mapId == data.mapId && invitation.status == "accepted" && invitation.permission == "edit" && ((auth.id != null && (invitation.invitedUserId == auth.id || invitation.invitedEmail == auth.id)) || (auth.email != null && (invitation.invitedUserId == auth.email || invitation.invitedEmail == auth.email))))',
-      'canReadParentMap',
-      'mapIsOwned || mapHasShareReader || mapHasInvitationReader',
-      'canEditParentMap',
-      'mapIsOwned || mapHasShareEditor || mapHasInvitationEditor',
-    ],
-  },
-
-  /**
-   * Shares define durable collaborator access. Creation requires either the map owner
-   * or an invited collaborator with an accepted invitation. Updates are owner-only to
-   * prevent privilege escalation by collaborators.
-   */
   shares: {
-    allow: {
-      view: 'mapOwnerOrShareRecipient',
-      create: 'ownerOrAcceptedInvitee',
-      update: 'mapOwnerOnly',
-      delete: 'mapOwnerOnly',
-    },
     bind: [
       'mapOwnerOnly',
-      'auth.id != null && exists(maps, map => map.id == data.mapId && map.createdBy == auth.id)',
+      'auth.id != null && auth.id in data.ref("creator.id")',
       'shareRecipient',
-      'auth.id != null && auth.id == data.userId',
+      'auth.id != null && auth.id in data.ref("user.id")',
+      'isActiveShare',
+      'data.status == "active"',
+      'isEditShare',
+      'data.permission == "edit"',
       'mapOwnerOrShareRecipient',
-      'mapOwnerOnly || shareRecipient',
-      'ownerOrAcceptedInvitee',
-      'mapOwnerOnly || (auth.id != null && auth.id == data.userId && data.invitationId != null && exists(shareInvitations, invitation => invitation.id == data.invitationId && invitation.status == "accepted" && invitation.invitedUserId == auth.id))',
+      'mapOwnerOnly || (shareRecipient && isActiveShare)',
+      'shareRecipientWithEdit',
+      'shareRecipient && isActiveShare && isEditShare',
+      'mapOwnerOrEditShareRecipient',
+      'mapOwnerOnly || shareRecipientWithEdit',
+      'hasInvitationForMap',
+      '(auth.id != null && (auth.id in data.ref("map.shareInvitations.invitedUserId") || auth.id in data.ref("map.shareInvitations.invitedEmail"))) || (auth.email != null && (auth.email in data.ref("map.shareInvitations.invitedUserId") || auth.email in data.ref("map.shareInvitations.invitedEmail")))',
+      'ownerOrInvitee',
+      'mapOwnerOnly || hasInvitationForMap',
     ],
-  },
-
-  /**
-   * Share invitations control pending access and token-based acceptance.
-   */
-  shareInvitations: {
     allow: {
-      view: 'mapOwnerOrInvitee',
-      create: 'mapOwnerCreator',
-      update: 'mapOwnerOrInvitee',
-      delete: 'mapOwnerCreator',
+      view: 'mapOwnerOrShareRecipient',
+      create: 'ownerOrInvitee',
+      delete: 'mapOwnerOnly',
+      update: 'mapOwnerOnly',
     },
+  },
+  concepts: {
+    bind: [
+      'mapIsOwned',
+      'auth.id != null && auth.id in data.ref("map.creator.id")',
+      'mapHasReadPermission',
+      'auth.id != null && auth.id in data.ref("map.readPermissions.id")',
+      'mapHasWritePermission',
+      'auth.id != null && auth.id in data.ref("map.writePermissions.id")',
+      'canReadParentMap',
+      'mapIsOwned || mapHasReadPermission || mapHasWritePermission',
+      'canEditParentMap',
+      'mapIsOwned || mapHasWritePermission',
+    ],
+    allow: {
+      view: 'canReadParentMap',
+      create: 'canEditParentMap',
+      delete: 'canEditParentMap',
+      update: 'canEditParentMap',
+    },
+  },
+  perspectives: {
+    bind: [
+      'mapIsOwned',
+      'auth.id != null && auth.id in data.ref("map.creator.id")',
+      'mapHasReadPermission',
+      'auth.id != null && auth.id in data.ref("map.readPermissions.id")',
+      'mapHasWritePermission',
+      'auth.id != null && auth.id in data.ref("map.writePermissions.id")',
+      'canReadParentMap',
+      'mapIsOwned || mapHasReadPermission || mapHasWritePermission',
+      'canEditParentMap',
+      'mapIsOwned || mapHasWritePermission',
+    ],
+    allow: {
+      view: 'canReadParentMap',
+      create: 'canEditParentMap',
+      delete: 'canEditParentMap',
+      update: 'canEditParentMap',
+    },
+  },
+  relationships: {
+    bind: [
+      'mapIsOwned',
+      'auth.id != null && auth.id in data.ref("map.creator.id")',
+      'mapHasReadPermission',
+      'auth.id != null && auth.id in data.ref("map.readPermissions.id")',
+      'mapHasWritePermission',
+      'auth.id != null && auth.id in data.ref("map.writePermissions.id")',
+      'canReadParentMap',
+      'mapIsOwned || mapHasReadPermission || mapHasWritePermission',
+      'canEditParentMap',
+      'mapIsOwned || mapHasWritePermission',
+    ],
+    allow: {
+      view: 'canReadParentMap',
+      create: 'canEditParentMap',
+      delete: 'canEditParentMap',
+      update: 'canEditParentMap',
+    },
+  },
+  shareInvitations: {
     bind: [
       'mapOwnerCreator',
-      'auth.id != null && auth.id == data.createdBy',
+      'auth.id != null && auth.id in data.ref("creator.id")',
       'authMatchesInvitee',
       '(auth.id != null && (auth.id == data.invitedEmail || auth.id == data.invitedUserId)) || (auth.email != null && (auth.email == data.invitedEmail || auth.email == data.invitedUserId))',
       'mapOwnerOrInvitee',
       'mapOwnerCreator || authMatchesInvitee',
     ],
+    allow: {
+      view: 'mapOwnerOrInvitee',
+      create: 'mapOwnerCreator',
+      delete: 'mapOwnerCreator',
+      update: 'mapOwnerOrInvitee',
+    },
+  },
+  $users: {
+    allow: {
+      // Allow viewing user entities when they're linked from other entities
+      // This is needed for nested link queries like shareInvitations.map.creator
+      view: 'auth.id != null',
+    },
   },
 } satisfies InstantRules
 

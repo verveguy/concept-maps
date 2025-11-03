@@ -38,12 +38,13 @@ export function useRelationships() {
   const { data } = db.useQuery(
     currentMapId
       ? {
-          relationships: {
-            $: {
-              where: relationshipIds
-                ? { mapId: currentMapId, id: { $in: relationshipIds } }
-                : { mapId: currentMapId },
-            },
+          maps: {
+            $: { where: { id: currentMapId } },
+            relationships: relationshipIds
+              ? {
+                  $: { where: { id: { $in: relationshipIds } } },
+                }
+              : {},
           },
         }
       : null
@@ -51,11 +52,11 @@ export function useRelationships() {
 
   // Transform InstantDB data to schema format
   const relationships: Relationship[] =
-    data?.relationships?.map((r: any) => ({
+    data?.maps?.[0]?.relationships?.map((r: any) => ({
       id: r.id,
-      mapId: r.mapId,
-      fromConceptId: r.fromConceptId,
-      toConceptId: r.toConceptId,
+      mapId: r.map?.id || currentMapId || '',
+      fromConceptId: r.fromConcept?.id || '',
+      toConceptId: r.toConcept?.id || '',
       primaryLabel: r.primaryLabel,
       reverseLabel: r.reverseLabel,
       notes: r.notes,
@@ -81,10 +82,9 @@ export function useAllRelationships() {
   const { data } = db.useQuery(
     currentMapId
       ? {
-          relationships: {
-            $: {
-              where: { mapId: currentMapId },
-            },
+          maps: {
+            $: { where: { id: currentMapId } },
+            relationships: {},
           },
         }
       : null
@@ -92,11 +92,11 @@ export function useAllRelationships() {
 
   // Transform InstantDB data to schema format
   const relationships: Relationship[] =
-    data?.relationships?.map((r: any) => ({
+    data?.maps?.[0]?.relationships?.map((r: any) => ({
       id: r.id,
-      mapId: r.mapId,
-      fromConceptId: r.fromConceptId,
-      toConceptId: r.toConceptId,
+      mapId: r.map?.id || currentMapId || '',
+      fromConceptId: r.fromConcept?.id || '',
+      toConceptId: r.toConcept?.id || '',
       primaryLabel: r.primaryLabel,
       reverseLabel: r.reverseLabel,
       notes: r.notes,

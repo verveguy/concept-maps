@@ -9,6 +9,7 @@ import { useMapStore } from '@/stores/mapStore'
 import { useConceptActions } from '@/hooks/useConceptActions'
 import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
 import { usePresence } from '@/hooks/usePresence'
+import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { usePerspectives } from '@/hooks/usePerspectives'
 import { useAllRelationships } from '@/hooks/useRelationships'
 import { EditingHighlight } from '@/components/presence/EditingHighlight'
@@ -54,6 +55,7 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
   const { updateConcept } = useConceptActions()
   const { toggleConceptInPerspective } = usePerspectiveActions()
   const { otherUsersPresence } = usePresence()
+  const { hasWriteAccess } = useMapPermissions()
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
   const isEditingPerspective = data.isEditingPerspective ?? false
   const isInPerspective = data.isInPerspective ?? true
@@ -158,6 +160,9 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     
+    // Disable inline editing if user doesn't have write access
+    if (!hasWriteAccess) return
+    
     // Cancel any pending click handler
     if (clickTimerRef.current) {
       clearTimeout(clickTimerRef.current)
@@ -169,6 +174,11 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
   }
 
   const handleSave = async () => {
+    if (!hasWriteAccess) {
+      setIsEditing(false)
+      return
+    }
+    
     if (editLabel.trim() && editLabel.trim() !== data.label) {
       try {
         await updateConcept(data.concept.id, {

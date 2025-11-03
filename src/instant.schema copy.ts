@@ -16,6 +16,7 @@ const _schema = i.schema({
     concepts: i.entity({
       createdAt: i.number().indexed(),
       label: i.string().indexed(),
+      mapId: i.string().indexed(),
       metadata: i.string().optional(),
       notes: i.string().optional(),
       positionX: i.number(),
@@ -24,40 +25,51 @@ const _schema = i.schema({
     }),
     maps: i.entity({
       createdAt: i.number().indexed(),
+      createdBy: i.string().indexed(),
       name: i.string().indexed(),
       updatedAt: i.number().indexed(),
     }),
     perspectives: i.entity({
       conceptIds: i.string().optional(),
       createdAt: i.number().indexed(),
+      createdBy: i.string().indexed(),
+      mapId: i.string().indexed(),
       name: i.string().indexed(),
       relationshipIds: i.string().optional(),
     }),
     relationships: i.entity({
       createdAt: i.number().indexed(),
+      fromConceptId: i.string().indexed(),
+      mapId: i.string().indexed(),
       metadata: i.string().optional(),
       notes: i.string().optional(),
       primaryLabel: i.string().indexed(),
       reverseLabel: i.string().indexed(),
+      toConceptId: i.string().indexed(),
       updatedAt: i.number().indexed(),
-    }),
-    shareInvitations: i.entity({
-      createdAt: i.number().indexed(),
-      expiresAt: i.number().indexed().optional(),
-      invitedEmail: i.string().indexed(),
-      invitedUserId: i.string().indexed().optional(),
-      permission: i.string(),
-      respondedAt: i.number().optional(),
-      revokedAt: i.number().optional(),
-      status: i.string().indexed(),
-      token: i.string().indexed(),
     }),
     shares: i.entity({
       acceptedAt: i.number().optional(),
       createdAt: i.number().indexed(),
+      mapId: i.string().indexed(),
       permission: i.string(),
+      userId: i.string().indexed(),
+      status: i.string().indexed(), // 'active' | 'revoked'
       revokedAt: i.number().optional(),
-      status: i.string().indexed(),
+      invitationId: i.string().optional().indexed(),
+    }),
+    shareInvitations: i.entity({
+      mapId: i.string().indexed(),
+      invitedEmail: i.string().indexed(),
+      invitedUserId: i.string().optional().indexed(),
+      permission: i.string(), // 'view' | 'edit'
+      token: i.string().indexed(),
+      status: i.string().indexed(), // 'pending' | 'accepted' | 'declined' | 'revoked' | 'expired'
+      createdBy: i.string().indexed(),
+      createdAt: i.number().indexed(),
+      expiresAt: i.number().optional().indexed(),
+      respondedAt: i.number().optional(),
+      revokedAt: i.number().optional(),
     }),
   },
   links: {
@@ -77,7 +89,7 @@ const _schema = i.schema({
     conceptsMap: {
       forward: {
         on: 'concepts',
-        has: 'one',
+        has: 'many',
         label: 'map',
       },
       reverse: {
@@ -86,35 +98,10 @@ const _schema = i.schema({
         label: 'concepts',
       },
     },
-    mapsCreator: {
-      forward: {
-        on: 'maps',
-        has: 'one',
-        label: 'creator',
-        required: true,
-      },
-      reverse: {
-        on: '$users',
-        has: 'many',
-        label: 'createdMaps',
-      },
-    },
-    perspectivesCreator: {
-      forward: {
-        on: 'perspectives',
-        has: 'one',
-        label: 'creator',
-      },
-      reverse: {
-        on: '$users',
-        has: 'many',
-        label: 'createdPerspectives',
-      },
-    },
     perspectivesMap: {
       forward: {
         on: 'perspectives',
-        has: 'one',
+        has: 'many',
         label: 'map',
       },
       reverse: {
@@ -126,7 +113,7 @@ const _schema = i.schema({
     relationshipsFromConcept: {
       forward: {
         on: 'relationships',
-        has: 'one',
+        has: 'many',
         label: 'fromConcept',
       },
       reverse: {
@@ -138,7 +125,7 @@ const _schema = i.schema({
     relationshipsMap: {
       forward: {
         on: 'relationships',
-        has: 'one',
+        has: 'many',
         label: 'map',
       },
       reverse: {
@@ -150,7 +137,7 @@ const _schema = i.schema({
     relationshipsToConcept: {
       forward: {
         on: 'relationships',
-        has: 'one',
+        has: 'many',
         label: 'toConcept',
       },
       reverse: {
@@ -159,88 +146,28 @@ const _schema = i.schema({
         label: 'incomingRelationships',
       },
     },
-    shareInvitationsCreator: {
+    sharesMap: {
       forward: {
-        on: 'shareInvitations',
-        has: 'one',
-        label: 'creator',
+        on: 'shares',
+        has: 'many',
+        label: 'map',
       },
       reverse: {
-        on: '$users',
+        on: 'maps',
         has: 'many',
-        label: 'createdShareInvitations',
+        label: 'shares',
       },
     },
     shareInvitationsMap: {
       forward: {
         on: 'shareInvitations',
-        has: 'one',
+        has: 'many',
         label: 'map',
       },
       reverse: {
         on: 'maps',
         has: 'many',
         label: 'shareInvitations',
-      },
-    },
-    sharesMap: {
-      forward: {
-        on: 'shares',
-        has: 'one',
-        label: 'map',
-      },
-      reverse: {
-        on: 'maps',
-        has: 'many',
-        label: 'shares',
-      },
-    },
-    sharesUser: {
-      forward: {
-        on: 'shares',
-        has: 'one',
-        label: 'user',
-      },
-      reverse: {
-        on: '$users',
-        has: 'many',
-        label: 'shares',
-      },
-    },
-    sharesCreator: {
-      forward: {
-        on: 'shares',
-        has: 'one',
-        label: 'creator',
-      },
-      reverse: {
-        on: '$users',
-        has: 'many',
-        label: 'createdShares',
-      },
-    },
-    mapsWritePermissions: {
-      forward: {
-        on: 'maps',
-        has: 'many',
-        label: 'writePermissions',
-      },
-      reverse: {
-        on: '$users',
-        has: 'many',
-        label: 'writeAccessMaps',
-      },
-    },
-    mapsReadPermissions: {
-      forward: {
-        on: 'maps',
-        has: 'many',
-        label: 'readPermissions',
-      },
-      reverse: {
-        on: '$users',
-        has: 'many',
-        label: 'readAccessMaps',
       },
     },
   },

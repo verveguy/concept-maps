@@ -50,15 +50,19 @@ export function usePerspectiveActions() {
   const createPerspective = async (perspective: CreatePerspectiveData) => {
     if (!auth.user?.id) throw new Error('User must be authenticated')
 
+    const perspectiveId = id()
     await db.transact([
-      tx.perspectives[id()].update({
-        mapId: perspective.mapId,
-        name: perspective.name,
-        conceptIds: JSON.stringify(perspective.conceptIds || []),
-        relationshipIds: JSON.stringify(perspective.relationshipIds || []),
-        createdBy: auth.user.id,
-        createdAt: Date.now(),
-      }),
+      tx.perspectives[perspectiveId]
+        .update({
+          name: perspective.name,
+          conceptIds: JSON.stringify(perspective.conceptIds || []),
+          relationshipIds: JSON.stringify(perspective.relationshipIds || []),
+          createdAt: Date.now(),
+        })
+        .link({
+          map: perspective.mapId,
+          creator: auth.user.id,
+        }),
     ])
   }
 

@@ -25,15 +25,18 @@ export function Sidebar() {
   const maps = useMaps()
   // Get all perspectives for all maps (not filtered by currentMapId)
   const { data: perspectivesData } = db.useQuery({
-    perspectives: {},
+    perspectives: {
+      creator: {},
+      map: {},
+    },
   })
   const allPerspectives = (perspectivesData?.perspectives || []).map((p: any) => ({
     id: p.id,
-    mapId: p.mapId,
+    mapId: p.map?.id || '',
     name: p.name,
     conceptIds: p.conceptIds ? JSON.parse(p.conceptIds) : [],
     relationshipIds: p.relationshipIds ? JSON.parse(p.relationshipIds) : [],
-    createdBy: p.createdBy,
+    createdBy: p.creator?.id || '',
     createdAt: new Date(p.createdAt),
   }))
   const { createMap } = useMapActions()

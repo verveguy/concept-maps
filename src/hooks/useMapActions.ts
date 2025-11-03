@@ -24,13 +24,15 @@ export function useMapActions() {
   const createMap = async (name: string) => {
     if (!auth.user?.id) throw new Error('User must be authenticated')
 
+    const mapId = id()
     await db.transact([
-      tx.maps[id()].update({
-        name,
-        createdBy: auth.user.id,
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      }),
+      tx.maps[mapId]
+        .update({
+          name,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        })
+        .link({ creator: auth.user.id }),
     ])
   }
 

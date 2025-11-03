@@ -38,15 +38,21 @@ export function PerspectiveEditor() {
   const { data } = db.useQuery(
     currentMapId
       ? {
-          concepts: { $: { where: { mapId: currentMapId } } },
-          relationships: { $: { where: { mapId: currentMapId } } },
+          maps: {
+            $: { where: { id: currentMapId } },
+            concepts: {},
+            relationships: {
+              fromConcept: {},
+              toConcept: {},
+            },
+          },
         }
       : null
   )
   const concepts =
-    data?.concepts?.map((c: any) => ({
+    data?.maps?.[0]?.concepts?.map((c: any) => ({
       id: c.id,
-      mapId: c.mapId,
+      mapId: c.map?.id || currentMapId || '',
       label: c.label,
       position: { x: c.positionX, y: c.positionY },
       notes: c.notes,
@@ -55,11 +61,11 @@ export function PerspectiveEditor() {
       updatedAt: new Date(c.updatedAt),
     })) || []
   const relationships =
-    data?.relationships?.map((r: any) => ({
+    data?.maps?.[0]?.relationships?.map((r: any) => ({
       id: r.id,
-      mapId: r.mapId,
-      fromConceptId: r.fromConceptId,
-      toConceptId: r.toConceptId,
+      mapId: r.map?.id || currentMapId || '',
+      fromConceptId: r.fromConcept?.id || '',
+      toConceptId: r.toConcept?.id || '',
       primaryLabel: r.primaryLabel,
       reverseLabel: r.reverseLabel,
       notes: r.notes,

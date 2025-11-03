@@ -9,6 +9,7 @@ import { Trash2, X } from 'lucide-react'
 import { useRelationshipActions } from '@/hooks/useRelationshipActions'
 import { useRelationships } from '@/hooks/useRelationships'
 import { useUIStore } from '@/stores/uiStore'
+import { useMapPermissions } from '@/hooks/useMapPermissions'
 
 /**
  * RelationshipEditor component - Side panel for editing relationship properties.
@@ -23,6 +24,7 @@ export function RelationshipEditor() {
   const setRelationshipEditorOpen = useUIStore((state) => state.setRelationshipEditorOpen)
   const relationships = useRelationships()
   const { updateRelationship, deleteRelationship } = useRelationshipActions()
+  const { hasWriteAccess } = useMapPermissions()
 
   const relationship = relationships.find((r) => r.id === selectedRelationshipId)
 
@@ -68,7 +70,7 @@ export function RelationshipEditor() {
   }, [selectedRelationshipId]) // Only depend on ID, not the relationship object
 
   const handleSavePrimaryLabel = async () => {
-    if (!relationship || !primaryLabel.trim() || primaryLabel.trim() === relationship.primaryLabel) return
+    if (!relationship || !primaryLabel.trim() || primaryLabel.trim() === relationship.primaryLabel || !hasWriteAccess) return
 
     setIsSaving(true)
     try {
@@ -85,7 +87,7 @@ export function RelationshipEditor() {
   }
 
   const handleSaveReverseLabel = async () => {
-    if (!relationship || reverseLabel === relationship.reverseLabel) return
+    if (!relationship || reverseLabel === relationship.reverseLabel || !hasWriteAccess) return
 
     setIsSaving(true)
     try {
@@ -123,7 +125,7 @@ export function RelationshipEditor() {
     edgeColor?: string
     edgeStyle?: 'solid' | 'dashed'
   }) => {
-    if (!relationship) return
+    if (!relationship || !hasWriteAccess) return
     
     isEditingRef.current = false
     
@@ -163,7 +165,7 @@ export function RelationshipEditor() {
   }
 
   const handleDelete = async () => {
-    if (!relationship || !confirm('Are you sure you want to delete this relationship?')) return
+    if (!relationship || !hasWriteAccess || !confirm('Are you sure you want to delete this relationship?')) return
 
     setIsDeleting(true)
     try {
@@ -218,7 +220,7 @@ export function RelationshipEditor() {
               }}
               className="w-full px-3 py-2 border rounded-md"
               required
-              disabled={isDeleting || isSaving}
+              disabled={isDeleting || isSaving || !hasWriteAccess}
               placeholder="e.g., 'related to'"
               tabIndex={2}
             />
@@ -243,7 +245,7 @@ export function RelationshipEditor() {
                 }
               }}
               className="w-full px-3 py-2 border rounded-md"
-              disabled={isDeleting || isSaving}
+              disabled={isDeleting || isSaving || !hasWriteAccess}
               placeholder="e.g., 'related from'"
               tabIndex={3}
             />
@@ -264,7 +266,7 @@ export function RelationshipEditor() {
               rows={8}
               className="w-full px-3 py-2 border rounded-md font-mono text-sm"
               placeholder="Add notes about this relationship..."
-              disabled={isDeleting || isSaving}
+              disabled={isDeleting || isSaving || !hasWriteAccess}
               tabIndex={4}
             />
             <p className="text-xs text-muted-foreground mt-1">
@@ -292,7 +294,7 @@ export function RelationshipEditor() {
                     handleSaveEdgeStyle({ edgeType: newType })
                   }}
                   className="w-full px-3 py-2 text-sm border rounded-md"
-                  disabled={isDeleting || isSaving}
+                  disabled={isDeleting || isSaving || !hasWriteAccess}
                   tabIndex={5}
                 >
                   <option value="bezier">Bezier (Curved)</option>
@@ -319,7 +321,7 @@ export function RelationshipEditor() {
                       handleSaveEdgeStyle({ edgeColor: newColor })
                     }}
                     className="w-16 h-10 border rounded cursor-pointer"
-                    disabled={isDeleting || isSaving}
+                    disabled={isDeleting || isSaving || !hasWriteAccess}
                     tabIndex={6}
                   />
                   <input
@@ -337,7 +339,7 @@ export function RelationshipEditor() {
                     }}
                     placeholder="#94a3b8"
                     className="flex-1 px-3 py-2 text-sm border rounded-md font-mono"
-                    disabled={isDeleting || isSaving}
+                    disabled={isDeleting || isSaving || !hasWriteAccess}
                     tabIndex={7}
                   />
                 </div>
@@ -358,7 +360,7 @@ export function RelationshipEditor() {
                     handleSaveEdgeStyle({ edgeStyle: newStyle })
                   }}
                   className="w-full px-3 py-2 text-sm border rounded-md"
-                  disabled={isDeleting || isSaving}
+                  disabled={isDeleting || isSaving || !hasWriteAccess}
                   tabIndex={8}
                 >
                   <option value="solid">Solid</option>
@@ -385,7 +387,7 @@ export function RelationshipEditor() {
             <button
               type="button"
               onClick={handleDelete}
-              disabled={isDeleting || isSaving}
+              disabled={isDeleting || isSaving || !hasWriteAccess}
               className="w-full px-4 py-2 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50 flex items-center justify-center gap-2"
               tabIndex={9}
             >

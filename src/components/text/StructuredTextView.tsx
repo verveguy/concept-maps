@@ -60,16 +60,17 @@ export function StructuredTextView() {
       if (!fromConcept) {
         const fromConceptId = id()
         await db.transact([
-          tx.concepts[fromConceptId].update({
-            mapId: currentMapId,
-            label: parsed.from,
-            positionX: 250,
-            positionY: 250,
-            notes: '',
-            metadata: JSON.stringify({}),
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          }),
+          tx.concepts[fromConceptId]
+            .update({
+              label: parsed.from,
+              positionX: 250,
+              positionY: 250,
+              notes: '',
+              metadata: JSON.stringify({}),
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            })
+            .link({ map: currentMapId }),
         ])
         fromConcept = {
           id: fromConceptId,
@@ -86,16 +87,17 @@ export function StructuredTextView() {
       if (!toConcept) {
         const toConceptId = id()
         await db.transact([
-          tx.concepts[toConceptId].update({
-            mapId: currentMapId,
-            label: parsed.to,
-            positionX: 350,
-            positionY: 350,
-            notes: '',
-            metadata: JSON.stringify({}),
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-          }),
+          tx.concepts[toConceptId]
+            .update({
+              label: parsed.to,
+              positionX: 350,
+              positionY: 350,
+              notes: '',
+              metadata: JSON.stringify({}),
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            })
+            .link({ map: currentMapId }),
         ])
         toConcept = {
           id: toConceptId,

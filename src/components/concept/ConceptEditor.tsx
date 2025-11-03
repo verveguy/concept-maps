@@ -23,6 +23,7 @@ export function ConceptEditor() {
   const setConceptEditorOpen = useUIStore((state) => state.setConceptEditorOpen)
   const concepts = useConcepts()
   const { updateConcept, deleteConcept } = useConceptActions()
+  const { hasWriteAccess } = useMapPermissions()
 
   const concept = concepts.find((c) => c.id === selectedConceptId)
 
@@ -74,7 +75,7 @@ export function ConceptEditor() {
   }, [selectedConceptId]) // Only depend on ID, not the concept object
 
   const handleSaveLabel = async () => {
-    if (!concept || !label.trim() || label.trim() === concept.label) return
+    if (!concept || !label.trim() || label.trim() === concept.label || !hasWriteAccess) return
 
     setIsSaving(true)
     try {
@@ -108,7 +109,7 @@ export function ConceptEditor() {
   }
 
   const handleSaveMetadata = async () => {
-    if (!concept) return
+    if (!concept || !hasWriteAccess) return
     
     isEditingRef.current = false // Mark editing as complete
 
@@ -175,7 +176,7 @@ export function ConceptEditor() {
     borderStyle?: 'solid' | 'dashed' | 'dotted'
     textColor?: string
   }) => {
-    if (!concept) return
+    if (!concept || !hasWriteAccess) return
     
     isEditingRef.current = false
     
@@ -218,6 +219,7 @@ export function ConceptEditor() {
   }
 
   const handleDeleteMetadataField = async (key: string) => {
+    if (!concept || !hasWriteAccess) return
     const newMetadata = { ...metadata }
     delete newMetadata[key]
     setMetadata(newMetadata)
@@ -308,7 +310,7 @@ export function ConceptEditor() {
               }}
               className="w-full px-3 py-2 border rounded-md"
               required
-              disabled={isDeleting || isSaving}
+              disabled={isDeleting || isSaving || !hasWriteAccess}
               tabIndex={2}
             />
           </div>
@@ -325,7 +327,7 @@ export function ConceptEditor() {
               rows={8}
               className="w-full px-3 py-2 border rounded-md font-mono text-sm"
               placeholder="Add notes about this concept..."
-              disabled={isDeleting || isSaving}
+              disabled={isDeleting || isSaving || !hasWriteAccess}
               tabIndex={3}
             />
             <p className="text-xs text-muted-foreground mt-1">
@@ -355,7 +357,7 @@ export function ConceptEditor() {
                       handleSaveNodeStyle({ fillColor: newColor })
                     }}
                     className="w-12 h-10 border rounded cursor-pointer"
-                    disabled={isDeleting || isSaving}
+                    disabled={isDeleting || isSaving || !hasWriteAccess}
                     tabIndex={4}
                   />
                   <input
@@ -368,7 +370,7 @@ export function ConceptEditor() {
                     onBlur={() => handleSaveNodeStyle()}
                     className="flex-1 px-3 py-2 text-sm border rounded-md font-mono"
                     placeholder="#ffffff"
-                    disabled={isDeleting || isSaving}
+                    disabled={isDeleting || isSaving || !hasWriteAccess}
                     tabIndex={5}
                   />
                 </div>
@@ -391,7 +393,7 @@ export function ConceptEditor() {
                       handleSaveNodeStyle({ borderColor: newColor })
                     }}
                     className="w-12 h-10 border rounded cursor-pointer"
-                    disabled={isDeleting || isSaving}
+                    disabled={isDeleting || isSaving || !hasWriteAccess}
                     tabIndex={6}
                   />
                   <input
@@ -404,7 +406,7 @@ export function ConceptEditor() {
                     onBlur={() => handleSaveNodeStyle()}
                     className="flex-1 px-3 py-2 text-sm border rounded-md font-mono"
                     placeholder="#d1d5db"
-                    disabled={isDeleting || isSaving}
+                    disabled={isDeleting || isSaving || !hasWriteAccess}
                     tabIndex={7}
                   />
                 </div>
@@ -425,7 +427,7 @@ export function ConceptEditor() {
                     handleSaveNodeStyle({ borderStyle: newStyle })
                   }}
                   className="w-full px-3 py-2 text-sm border rounded-md"
-                  disabled={isDeleting || isSaving}
+                  disabled={isDeleting || isSaving || !hasWriteAccess}
                   tabIndex={8}
                 >
                   <option value="solid">Solid</option>
@@ -451,7 +453,7 @@ export function ConceptEditor() {
                       handleSaveNodeStyle({ textColor: newColor })
                     }}
                     className="w-12 h-10 border rounded cursor-pointer"
-                    disabled={isDeleting || isSaving}
+                    disabled={isDeleting || isSaving || !hasWriteAccess}
                     tabIndex={9}
                   />
                   <input
@@ -464,7 +466,7 @@ export function ConceptEditor() {
                     onBlur={() => handleSaveNodeStyle()}
                     className="flex-1 px-3 py-2 text-sm border rounded-md font-mono"
                     placeholder="#111827"
-                    disabled={isDeleting || isSaving}
+                    disabled={isDeleting || isSaving || !hasWriteAccess}
                     tabIndex={10}
                   />
                 </div>
@@ -510,7 +512,7 @@ export function ConceptEditor() {
                       }}
                       placeholder="Key"
                       className="flex-1 px-2 py-1 text-xs border rounded-md"
-                      disabled={isDeleting || isSaving}
+                      disabled={isDeleting || isSaving || !hasWriteAccess}
                     />
                     <input
                       type="text"
@@ -527,12 +529,12 @@ export function ConceptEditor() {
                       }}
                       placeholder="Value"
                       className="flex-1 px-2 py-1 text-xs border rounded-md"
-                      disabled={isDeleting || isSaving}
+                      disabled={isDeleting || isSaving || !hasWriteAccess}
                     />
                     <button
                       type="button"
                       onClick={() => handleDeleteMetadataField(key)}
-                      disabled={isDeleting || isSaving}
+                      disabled={isDeleting || isSaving || !hasWriteAccess}
                       className="px-2 py-1 text-xs text-destructive hover:bg-destructive/10 rounded disabled:opacity-50"
                       tabIndex={12}
                     >
@@ -553,7 +555,7 @@ export function ConceptEditor() {
             <button
               type="button"
               onClick={handleDelete}
-              disabled={isDeleting || isSaving}
+              disabled={isDeleting || isSaving || !hasWriteAccess}
               className="w-full px-4 py-2 text-sm bg-destructive text-destructive-foreground rounded-md hover:bg-destructive/90 disabled:opacity-50 flex items-center justify-center gap-2"
               tabIndex={13}
             >

@@ -29,7 +29,6 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
   const { setCurrentMapId } = useMapStore()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [hasCompleted, setHasCompleted] = useState(false)
 
   const invitationQuery = db.useQuery(
     inviteToken
@@ -37,6 +36,10 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
           shareInvitations: {
             $: {
               where: { token: inviteToken },
+            },
+            creator: {},
+            map: {
+              creator: {},
             },
           },
         }
@@ -46,32 +49,21 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
   const invitationRecord = invitationQuery?.data?.shareInvitations?.[0] ?? null
   const isLoading = invitationQuery?.isLoading ?? false
 
-  const mapQuery = db.useQuery(
-    invitationRecord?.mapId
-      ? {
-          maps: {
-            $: {
-              where: { id: invitationRecord.mapId },
-            },
-          },
-        }
-      : null
-  )
-
   const invitation: (ShareInvitation & { map?: { id: string; name: string; createdBy: string } }) | null = useMemo(() => {
     if (!invitationRecord) return null
 
-    const map = mapQuery?.data?.maps?.[0]
+    // Map is now has: 'one', so it's a single object, not an array
+    const map = invitationRecord.map
 
     return {
       id: invitationRecord.id,
-      mapId: invitationRecord.mapId,
+      mapId: map?.id || '',
       invitedEmail: invitationRecord.invitedEmail,
       invitedUserId: invitationRecord.invitedUserId ?? null,
       permission: invitationRecord.permission as ShareInvitation['permission'],
       token: invitationRecord.token,
       status: invitationRecord.status as ShareInvitation['status'],
-      createdBy: invitationRecord.createdBy,
+      createdBy: invitationRecord.creator?.id || '',
       createdAt: new Date(invitationRecord.createdAt),
       expiresAt: invitationRecord.expiresAt ? new Date(invitationRecord.expiresAt) : null,
       respondedAt: invitationRecord.respondedAt ? new Date(invitationRecord.respondedAt) : null,
@@ -80,19 +72,18 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
         ? {
             id: map.id,
             name: map.name,
-            createdBy: map.createdBy,
+            createdBy: map.creator?.id || '',
           }
         : undefined,
     }
-  }, [invitationRecord, mapQuery?.data?.maps])
+  }, [invitationRecord])
 
   /**
-   * Utility to clear the invitation token from the URL after the flow finishes.
+   * Utility to navigate to the root of the app after the flow finishes.
    */
-  const clearInviteTokenFromUrl = () => {
-    const url = new URL(window.location.href)
-    url.searchParams.delete('inviteToken')
-    window.history.replaceState({}, document.title, url.toString())
+  const navigateToApp = () => {
+    // Navigate to root path, removing any query params
+    window.location.href = '/'
   }
 
   /**
@@ -111,11 +102,25 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
       setErrorMessage('This invitation is no longer pending.')
       return
     }
+    if (!invitation.map?.id) {
+      setErrorMessage('Map information is missing. Please contact the map owner.')
+      return
+    }
 
     setIsProcessing(true)
     setErrorMessage(null)
 
     try {
+      // Get the map owner (invitation creator) from the raw query data
+      // The invitation creator is the map owner who created the invitation
+      const mapOwnerId = invitationRecord?.creator?.id || invitationRecord?.map?.creator?.id
+      if (!mapOwnerId || mapOwnerId.trim() === '') {
+        console.error('Invitation data:', { invitationRecord, invitation })
+        setErrorMessage('Map owner information is missing. Cannot accept invitation.')
+        return
+      }
+
+      // Combine both operations in a single transaction to ensure atomicity
       await db.transact([
         tx.shareInvitations[invitation.id].update({
           status: 'accepted',
@@ -123,24 +128,26 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
           respondedAt: Date.now(),
           revokedAt: null,
         }),
+        tx.shares[invitation.id]
+          .update({
+            permission: invitation.permission,
+            createdAt: Date.now(),
+            acceptedAt: Date.now(),
+            status: 'active',
+            revokedAt: null,
+          })
+          .link({
+            user: auth.user.id,
+            map: invitation.map.id,
+            creator: mapOwnerId, // Link creator to map owner for permission checks
+          }),
+        // Create permission links based on the invitation permission
+        ...(invitation.permission === 'edit'
+          ? [tx.maps[invitation.map.id].link({ writePermissions: auth.user.id })]
+          : [tx.maps[invitation.map.id].link({ readPermissions: auth.user.id })]),
       ])
 
-      await db.transact([
-        tx.shares[invitation.id].update({
-          mapId: invitation.mapId,
-          userId: auth.user.id,
-          permission: invitation.permission,
-          createdAt: Date.now(),
-          acceptedAt: Date.now(),
-          status: 'active',
-          revokedAt: null,
-          invitationId: invitation.id,
-        }),
-      ])
-
-      setCurrentMapId(invitation.mapId)
-      setHasCompleted(true)
-      clearInviteTokenFromUrl()
+      setCurrentMapId(invitation.map.id)
     } catch (error) {
       console.error('Failed to accept invitation', error)
       setErrorMessage('Failed to accept the invitation. Please try again or contact the owner.')
@@ -177,9 +184,6 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
           respondedAt: Date.now(),
         }),
       ])
-
-      clearInviteTokenFromUrl()
-      setHasCompleted(true)
     } catch (error) {
       console.error('Failed to decline invitation', error)
       setErrorMessage('Failed to decline the invitation. Please try again.')
@@ -208,7 +212,7 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
           </p>
           <button
             className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-            onClick={clearInviteTokenFromUrl}
+            onClick={navigateToApp}
           >
             Return to app
           </button>
@@ -217,24 +221,8 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
     )
   }
 
-  if (hasCompleted) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="space-y-4 text-center max-w-md">
-          <h1 className="text-2xl font-semibold">All Set!</h1>
-          <p className="text-sm text-muted-foreground">
-            You can now continue to the map workspace.
-          </p>
-          <button
-            className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-            onClick={() => clearInviteTokenFromUrl()}
-          >
-            Continue
-          </button>
-        </div>
-      </div>
-    )
-  }
+  const isAccepted = invitation.status === 'accepted'
+  const isDeclined = invitation.status === 'declined'
 
   return (
     <div className="flex items-center justify-center min-h-screen px-4">
@@ -254,6 +242,18 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
           </div>
         )}
 
+        {isAccepted && (
+          <div className="p-3 text-sm text-green-700 bg-green-50 border border-green-100 rounded-md">
+            Invitation accepted! You now have access to this map.
+          </div>
+        )}
+
+        {isDeclined && (
+          <div className="p-3 text-sm text-gray-700 bg-gray-50 border border-gray-100 rounded-md">
+            This invitation has been declined.
+          </div>
+        )}
+
         {!auth.user && (
           <div className="p-3 text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded-md">
             Sign in with the email address that received this invitation to accept or decline.
@@ -266,7 +266,7 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
           </div>
         )}
 
-        {invitation.status !== 'pending' && (
+        {invitation.status !== 'pending' && invitation.status !== 'accepted' && invitation.status !== 'declined' && (
           <div className="p-3 text-sm text-yellow-700 bg-yellow-50 border border-yellow-100 rounded-md">
             This invitation is marked as {invitation.status}. Please contact the map owner for a new invite if needed.
           </div>
@@ -280,20 +280,31 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
         </div>
 
         <div className="flex flex-col sm:flex-row sm:justify-end gap-2 pt-2">
-          <button
-            onClick={handleDecline}
-            disabled={isProcessing || invitation.status !== 'pending'}
-            className="px-4 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50"
-          >
-            Decline
-          </button>
-          <button
-            onClick={handleAccept}
-            disabled={isProcessing || invitation.status !== 'pending'}
-            className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
-          >
-            {isProcessing ? 'Processing...' : 'Accept Invitation'}
-          </button>
+          {!isAccepted && !isDeclined && (
+            <button
+              onClick={handleDecline}
+              disabled={isProcessing || invitation.status !== 'pending'}
+              className="px-4 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50"
+            >
+              Decline
+            </button>
+          )}
+          {isAccepted ? (
+            <button
+              onClick={navigateToApp}
+              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            >
+              Continue
+            </button>
+          ) : (
+            <button
+              onClick={handleAccept}
+              disabled={isProcessing || invitation.status !== 'pending'}
+              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+            >
+              {isProcessing ? 'Processing...' : 'Accept Invitation'}
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -16,6 +16,7 @@ import { useMapStore } from '@/stores/mapStore'
 import { useConceptActions } from '@/hooks/useConceptActions'
 import { useMap } from '@/hooks/useMap'
 import { usePerspectives } from '@/hooks/usePerspectives'
+import { useMapPermissions } from '@/hooks/useMapPermissions'
 
 /**
  * Main map page component.
@@ -33,6 +34,7 @@ export function MapPage() {
   const perspectives = usePerspectives()
   const currentPerspective = perspectives.find((p) => p.id === currentPerspectiveId)
   const { createConcept } = useConceptActions()
+  const { hasWriteAccess } = useMapPermissions()
   const [isCreatingConcept, setIsCreatingConcept] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showShareDialog, setShowShareDialog] = useState(false)
@@ -42,14 +44,14 @@ export function MapPage() {
 
   const handleCreateConcept = useCallback(
     async (position: { x: number; y: number }) => {
-      if (!currentMapId || !map) return
+      if (!currentMapId || !map || !hasWriteAccess) return
 
       // Show dialog instead of using prompt()
       setCreatePosition(position)
       setShowCreateDialog(true)
       setConceptLabel('')
     },
-    [currentMapId, map]
+    [currentMapId, map, hasWriteAccess]
   )
 
   const handleSubmitConcept = useCallback(

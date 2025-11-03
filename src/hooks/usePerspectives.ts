@@ -19,8 +19,9 @@ export function usePerspectives() {
   const { data } = db.useQuery(
     currentMapId
       ? {
-          perspectives: {
-            $: { where: { mapId: currentMapId } },
+          maps: {
+            $: { where: { id: currentMapId } },
+            perspectives: {},
           },
         }
       : null
@@ -28,13 +29,13 @@ export function usePerspectives() {
 
   // Transform InstantDB data to schema format
   const perspectives: Perspective[] =
-    data?.perspectives?.map((p: any) => ({
+    data?.maps?.[0]?.perspectives?.map((p: any) => ({
       id: p.id,
-      mapId: p.mapId,
+      mapId: p.map?.id || currentMapId || '',
       name: p.name,
       conceptIds: p.conceptIds ? JSON.parse(p.conceptIds) : [],
       relationshipIds: p.relationshipIds ? JSON.parse(p.relationshipIds) : [],
-      createdBy: p.createdBy,
+      createdBy: p.creator?.id || '',
       createdAt: new Date(p.createdAt),
     })) || []
 

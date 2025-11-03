@@ -21,58 +21,77 @@ export function useSharing(mapId: string | null) {
   const userId = currentUser?.id || null
 
   // Query share invitations and share records for the provided map
+  // Include permission links for debugging and consistency
+  // Include map link on shares so permission checks can traverse to map.creator
   const { data } = db.useQuery(
     mapId
       ? {
-          shares: {
-            $: {
-              where: { mapId },
+          maps: {
+            $: { where: { id: mapId } },
+            shares: {
+              user: {},
+              map: {
+                creator: {},
+              },
+              creator: {},
             },
-          },
-          shareInvitations: {
-            $: {
-              where: { mapId },
+            shareInvitations: {
+              creator: {},
             },
+            writePermissions: {},
+            readPermissions: {},
           },
         }
       : null
   )
 
   // Transform InstantDB data to domain schema format
-  const shares: Share[] = useMemo(
-    () =>
-      data?.shares?.map((s: any) => ({
-        id: s.id,
-        mapId: s.mapId,
-        userId: s.userId,
-        permission: s.permission as 'view' | 'edit',
-        createdAt: new Date(s.createdAt),
-        acceptedAt: s.acceptedAt ? new Date(s.acceptedAt) : null,
-        status: (s.status ?? 'pending') as Share['status'],
-        revokedAt: s.revokedAt ? new Date(s.revokedAt) : null,
-        invitationId: s.invitationId ?? null,
-      })) || [],
-    [data?.shares]
-  )
-
   const invitations: ShareInvitation[] = useMemo(
     () =>
-      data?.shareInvitations?.map((inv: any) => ({
+      data?.maps?.[0]?.shareInvitations?.map((inv: any) => ({
         id: inv.id,
-        mapId: inv.mapId,
+        mapId: inv.map?.id || mapId || '',
         invitedEmail: inv.invitedEmail,
         invitedUserId: inv.invitedUserId ?? null,
         permission: inv.permission as 'view' | 'edit',
         token: inv.token,
         status: inv.status as ShareInvitation['status'],
-        createdBy: inv.createdBy,
+        createdBy: inv.creator?.id || '',
         createdAt: new Date(inv.createdAt),
         expiresAt: inv.expiresAt ? new Date(inv.expiresAt) : null,
         respondedAt: inv.respondedAt ? new Date(inv.respondedAt) : null,
         revokedAt: inv.revokedAt ? new Date(inv.revokedAt) : null,
       })) || [],
-    [data?.shareInvitations]
+    [data?.maps, mapId]
   )
+
+  const shares: Share[] = useMemo(() => {
+    const sharesData = data?.maps?.[0]?.shares || []
+    return sharesData.map((s: any) => {
+      const userId = s.user?.id || ''
+      // Shares created from invitations use the invitation ID as the share ID
+      // So we can match directly by ID, or fall back to matching by userId
+      const matchingInvitation = invitations.find(
+        (inv) => inv.id === s.id || (inv.invitedUserId === userId && inv.status === 'accepted')
+      )
+      
+      // Get email from user object if available, otherwise from matching invitation
+      const userEmail = s.user?.email || matchingInvitation?.invitedEmail || null
+
+      return {
+        id: s.id,
+        mapId: s.map?.id || mapId || '',
+        userId,
+        userEmail,
+        permission: s.permission as 'view' | 'edit',
+        createdAt: new Date(s.createdAt),
+        acceptedAt: s.acceptedAt ? new Date(s.acceptedAt) : null,
+        status: (s.status ?? 'pending') as Share['status'],
+        revokedAt: s.revokedAt ? new Date(s.revokedAt) : null,
+        invitationId: null, // No longer tracked as attribute
+      }
+    })
+  }, [data?.maps, mapId, invitations])
 
   /**
    * Create a new invitation for a map collaborator.
@@ -93,19 +112,22 @@ export function useSharing(mapId: string | null) {
         : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`)
 
       await db.transact([
-        tx.shareInvitations[invitationId].update({
-          mapId,
-          invitedEmail: targetEmail.toLowerCase(),
-          invitedUserId: null,
-          permission,
-          token,
-          status: 'pending',
-          createdBy: currentUser.id,
-          createdAt: Date.now(),
-          expiresAt: null,
-          respondedAt: null,
-          revokedAt: null,
-        }),
+        tx.shareInvitations[invitationId]
+          .update({
+            invitedEmail: targetEmail.toLowerCase(),
+            invitedUserId: null,
+            permission,
+            token,
+            status: 'pending',
+            createdAt: Date.now(),
+            expiresAt: null,
+            respondedAt: null,
+            revokedAt: null,
+          })
+          .link({
+            creator: currentUser.id,
+            map: mapId,
+          }),
       ])
 
       return token
@@ -116,6 +138,7 @@ export function useSharing(mapId: string | null) {
   /**
    * Accept a collaboration invitation.
    * Updates the invitation record to accepted and creates an active share entry.
+   * All operations are performed in a single atomic transaction.
    *
    * @param invitationId - ID of the invitation to accept
    */
@@ -129,6 +152,15 @@ export function useSharing(mapId: string | null) {
         throw new Error('Only pending invitations can be accepted')
       }
 
+      // Get the map owner (invitation creator) from the raw query data
+      const invitationRecord = data?.maps?.[0]?.shareInvitations?.find((inv: any) => inv.id === invitationId)
+      const mapOwnerId = invitationRecord?.creator?.id || invitation.createdBy
+
+      if (!mapOwnerId) {
+        throw new Error('Map owner information is missing. Cannot create share.')
+      }
+
+      // Single atomic transaction combining all operations
       await db.transact([
         tx.shareInvitations[invitationId].update({
           status: 'accepted',
@@ -136,22 +168,26 @@ export function useSharing(mapId: string | null) {
           respondedAt: Date.now(),
           revokedAt: null,
         }),
-      ])
-
-      await db.transact([
-        tx.shares[invitation.id].update({
-          mapId: invitation.mapId,
-          userId,
-          permission: invitation.permission,
-          createdAt: Date.now(),
-          acceptedAt: Date.now(),
-          status: 'active',
-          revokedAt: null,
-          invitationId: invitation.id,
-        }),
+        tx.shares[invitation.id]
+          .update({
+            permission: invitation.permission,
+            createdAt: Date.now(),
+            acceptedAt: Date.now(),
+            status: 'active',
+            revokedAt: null,
+          })
+          .link({
+            user: userId,
+            map: invitation.mapId,
+            creator: mapOwnerId, // Link creator to map owner for permission checks
+          }),
+        // Create permission links based on the invitation permission
+        ...(invitation.permission === 'edit'
+          ? [tx.maps[invitation.mapId].link({ writePermissions: userId })]
+          : [tx.maps[invitation.mapId].link({ readPermissions: userId })]),
       ])
     },
-    [invitations, userId]
+    [invitations, userId, data]
   )
 
   /**
@@ -182,6 +218,7 @@ export function useSharing(mapId: string | null) {
 
   /**
    * Revoke an invitation (owner action) and expire any linked shares.
+   * Also removes permission links if the invitation was already accepted.
    *
    * @param invitationId - ID of the invitation to revoke
    */
@@ -189,70 +226,163 @@ export function useSharing(mapId: string | null) {
     async (invitationId: string) => {
       if (!currentUser?.id) throw new Error('Authentication required to revoke invitations')
 
-      const invitationShares = shares.filter((share) => share.invitationId === invitationId)
+      const invitation = invitations.find((inv) => inv.id === invitationId)
+      if (!invitation) throw new Error('Invitation not found')
 
-      await db.transact([
+      // Find associated share - shares created from invitations use the invitation ID as the share ID
+      const sharesData = data?.maps?.[0]?.shares || []
+      const associatedShare = sharesData.find((s: any) => s.id === invitationId)
+
+      const operations: any[] = [
         tx.shareInvitations[invitationId].update({
           status: 'revoked',
           revokedAt: Date.now(),
         }),
-        ...invitationShares.map((share) =>
-          tx.shares[share.id].update({
+      ]
+
+      // If there's an associated share that was accepted, revoke it and remove permission links
+      if (associatedShare && associatedShare.status === 'active') {
+        operations.push(
+          tx.shares[invitationId].update({
             status: 'revoked',
             revokedAt: Date.now(),
           })
-        ),
-      ])
+        )
+
+        // Remove permission links
+        const userId = associatedShare.user?.id || invitation.invitedUserId
+        if (userId) {
+          operations.push(
+            ...(invitation.permission === 'edit'
+              ? [tx.maps[invitation.mapId].unlink({ writePermissions: userId })]
+              : [tx.maps[invitation.mapId].unlink({ readPermissions: userId })])
+          )
+        }
+      }
+
+      await db.transact(operations)
     },
-    [currentUser?.id, shares]
+    [currentUser?.id, invitations, data]
   )
 
   /**
    * Update the permission level for an active share (owner action).
+   * Updates the permission links accordingly. Operations are idempotent - always
+   * unlinks from both permission types before linking to the correct one.
    *
    * @param shareId - ID of the share to update
    * @param permission - New permission level
    */
   const updateSharePermission = useCallback(
     async (shareId: string, permission: 'view' | 'edit') => {
+      // Find the share in the raw query data to access the user link directly
+      const sharesData = data?.maps?.[0]?.shares || []
+      const shareRecord = sharesData.find((s: any) => s.id === shareId)
+      
+      if (!shareRecord) throw new Error('Share not found')
+      if (shareRecord.status !== 'active') {
+        throw new Error('Can only update permissions for active shares')
+      }
+      
+      const share = shares.find((s) => s.id === shareId)
+      if (!share) throw new Error('Share not found')
+      if (!share.mapId) throw new Error('Share map ID is required')
+      
+      // Get userId from link - try shareRecord first, then fallback to transformed share.userId
+      // The transformed share.userId comes from the same query data, so if one is missing, both will be
+      // But we try both in case of timing/refresh issues
+      let userId = shareRecord.user?.id || share.userId
+      if (!userId || userId.trim() === '') {
+        // Last resort: try to get from the invitation if this share was created from one
+        const matchingInvitation = invitations.find(
+          (inv) => inv.id === shareId && inv.status === 'accepted'
+        )
+        userId = matchingInvitation?.invitedUserId || null
+      }
+      
+      if (!userId || userId.trim() === '') {
+        console.error('Share data:', { shareRecord, share, sharesData })
+        throw new Error(
+          'Share is missing user link. Share may not have been fully loaded. ' +
+          'Please refresh the page and try again.'
+        )
+      }
+      
+      if (share.permission === permission) return // No change needed
+
+      // Get the creator ID from the share record (map owner) - needed for permission check
+      const creatorId = shareRecord.creator?.id || shareRecord.map?.creator?.id
+      if (!creatorId) {
+        throw new Error('Share creator information is missing. Cannot update permission.')
+      }
+
+      // Idempotent update: unlink from both permission types, then link to correct one
+      // Ensure map and creator links are maintained in transaction for permission checks
       await db.transact([
-        tx.shares[shareId].update({
-          permission,
-        }),
+        tx.shares[shareId]
+          .update({
+            permission,
+          })
+          .link({
+            map: share.mapId,
+            creator: creatorId, // Maintain creator link for permission evaluation
+          }),
+        // Unlink from old permission type (idempotent - safe if already unlinked)
+        ...(share.permission === 'edit'
+          ? [tx.maps[share.mapId].unlink({ writePermissions: userId })]
+          : [tx.maps[share.mapId].unlink({ readPermissions: userId })]),
+        // Link to new permission type
+        ...(permission === 'edit'
+          ? [tx.maps[share.mapId].link({ writePermissions: userId })]
+          : [tx.maps[share.mapId].link({ readPermissions: userId })]),
       ])
     },
-    []
+    [shares, data, invitations]
   )
 
   /**
-   * Revoke a share (owner action) and flag the underlying invitation as revoked.
+   * Revoke a share (owner action) and remove permission links.
    *
    * @param shareId - ID of the share to revoke
    */
   const revokeShare = useCallback(
     async (shareId: string) => {
+      // Find the share in the raw query data to access the user link directly
+      const sharesData = data?.maps?.[0]?.shares || []
+      const shareRecord = sharesData.find((s: any) => s.id === shareId)
+      
+      if (!shareRecord) throw new Error('Share not found')
+      if (shareRecord.status === 'revoked') {
+        return // Already revoked, nothing to do
+      }
+      
       const share = shares.find((s) => s.id === shareId)
       if (!share) throw new Error('Share not found')
+      if (!share.mapId) throw new Error('Share map ID is required')
+      
+      // Get userId from link - should always exist for active shares
+      const userId = shareRecord.user?.id
+      if (!userId) {
+        throw new Error('Share is missing user link. Cannot revoke.')
+      }
 
-      const updates = [
+      const operations: any[] = [
         tx.shares[shareId].update({
           status: 'revoked',
           revokedAt: Date.now(),
         }),
       ]
 
-      if (share.invitationId) {
-        updates.push(
-          tx.shareInvitations[share.invitationId].update({
-            status: 'revoked',
-            revokedAt: Date.now(),
-          })
-        )
-      }
+      // Remove permission links based on current permission
+      operations.push(
+        ...(share.permission === 'edit'
+          ? [tx.maps[share.mapId].unlink({ writePermissions: userId })]
+          : [tx.maps[share.mapId].unlink({ readPermissions: userId })])
+      )
 
-      await db.transact(updates)
+      await db.transact(operations)
     },
-    [shares]
+    [shares, data]
   )
 
   return {

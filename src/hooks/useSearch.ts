@@ -82,6 +82,7 @@ export function useSearchQuery(query: string) {
                 label: { $ilike: searchPattern },
               },
             },
+            map: {},
           },
         }
       : null
@@ -99,6 +100,7 @@ export function useSearchQuery(query: string) {
                 primaryLabel: { $ilike: searchPattern },
               },
             },
+            map: {},
           },
         }
       : null
@@ -113,6 +115,7 @@ export function useSearchQuery(query: string) {
                 reverseLabel: { $ilike: searchPattern },
               },
             },
+            map: {},
           },
         }
       : null
@@ -151,7 +154,7 @@ export function useSearchQuery(query: string) {
         results.push({
           type: 'concept',
           id: c.id,
-          mapId: c.mapId,
+          mapId: c.map?.id || '',
         })
       })
     }
@@ -161,7 +164,7 @@ export function useSearchQuery(query: string) {
       results.push({
         type: 'relationship',
         id: r.id,
-        mapId: r.mapId,
+        mapId: r.map?.id || '',
       })
     })
 
@@ -183,9 +186,9 @@ export function useSearchQuery(query: string) {
         results.push({
           type: 'concept',
           id: c.id,
-          mapId: c.mapId,
+          mapId: c.map?.id || '',
           label: c.label,
-          mapName: mapNames.get(c.mapId),
+          mapName: mapNames.get(c.map?.id || ''),
         })
       })
     }
@@ -195,10 +198,10 @@ export function useSearchQuery(query: string) {
       results.push({
         type: 'relationship',
         id: r.id,
-        mapId: r.mapId,
+        mapId: r.map?.id || '',
         label: r.primaryLabel,
         secondaryLabel: r.reverseLabel,
-        mapName: mapNames.get(r.mapId),
+        mapName: mapNames.get(r.map?.id || ''),
       })
     })
 

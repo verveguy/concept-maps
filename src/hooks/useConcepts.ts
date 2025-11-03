@@ -38,12 +38,13 @@ export function useConcepts() {
   const { data } = db.useQuery(
     currentMapId
       ? {
-          concepts: {
-            $: {
-              where: conceptIds
-                ? { mapId: currentMapId, id: { $in: conceptIds } }
-                : { mapId: currentMapId },
-            },
+          maps: {
+            $: { where: { id: currentMapId } },
+            concepts: conceptIds
+              ? {
+                  $: { where: { id: { $in: conceptIds } } },
+                }
+              : {},
           },
         }
       : null
@@ -51,9 +52,9 @@ export function useConcepts() {
 
   // Transform InstantDB data to schema format
   const concepts: Concept[] =
-    data?.concepts?.map((c: any) => ({
+    data?.maps?.[0]?.concepts?.map((c: any) => ({
       id: c.id,
-      mapId: c.mapId,
+      mapId: c.map?.id || currentMapId || '',
       label: c.label,
       position: { x: c.positionX, y: c.positionY },
       notes: c.notes,
@@ -79,10 +80,9 @@ export function useAllConcepts() {
   const { data } = db.useQuery(
     currentMapId
       ? {
-          concepts: {
-            $: {
-              where: { mapId: currentMapId },
-            },
+          maps: {
+            $: { where: { id: currentMapId } },
+            concepts: {},
           },
         }
       : null
@@ -90,9 +90,9 @@ export function useAllConcepts() {
 
   // Transform InstantDB data to schema format
   const concepts: Concept[] =
-    data?.concepts?.map((c: any) => ({
+    data?.maps?.[0]?.concepts?.map((c: any) => ({
       id: c.id,
-      mapId: c.mapId,
+      mapId: c.map?.id || currentMapId || '',
       label: c.label,
       position: { x: c.positionX, y: c.positionY },
       notes: c.notes,

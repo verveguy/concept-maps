@@ -45,7 +45,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
   const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null)
 
   // Check if current user is the map owner
-  const isOwner = map?.createdBy === currentUser?.id
+  const isOwner = map?.creator?.id === currentUser?.id
 
   const handleShare = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -273,7 +273,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <div className="text-sm font-medium">{share.userId}</div>
+                        <div className="text-sm font-medium">{share.userEmail || share.userId}</div>
                         <span
                           className={`text-xs px-2 py-0.5 rounded-full ${
                             share.status === 'active'

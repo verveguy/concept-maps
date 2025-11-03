@@ -35,6 +35,7 @@ import { applyForceDirectedLayout, applyHierarchicalLayout } from '@/lib/layouts
 import { Network, Layers, FileText } from 'lucide-react'
 import { usePresence } from '@/hooks/usePresence'
 import { PresenceCursor } from '@/components/presence/PresenceCursor'
+import { useMapPermissions } from '@/hooks/useMapPermissions'
 
 /**
  * Props for ConceptMapCanvas component.
@@ -71,6 +72,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const currentMapId = useMapStore((state) => state.currentMapId)
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
   const isEditingPerspective = useMapStore((state) => state.isEditingPerspective)
+  
+  // Check if user has write access to the current map
+  const { hasWriteAccess } = useMapPermissions()
   
   // Get perspectives to check which concepts are included
   const perspectives = usePerspectives()
@@ -472,28 +476,32 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
           // Create both concept and relationship in a single transaction
           await db.transact([
             // Create the new concept
-            tx.concepts[newConceptId].update({
-              mapId: currentMapId,
-              label: 'New Concept',
-              positionX: position.x,
-              positionY: position.y,
-              notes: '',
-              metadata: JSON.stringify({}),
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            }),
+            tx.concepts[newConceptId]
+              .update({
+                label: 'New Concept',
+                positionX: position.x,
+                positionY: position.y,
+                notes: '',
+                metadata: JSON.stringify({}),
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              })
+              .link({ map: currentMapId }),
             // Create the relationship linking source to new concept
-            tx.relationships[newRelationshipId].update({
-              mapId: currentMapId,
-              fromConceptId: connectionStart.sourceId,
-              toConceptId: newConceptId,
-              primaryLabel: 'related to',
-              reverseLabel: 'related from',
-              notes: '',
-              metadata: JSON.stringify({}),
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            }),
+            tx.relationships[newRelationshipId]
+              .update({
+                primaryLabel: 'related to',
+                reverseLabel: 'related from',
+                notes: '',
+                metadata: JSON.stringify({}),
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              })
+              .link({
+                map: currentMapId,
+                fromConcept: connectionStart.sourceId,
+                toConcept: newConceptId,
+              }),
           ])
         } catch (error) {
           console.error('Failed to create concept and relationship from connection:', error)
@@ -516,7 +524,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   // Handle node drag - update position in database with throttling
   const onNodeDrag = useCallback(
     async (_event: React.MouseEvent, node: Node) => {
-      if (!currentMapId) return
+      if (!currentMapId || !hasWriteAccess) return
 
       // Handle text view node position update (no throttling needed for UI state)
       if (node.id === 'text-view-node') {
@@ -552,13 +560,13 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         }
       }
     },
-    [currentMapId, concepts, updateConcept, setTextViewPosition, screenToFlowPosition, setCursor]
+    [currentMapId, concepts, updateConcept, setTextViewPosition, screenToFlowPosition, setCursor, hasWriteAccess]
   )
 
   // Handle node drag end - ensure final position is saved
   const onNodeDragStop = useCallback(
     async (_event: React.MouseEvent, node: Node) => {
-      if (!currentMapId) return
+      if (!currentMapId || !hasWriteAccess) return
       
       // Handle text view node position update
       if (node.id === 'text-view-node') {
@@ -592,7 +600,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         }
       }
     },
-    [concepts, currentMapId, updateConcept, setTextViewPosition, screenToFlowPosition, setCursor]
+    [concepts, currentMapId, updateConcept, setTextViewPosition, screenToFlowPosition, setCursor, hasWriteAccess]
   )
 
   // Handle node click - let ConceptNode handle clicks (to distinguish single vs double-click)
@@ -621,7 +629,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   // Handle connection creation - create new relationship between existing nodes
   const onConnectHandler = useCallback(
     (connection: Connection) => {
-      if (!currentMapId || !connection.source || !connection.target) {
+      if (!currentMapId || !hasWriteAccess || !connection.source || !connection.target) {
         return
       }
 
@@ -641,7 +649,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         }
       })()
     },
-    [currentMapId, createRelationship]
+    [currentMapId, hasWriteAccess, createRelationship]
   )
 
   // Handle pane click - deselect
@@ -661,7 +669,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   // Note: React Flow doesn't support onPaneDoubleClick directly, so we'll handle it via a wrapper div
   const handleDoubleClick = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
-      if (!onCreateConcept) return
+      if (!onCreateConcept || !hasWriteAccess) return
 
       // Check if clicking on the background (not on a node or edge)
       const target = event.target as HTMLElement
@@ -679,7 +687,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       })
       onCreateConcept(position)
     },
-    [onCreateConcept, screenToFlowPosition]
+    [onCreateConcept, screenToFlowPosition, hasWriteAccess]
   )
 
   return (
@@ -700,14 +708,16 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         edgeTypes={edgeTypesRef.current}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={onConnectHandler}
-        onConnectStart={onConnectStart}
-        onConnectEnd={onConnectEnd}
+        onConnect={hasWriteAccess ? onConnectHandler : undefined}
+        onConnectStart={hasWriteAccess ? onConnectStart : undefined}
+        onConnectEnd={hasWriteAccess ? onConnectEnd : undefined}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
+        nodesDraggable={hasWriteAccess}
+        nodesConnectable={hasWriteAccess}
         fitView
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2 }}

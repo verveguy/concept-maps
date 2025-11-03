@@ -9,6 +9,7 @@ import { useMapStore } from '@/stores/mapStore'
 /**
  * Hook to get the current map data.
  * Uses InstantDB useQuery() for real-time updates.
+ * Includes permission links for access control.
  * 
  * @returns The current map entity, or null if no map is selected
  */
@@ -20,6 +21,9 @@ export function useMap() {
       ? {
           maps: {
             $: { where: { id: currentMapId } },
+            creator: {},
+            writePermissions: {},
+            readPermissions: {},
           },
         }
       : null

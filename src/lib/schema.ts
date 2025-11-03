@@ -70,6 +70,7 @@ export interface Share {
   id: string
   mapId: string
   userId: string
+  userEmail: string | null // Email address of the user with whom the map is shared
   permission: 'view' | 'edit'
   createdAt: Date
   acceptedAt: Date | null // Timestamp when user accepted the share

@@ -49,17 +49,19 @@ export function useConceptActions() {
    * @param concept - Concept data to create
    */
   const createConcept = async (concept: CreateConceptData) => {
+    const conceptId = id()
     await db.transact([
-      tx.concepts[id()].update({
-        mapId: concept.mapId,
-        label: concept.label,
-        positionX: concept.position.x,
-        positionY: concept.position.y,
-        notes: concept.notes || '',
-        metadata: JSON.stringify(concept.metadata || {}),
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      }),
+      tx.concepts[conceptId]
+        .update({
+          label: concept.label,
+          positionX: concept.position.x,
+          positionY: concept.position.y,
+          notes: concept.notes || '',
+          metadata: JSON.stringify(concept.metadata || {}),
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        })
+        .link({ map: concept.mapId }),
     ])
   }
 

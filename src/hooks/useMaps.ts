@@ -10,6 +10,7 @@ import type { Map } from '@/lib/schema'
 /**
  * Hook to get all maps accessible to the current user (owned or shared).
  * Uses InstantDB useQuery() for real-time updates.
+ * Permissions automatically filter results to only maps the user can view.
  * 
  * @returns Array of maps created by or shared with the authenticated user
  */
@@ -17,68 +18,29 @@ export function useMaps() {
   const auth = db.useAuth()
   const userId = auth.user?.id
 
-  const { data: ownedMapsData } = db.useQuery(
+  // Query maps directly - permissions will automatically filter to only maps
+  // the user can view (owned or shared with them via shares/invitations)
+  const { data: mapsData } = db.useQuery(
     userId
       ? {
           maps: {
-            $: {
-              where: { createdBy: userId },
-            },
+            creator: {},
           },
         }
       : null
   )
 
-  const { data: sharedMapsData } = db.useQuery(
-    userId
-      ? {
-          shares: {
-            $: {
-              where: { userId, status: 'active' },
-            },
-            map: {},
-          },
-        }
-      : null
-  )
-
-  const ownedMaps: Map[] = useMemo(
+  const maps: Map[] = useMemo(
     () =>
-      ownedMapsData?.maps?.map((m: any) => ({
+      mapsData?.maps?.map((m: any) => ({
         id: m.id,
         name: m.name,
-        createdBy: m.createdBy,
+        createdBy: m.creator?.id || userId || '',
         createdAt: new Date(m.createdAt),
         updatedAt: new Date(m.updatedAt),
       })) || [],
-    [ownedMapsData?.maps]
+    [mapsData?.maps, userId]
   )
 
-  const sharedMaps: Map[] = useMemo(() => {
-    if (!sharedMapsData?.shares) return []
-
-    return sharedMapsData.shares
-      .map((share: any) => share.map)
-      .filter(Boolean)
-      .map((map: any) => ({
-        id: map.id,
-        name: map.name,
-        createdBy: map.createdBy,
-        createdAt: new Date(map.createdAt),
-        updatedAt: new Date(map.updatedAt),
-      }))
-  }, [sharedMapsData?.shares])
-
-  const combinedMaps = useMemo(() => {
-    const deduped = new Map<string, Map>()
-    ownedMaps.forEach((map) => {
-      deduped.set(map.id, map)
-    })
-    sharedMaps.forEach((map) => {
-      deduped.set(map.id, map)
-    })
-    return Array.from(deduped.values())
-  }, [ownedMaps, sharedMaps])
-
-  return combinedMaps
+  return maps
 }

@@ -53,18 +53,22 @@ export function useRelationshipActions() {
    * @param relationship - Relationship data to create
    */
   const createRelationship = async (relationship: CreateRelationshipData) => {
+    const relationshipId = id()
     await db.transact([
-      tx.relationships[id()].update({
-        mapId: relationship.mapId,
-        fromConceptId: relationship.fromConceptId,
-        toConceptId: relationship.toConceptId,
-        primaryLabel: relationship.primaryLabel,
-        reverseLabel: relationship.reverseLabel || relationship.primaryLabel,
-        notes: relationship.notes || '',
-        metadata: JSON.stringify(relationship.metadata || {}),
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      }),
+      tx.relationships[relationshipId]
+        .update({
+          primaryLabel: relationship.primaryLabel,
+          reverseLabel: relationship.reverseLabel || relationship.primaryLabel,
+          notes: relationship.notes || '',
+          metadata: JSON.stringify(relationship.metadata || {}),
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        })
+        .link({
+          map: relationship.mapId,
+          fromConcept: relationship.fromConceptId,
+          toConcept: relationship.toConceptId,
+        }),
     ])
   }
 
