@@ -15,11 +15,6 @@ const rules = {
       'auth.id != null && ((auth.id in data.ref("shareInvitations.invitedUserId") || (auth.email != null && auth.email in data.ref("shareInvitations.invitedEmail"))) && "pending" in data.ref("shareInvitations.status")) || (auth.email != null && auth.email in data.ref("shareInvitations.invitedEmail") && "pending" in data.ref("shareInvitations.status"))',
       'isOwnerOrReader',
       'isOwner || hasReadPermission || hasWritePermission || hasPendingInvitation',
-      // Note: hasPendingInvitation is included to allow users accepting invitations
-      // to link themselves to permission links. This is a necessary security trade-off:
-      // users with pending invitations can update the map, though in practice they should
-      // only be linking permission links (as enforced by application code).
-      // TODO: Consider if InstantDB supports more granular link-level permissions.
       'isOwnerOrEditor',
       'isOwner || hasWritePermission || hasPendingInvitation',
     ],
@@ -28,6 +23,11 @@ const rules = {
       create: 'auth.id != null',
       delete: 'isOwner',
       update: 'isOwnerOrEditor',
+    },
+  },
+  $users: {
+    allow: {
+      view: 'auth.id != null',
     },
   },
   shares: {
@@ -132,13 +132,6 @@ const rules = {
       create: 'mapOwnerCreator',
       delete: 'mapOwnerCreator',
       update: 'mapOwnerOrInvitee',
-    },
-  },
-  $users: {
-    allow: {
-      // Allow viewing user entities when they're linked from other entities
-      // This is needed for nested link queries like shareInvitations.map.creator
-      view: 'auth.id != null',
     },
   },
 } satisfies InstantRules

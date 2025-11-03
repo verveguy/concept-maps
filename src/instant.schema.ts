@@ -99,6 +99,30 @@ const _schema = i.schema({
         label: 'createdMaps',
       },
     },
+    mapsReadPermissions: {
+      forward: {
+        on: 'maps',
+        has: 'many',
+        label: 'readPermissions',
+      },
+      reverse: {
+        on: '$users',
+        has: 'many',
+        label: 'readAccessMaps',
+      },
+    },
+    mapsWritePermissions: {
+      forward: {
+        on: 'maps',
+        has: 'many',
+        label: 'writePermissions',
+      },
+      reverse: {
+        on: '$users',
+        has: 'many',
+        label: 'writeAccessMaps',
+      },
+    },
     perspectivesCreator: {
       forward: {
         on: 'perspectives',
@@ -183,6 +207,18 @@ const _schema = i.schema({
         label: 'shareInvitations',
       },
     },
+    sharesCreator: {
+      forward: {
+        on: 'shares',
+        has: 'one',
+        label: 'creator',
+      },
+      reverse: {
+        on: '$users',
+        has: 'many',
+        label: 'createdShares',
+      },
+    },
     sharesMap: {
       forward: {
         on: 'shares',
@@ -205,42 +241,6 @@ const _schema = i.schema({
         on: '$users',
         has: 'many',
         label: 'shares',
-      },
-    },
-    sharesCreator: {
-      forward: {
-        on: 'shares',
-        has: 'one',
-        label: 'creator',
-      },
-      reverse: {
-        on: '$users',
-        has: 'many',
-        label: 'createdShares',
-      },
-    },
-    mapsWritePermissions: {
-      forward: {
-        on: 'maps',
-        has: 'many',
-        label: 'writePermissions',
-      },
-      reverse: {
-        on: '$users',
-        has: 'many',
-        label: 'writeAccessMaps',
-      },
-    },
-    mapsReadPermissions: {
-      forward: {
-        on: 'maps',
-        has: 'many',
-        label: 'readPermissions',
-      },
-      reverse: {
-        on: '$users',
-        has: 'many',
-        label: 'readAccessMaps',
       },
     },
   },
