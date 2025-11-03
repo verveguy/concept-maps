@@ -73,4 +73,26 @@ export interface Share {
   permission: 'view' | 'edit'
   createdAt: Date
   acceptedAt: Date | null // Timestamp when user accepted the share
+  status: 'pending' | 'active' | 'revoked'
+  revokedAt: Date | null
+  invitationId: string | null
+}
+
+/**
+ * Represents a share invitation for collaborating on a map.
+ * Invitations manage the token-based acceptance and audit history.
+ */
+export interface ShareInvitation {
+  id: string
+  mapId: string
+  invitedEmail: string
+  invitedUserId: string | null
+  permission: 'view' | 'edit'
+  token: string
+  status: 'pending' | 'accepted' | 'declined' | 'revoked' | 'expired'
+  createdBy: string
+  createdAt: Date
+  expiresAt: Date | null
+  respondedAt: Date | null
+  revokedAt: Date | null
 }

@@ -31,7 +31,7 @@ interface EditableTripleProps {
 export function EditableTriple({ triple, onUpdate }: EditableTripleProps) {
   const { updateConcept } = useConceptActions()
   const { updateRelationship, deleteRelationship } = useRelationshipActions()
-  const { setSelectedConceptId, setSelectedRelationshipId, setConceptEditorOpen, setRelationshipEditorOpen } = useUIStore()
+  const { setSelectedRelationshipId, setRelationshipEditorOpen } = useUIStore()
   
   const [isEditing, setIsEditing] = useState(false)
   const [editText, setEditText] = useState(formatTriple(triple))

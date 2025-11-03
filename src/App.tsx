@@ -7,6 +7,7 @@ import { useEffect } from 'react'
 import { db } from '@/lib/instant'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { MapPage } from '@/pages/MapPage'
+import { InvitationPage } from '@/pages/InvitationPage'
 
 /**
  * Root application component.
@@ -16,6 +17,9 @@ import { MapPage } from '@/pages/MapPage'
  */
 function App() {
   const auth = db.useAuth()
+  const inviteToken = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('inviteToken')
+    : null
 
   useEffect(() => {
     // Check authentication status
@@ -27,6 +31,10 @@ function App() {
   // Show login form if not authenticated
   if (!auth.user) {
     return <LoginForm />
+  }
+
+  if (inviteToken) {
+    return <InvitationPage inviteToken={inviteToken} />
   }
 
   // Show main app if authenticated

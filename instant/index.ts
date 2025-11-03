@@ -56,6 +56,23 @@ export const schema = {
     userId: { type: 'string' },
     permission: { type: 'string' }, // 'view' | 'edit'
     createdAt: { type: 'number' },
+    acceptedAt: { type: 'number' },
+    status: { type: 'string' },
+    revokedAt: { type: 'number' },
+    invitationId: { type: 'string' },
+  },
+  shareInvitations: {
+    mapId: { type: 'string' },
+    invitedEmail: { type: 'string' },
+    invitedUserId: { type: 'string' },
+    permission: { type: 'string' }, // 'view' | 'edit'
+    token: { type: 'string' },
+    status: { type: 'string' },
+    createdBy: { type: 'string' },
+    createdAt: { type: 'number' },
+    expiresAt: { type: 'number' },
+    respondedAt: { type: 'number' },
+    revokedAt: { type: 'number' },
   },
 }
 

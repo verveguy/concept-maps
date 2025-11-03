@@ -23,7 +23,7 @@ export interface TextViewNodeData {
  * @param selected - Whether the node is selected
  * @returns The text view node JSX
  */
-export const TextViewNode = memo(({ data, selected }: NodeProps<TextViewNodeData>) => {
+export const TextViewNode = memo(({ data: _data, selected }: NodeProps<TextViewNodeData>) => {
   return (
     <div
       className={`w-[800px] h-[600px] bg-white border-2 rounded-lg shadow-lg overflow-hidden ${
