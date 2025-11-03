@@ -79,7 +79,7 @@ export function useSearchQuery(query: string) {
           concepts: {
             $: {
               where: {
-                label: { $like: searchPattern },
+                label: { $ilike: searchPattern },
               },
             },
           },
@@ -96,7 +96,7 @@ export function useSearchQuery(query: string) {
           relationships: {
             $: {
               where: {
-                primaryLabel: { $like: searchPattern },
+                primaryLabel: { $ilike: searchPattern },
               },
             },
           },
@@ -110,7 +110,7 @@ export function useSearchQuery(query: string) {
           relationships: {
             $: {
               where: {
-                reverseLabel: { $like: searchPattern },
+                reverseLabel: { $ilike: searchPattern },
               },
             },
           },
