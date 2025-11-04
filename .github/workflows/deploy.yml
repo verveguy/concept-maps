@@ -1,0 +1,98 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies (root)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install dependencies (docs)
+        run: cd docs && pnpm install --frozen-lockfile
+
+      - name: Build app
+        run: pnpm build
+        env:
+          VITE_INSTANTDB_APP_ID: ${{ secrets.VITE_INSTANTDB_APP_ID }}
+          VITE_INSTANTDB_API_KEY: ${{ secrets.VITE_INSTANTDB_API_KEY }}
+
+      - name: Build docs
+        run: cd docs && pnpm build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Prepare deployment
+        run: |
+          # Create output directory structure
+          mkdir -p deploy/app deploy/docs
+          
+          # Copy app build to deploy/app
+          cp -r dist/* deploy/app/
+          
+          # Copy docs build to deploy/docs
+          cp -r docs/build/* deploy/docs/
+          
+          # Create index.html redirect to app
+          cat > deploy/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta http-equiv="refresh" content="0; url=/concept-maps/app/">
+            <link rel="canonical" href="/concept-maps/app/">
+          </head>
+          <body>
+            <p>Redirecting to <a href="/concept-maps/app/">the app</a>...</p>
+          </body>
+          </html>
+          EOF
+          
+          # Create .nojekyll to prevent Jekyll processing
+          touch deploy/.nojekyll
+          touch deploy/app/.nojekyll
+          touch deploy/docs/.nojekyll
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./deploy
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
