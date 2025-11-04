@@ -38,18 +38,35 @@ export function useMapPermissions() {
 
   // Check if user has write access
   const hasWriteAccess = useMemo(() => {
-    if (!currentUserId || !map) return false
+    if (!currentUserId || !map) {
+      console.log('useMapPermissions: No user or map', { currentUserId, mapId: currentMapId, map })
+      return false
+    }
     
     // Check if user is the map creator
     const isOwner = map.creator?.id === currentUserId
     
     // Check if user is in writePermissions link set
-    const hasWritePermission = map.writePermissions?.some(
+    const writePerms = map.writePermissions || []
+    const hasWritePermission = writePerms.some(
       (user: { id: string }) => user.id === currentUserId
     ) || false
 
+    // Debug logging
+    console.log('useMapPermissions: Permission check', {
+      currentUserId,
+      mapId: currentMapId,
+      isOwner,
+      writePermsCount: writePerms.length,
+      writePermsUserIds: writePerms.map((u: { id: string }) => u.id),
+      hasWritePermission,
+      hasWriteAccess: isOwner || hasWritePermission,
+      readPermsCount: map.readPermissions?.length || 0,
+      readPermsUserIds: map.readPermissions?.map((u: { id: string }) => u.id) || [],
+    })
+
     return isOwner || hasWritePermission
-  }, [currentUserId, map])
+  }, [currentUserId, map, currentMapId])
 
   // Check if user has read access
   const hasReadAccess = useMemo(() => {

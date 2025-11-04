@@ -332,7 +332,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
 
   // Sync InstantDB data changes to React Flow only when data actually changes
   useEffect(() => {
-    // Only update if concepts actually changed (by ID, position, label, or metadata)
+    // Only update if concepts actually changed (by ID, position, label, notes, or metadata)
     const conceptsChanged = 
       concepts.length !== prevConceptsRef.current.length ||
       concepts.some((c, i) => {
@@ -342,6 +342,8 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         if (c.position.x !== prev.position.x) return true
         if (c.position.y !== prev.position.y) return true
         if (c.label !== prev.label) return true
+        // Check if notes changed
+        if ((c.notes || '') !== (prev.notes || '')) return true
         // Check if metadata changed (compare JSON strings)
         const metadataChanged = JSON.stringify(c.metadata || {}) !== JSON.stringify(prev.metadata || {})
         return metadataChanged

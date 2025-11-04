@@ -6,6 +6,7 @@ import { useConcepts } from '@/hooks/useConcepts'
 import { useRelationships } from '@/hooks/useRelationships'
 import { useUIStore } from '@/stores/uiStore'
 import { MarkdownEditor } from '@/components/notes/MarkdownEditor'
+import { useMapPermissions } from '@/hooks/useMapPermissions'
 
 /**
  * Style attribute keys that should be treated as built-in attributes, not metadata
@@ -112,6 +113,7 @@ function ConceptEditorContent({
   onUpdate: (id: string, updates: any) => Promise<void>
   onDelete: (id: string) => Promise<void>
 }) {
+  const { hasWriteAccess } = useMapPermissions()
   const [label, setLabel] = useState(concept.label)
   const [notes, setNotes] = useState(concept.notes || '')
   const [metadata, setMetadata] = useState<Record<string, string>>({})
@@ -144,7 +146,7 @@ function ConceptEditorContent({
   }, [concept])
 
   const handleSaveLabel = async () => {
-    if (!label.trim() || label.trim() === concept.label) return
+    if (!hasWriteAccess || !label.trim() || label.trim() === concept.label) return
     setIsSaving(true)
     isEditingRef.current = false
     try {
@@ -159,7 +161,7 @@ function ConceptEditorContent({
   }
 
   const handleSaveNotes = async () => {
-    if (notes === (concept.notes || '')) return
+    if (!hasWriteAccess || notes === (concept.notes || '')) return
     setIsSaving(true)
     isEditingRef.current = false
     try {
@@ -174,6 +176,7 @@ function ConceptEditorContent({
   }
 
   const handleSaveMetadata = async () => {
+    if (!hasWriteAccess) return
     setIsSaving(true)
     isEditingRef.current = false
     try {
@@ -213,6 +216,7 @@ function ConceptEditorContent({
     borderStyle?: 'solid' | 'dashed' | 'dotted'
     textColor?: string
   }) => {
+    if (!hasWriteAccess) return
     const currentMetadata = concept.metadata || {}
     const newMetadata = {
       ...currentMetadata,
@@ -230,7 +234,7 @@ function ConceptEditorContent({
   }
 
   const handleDelete = async () => {
-    if (!confirm(`Are you sure you want to delete "${concept.label}"?`)) return
+    if (!hasWriteAccess || !confirm(`Are you sure you want to delete "${concept.label}"?`)) return
     setIsDeleting(true)
     try {
       await onDelete(concept.id)
@@ -244,13 +248,14 @@ function ConceptEditorContent({
   }
 
   const handleAddMetadata = () => {
+    if (!hasWriteAccess) return
     const newKey = `key${Object.keys(metadata).length + 1}`
     setMetadata({ ...metadata, [newKey]: '' })
     isEditingRef.current = true
   }
 
   const handleUpdateMetadataKey = (oldKey: string, newKey: string) => {
-    if (newKey === oldKey) return
+    if (!hasWriteAccess || newKey === oldKey) return
     const newMetadata = { ...metadata }
     delete newMetadata[oldKey]
     if (newKey.trim()) {
@@ -261,11 +266,13 @@ function ConceptEditorContent({
   }
 
   const handleUpdateMetadataValue = (key: string, value: string) => {
+    if (!hasWriteAccess) return
     setMetadata({ ...metadata, [key]: value })
     isEditingRef.current = true
   }
 
   const handleRemoveMetadata = (key: string) => {
+    if (!hasWriteAccess) return
     const newMetadata = { ...metadata }
     delete newMetadata[key]
     setMetadata(newMetadata)
@@ -277,7 +284,9 @@ function ConceptEditorContent({
       {/* Header */}
       <div className="p-4 border-b">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Edit Concept</h2>
+          <h2 className="text-lg font-semibold">
+            {hasWriteAccess ? 'Edit Concept' : 'View Concept'}
+          </h2>
           <button
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted"
@@ -287,6 +296,13 @@ function ConceptEditorContent({
             <X className="h-5 w-5" />
           </button>
         </div>
+        {!hasWriteAccess && (
+          <div className="mt-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md">
+            <p className="text-xs font-medium text-amber-800">
+              Read-only mode: You have read-only access to this map
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Form */}
@@ -302,8 +318,10 @@ function ConceptEditorContent({
               type="text"
               value={label}
               onChange={(e) => {
-                setLabel(e.target.value)
-                isEditingRef.current = true
+                if (hasWriteAccess) {
+                  setLabel(e.target.value)
+                  isEditingRef.current = true
+                }
               }}
               onBlur={handleSaveLabel}
               onKeyDown={(e) => {
@@ -313,7 +331,7 @@ function ConceptEditorContent({
               }}
               className="w-full px-3 py-2 border rounded-md"
               required
-              disabled={isDeleting || isSaving}
+              disabled={isDeleting || isSaving || !hasWriteAccess}
               tabIndex={2}
             />
           </div>
@@ -323,12 +341,14 @@ function ConceptEditorContent({
             <MarkdownEditor
               value={notes}
               onChange={(value) => {
-                setNotes(value)
-                isEditingRef.current = true
+                if (hasWriteAccess) {
+                  setNotes(value)
+                  isEditingRef.current = true
+                }
               }}
               onBlur={handleSaveNotes}
               placeholder="Add notes about this concept..."
-              disabled={isDeleting || isSaving}
+              disabled={isDeleting || isSaving || !hasWriteAccess}
             />
           </div>
 
@@ -344,22 +364,28 @@ function ConceptEditorContent({
                   type="color"
                   value={fillColor}
                   onChange={(e) => {
-                    setFillColor(e.target.value)
-                    handleSaveNodeStyle({ fillColor: e.target.value })
+                    if (hasWriteAccess) {
+                      setFillColor(e.target.value)
+                      handleSaveNodeStyle({ fillColor: e.target.value })
+                    }
                   }}
                   className="w-12 h-8 border rounded cursor-pointer"
+                  disabled={!hasWriteAccess}
                   tabIndex={10}
                 />
                 <input
                   type="text"
                   value={fillColor}
                   onChange={(e) => {
-                    setFillColor(e.target.value)
-                    isEditingRef.current = true
+                    if (hasWriteAccess) {
+                      setFillColor(e.target.value)
+                      isEditingRef.current = true
+                    }
                   }}
                   onBlur={() => handleSaveNodeStyle({ fillColor })}
                   className="flex-1 px-2 py-1 text-xs border rounded"
                   placeholder="#ffffff"
+                  disabled={!hasWriteAccess}
                   tabIndex={11}
                 />
               </div>
@@ -373,22 +399,28 @@ function ConceptEditorContent({
                   type="color"
                   value={borderColor}
                   onChange={(e) => {
-                    setBorderColor(e.target.value)
-                    handleSaveNodeStyle({ borderColor: e.target.value })
+                    if (hasWriteAccess) {
+                      setBorderColor(e.target.value)
+                      handleSaveNodeStyle({ borderColor: e.target.value })
+                    }
                   }}
                   className="w-12 h-8 border rounded cursor-pointer"
+                  disabled={!hasWriteAccess}
                   tabIndex={12}
                 />
                 <input
                   type="text"
                   value={borderColor}
                   onChange={(e) => {
-                    setBorderColor(e.target.value)
-                    isEditingRef.current = true
+                    if (hasWriteAccess) {
+                      setBorderColor(e.target.value)
+                      isEditingRef.current = true
+                    }
                   }}
                   onBlur={() => handleSaveNodeStyle({ borderColor })}
                   className="flex-1 px-2 py-1 text-xs border rounded"
                   placeholder="#d1d5db"
+                  disabled={!hasWriteAccess}
                   tabIndex={13}
                 />
               </div>
@@ -400,11 +432,14 @@ function ConceptEditorContent({
               <select
                 value={borderStyle}
                 onChange={(e) => {
-                  const style = e.target.value as 'solid' | 'dashed' | 'dotted'
-                  setBorderStyle(style)
-                  handleSaveNodeStyle({ borderStyle: style })
+                  if (hasWriteAccess) {
+                    const style = e.target.value as 'solid' | 'dashed' | 'dotted'
+                    setBorderStyle(style)
+                    handleSaveNodeStyle({ borderStyle: style })
+                  }
                 }}
                 className="w-full px-2 py-1 text-xs border rounded"
+                disabled={!hasWriteAccess}
                 tabIndex={14}
               >
                 <option value="solid">Solid</option>
@@ -421,22 +456,28 @@ function ConceptEditorContent({
                   type="color"
                   value={textColor}
                   onChange={(e) => {
-                    setTextColor(e.target.value)
-                    handleSaveNodeStyle({ textColor: e.target.value })
+                    if (hasWriteAccess) {
+                      setTextColor(e.target.value)
+                      handleSaveNodeStyle({ textColor: e.target.value })
+                    }
                   }}
                   className="w-12 h-8 border rounded cursor-pointer"
+                  disabled={!hasWriteAccess}
                   tabIndex={15}
                 />
                 <input
                   type="text"
                   value={textColor}
                   onChange={(e) => {
-                    setTextColor(e.target.value)
-                    isEditingRef.current = true
+                    if (hasWriteAccess) {
+                      setTextColor(e.target.value)
+                      isEditingRef.current = true
+                    }
                   }}
                   onBlur={() => handleSaveNodeStyle({ textColor })}
                   className="flex-1 px-2 py-1 text-xs border rounded"
                   placeholder="#111827"
+                  disabled={!hasWriteAccess}
                   tabIndex={16}
                 />
               </div>
@@ -450,7 +491,7 @@ function ConceptEditorContent({
               <button
                 onClick={handleAddMetadata}
                 className="p-1 text-primary hover:bg-primary/10 rounded"
-                disabled={isDeleting || isSaving}
+                disabled={isDeleting || isSaving || !hasWriteAccess}
                 tabIndex={17}
               >
                 <Plus className="h-4 w-4" />
@@ -466,6 +507,7 @@ function ConceptEditorContent({
                     onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Key"
+                    disabled={!hasWriteAccess}
                     tabIndex={18 + index * 2}
                   />
                   <input
@@ -475,6 +517,7 @@ function ConceptEditorContent({
                     onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Value"
+                    disabled={!hasWriteAccess}
                     tabIndex={19 + index * 2}
                   />
                   <button
@@ -483,6 +526,7 @@ function ConceptEditorContent({
                       handleSaveMetadata()
                     }}
                     className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    disabled={!hasWriteAccess}
                     tabIndex={20 + index * 2}
                   >
                     <X className="h-4 w-4" />
@@ -500,7 +544,7 @@ function ConceptEditorContent({
         <div className="p-4 border-t bg-gray-50">
           <button
             onClick={handleDelete}
-            disabled={isDeleting || isSaving}
+            disabled={isDeleting || isSaving || !hasWriteAccess}
             className="w-full px-4 py-2 text-sm text-red-600 bg-white border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50 flex items-center justify-center gap-2"
             tabIndex={100}
           >
@@ -533,6 +577,7 @@ function RelationshipEditorContent({
   onUpdate: (id: string, updates: any) => Promise<void>
   onDelete: (id: string) => Promise<void>
 }) {
+  const { hasWriteAccess } = useMapPermissions()
   const [primaryLabel, setPrimaryLabel] = useState(relationship.primaryLabel)
   const [reverseLabel, setReverseLabel] = useState(relationship.reverseLabel)
   const [notes, setNotes] = useState(relationship.notes || '')
@@ -565,7 +610,7 @@ function RelationshipEditorContent({
   }, [relationship])
 
   const handleSavePrimaryLabel = async () => {
-    if (!primaryLabel.trim() || primaryLabel.trim() === relationship.primaryLabel) return
+    if (!hasWriteAccess || !primaryLabel.trim() || primaryLabel.trim() === relationship.primaryLabel) return
     setIsSaving(true)
     isEditingRef.current = false
     try {
@@ -580,7 +625,7 @@ function RelationshipEditorContent({
   }
 
   const handleSaveReverseLabel = async () => {
-    if (!reverseLabel.trim() || reverseLabel.trim() === relationship.reverseLabel) return
+    if (!hasWriteAccess || !reverseLabel.trim() || reverseLabel.trim() === relationship.reverseLabel) return
     setIsSaving(true)
     isEditingRef.current = false
     try {
@@ -595,7 +640,7 @@ function RelationshipEditorContent({
   }
 
   const handleSaveNotes = async () => {
-    if (notes === (relationship.notes || '')) return
+    if (!hasWriteAccess || notes === (relationship.notes || '')) return
     setIsSaving(true)
     isEditingRef.current = false
     try {
@@ -614,6 +659,7 @@ function RelationshipEditorContent({
     edgeColor?: string
     edgeStyle?: 'solid' | 'dashed'
   }) => {
+    if (!hasWriteAccess) return
     const currentMetadata = relationship.metadata || {}
     const newMetadata = {
       ...currentMetadata,
@@ -630,6 +676,7 @@ function RelationshipEditorContent({
   }
 
   const handleSaveMetadata = async () => {
+    if (!hasWriteAccess) return
     setIsSaving(true)
     isEditingRef.current = false
     try {
@@ -663,13 +710,14 @@ function RelationshipEditorContent({
   }
 
   const handleAddMetadata = () => {
+    if (!hasWriteAccess) return
     const newKey = `key${Object.keys(metadata).length + 1}`
     setMetadata({ ...metadata, [newKey]: '' })
     isEditingRef.current = true
   }
 
   const handleUpdateMetadataKey = (oldKey: string, newKey: string) => {
-    if (newKey === oldKey) return
+    if (!hasWriteAccess || newKey === oldKey) return
     const newMetadata = { ...metadata }
     delete newMetadata[oldKey]
     if (newKey.trim()) {
@@ -680,11 +728,13 @@ function RelationshipEditorContent({
   }
 
   const handleUpdateMetadataValue = (key: string, value: string) => {
+    if (!hasWriteAccess) return
     setMetadata({ ...metadata, [key]: value })
     isEditingRef.current = true
   }
 
   const handleRemoveMetadata = (key: string) => {
+    if (!hasWriteAccess) return
     const newMetadata = { ...metadata }
     delete newMetadata[key]
     setMetadata(newMetadata)
@@ -692,7 +742,7 @@ function RelationshipEditorContent({
   }
 
   const handleDelete = async () => {
-    if (!confirm(`Are you sure you want to delete this relationship?`)) return
+    if (!hasWriteAccess || !confirm(`Are you sure you want to delete this relationship?`)) return
     setIsDeleting(true)
     try {
       await onDelete(relationship.id)
@@ -710,7 +760,9 @@ function RelationshipEditorContent({
       {/* Header */}
       <div className="p-4 border-b">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Edit Relationship</h2>
+          <h2 className="text-lg font-semibold">
+            {hasWriteAccess ? 'Edit Relationship' : 'View Relationship'}
+          </h2>
           <button
             onClick={onClose}
             className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted"
@@ -720,6 +772,13 @@ function RelationshipEditorContent({
             <X className="h-5 w-5" />
           </button>
         </div>
+        {!hasWriteAccess && (
+          <div className="mt-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md">
+            <p className="text-xs font-medium text-amber-800">
+              Read-only mode: You have read-only access to this map
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Form */}
@@ -735,8 +794,10 @@ function RelationshipEditorContent({
               type="text"
               value={primaryLabel}
               onChange={(e) => {
-                setPrimaryLabel(e.target.value)
-                isEditingRef.current = true
+                if (hasWriteAccess) {
+                  setPrimaryLabel(e.target.value)
+                  isEditingRef.current = true
+                }
               }}
               onBlur={handleSavePrimaryLabel}
               onKeyDown={(e) => {
@@ -746,7 +807,7 @@ function RelationshipEditorContent({
               }}
               className="w-full px-3 py-2 border rounded-md"
               required
-              disabled={isDeleting || isSaving}
+              disabled={isDeleting || isSaving || !hasWriteAccess}
               placeholder="e.g., 'related to'"
               tabIndex={2}
             />
@@ -768,8 +829,10 @@ function RelationshipEditorContent({
               type="text"
               value={reverseLabel}
               onChange={(e) => {
-                setReverseLabel(e.target.value)
-                isEditingRef.current = true
+                if (hasWriteAccess) {
+                  setReverseLabel(e.target.value)
+                  isEditingRef.current = true
+                }
               }}
               onBlur={handleSaveReverseLabel}
               onKeyDown={(e) => {
@@ -779,7 +842,7 @@ function RelationshipEditorContent({
               }}
               className="w-full px-3 py-2 border rounded-md"
               required
-              disabled={isDeleting || isSaving}
+              disabled={isDeleting || isSaving || !hasWriteAccess}
               placeholder="e.g., 'related from'"
               tabIndex={3}
             />
@@ -793,12 +856,14 @@ function RelationshipEditorContent({
             <MarkdownEditor
               value={notes}
               onChange={(value) => {
-                setNotes(value)
-                isEditingRef.current = true
+                if (hasWriteAccess) {
+                  setNotes(value)
+                  isEditingRef.current = true
+                }
               }}
               onBlur={handleSaveNotes}
               placeholder="Add notes about this relationship..."
-              disabled={isDeleting || isSaving}
+              disabled={isDeleting || isSaving || !hasWriteAccess}
             />
           </div>
 
@@ -812,11 +877,14 @@ function RelationshipEditorContent({
               <select
                 value={edgeType}
                 onChange={(e) => {
-                  const type = e.target.value as 'bezier' | 'smoothstep' | 'step' | 'straight'
-                  setEdgeType(type)
-                  handleSaveEdgeStyle({ edgeType: type })
+                  if (hasWriteAccess) {
+                    const type = e.target.value as 'bezier' | 'smoothstep' | 'step' | 'straight'
+                    setEdgeType(type)
+                    handleSaveEdgeStyle({ edgeType: type })
+                  }
                 }}
                 className="w-full px-2 py-1 text-xs border rounded"
+                disabled={!hasWriteAccess}
                 tabIndex={5}
               >
                 <option value="bezier">Bezier</option>
@@ -834,22 +902,28 @@ function RelationshipEditorContent({
                   type="color"
                   value={edgeColor}
                   onChange={(e) => {
-                    setEdgeColor(e.target.value)
-                    handleSaveEdgeStyle({ edgeColor: e.target.value })
+                    if (hasWriteAccess) {
+                      setEdgeColor(e.target.value)
+                      handleSaveEdgeStyle({ edgeColor: e.target.value })
+                    }
                   }}
                   className="w-12 h-8 border rounded cursor-pointer"
+                  disabled={!hasWriteAccess}
                   tabIndex={6}
                 />
                 <input
                   type="text"
                   value={edgeColor}
                   onChange={(e) => {
-                    setEdgeColor(e.target.value)
-                    isEditingRef.current = true
+                    if (hasWriteAccess) {
+                      setEdgeColor(e.target.value)
+                      isEditingRef.current = true
+                    }
                   }}
                   onBlur={() => handleSaveEdgeStyle({ edgeColor })}
                   className="flex-1 px-2 py-1 text-xs border rounded"
                   placeholder="#6366f1"
+                  disabled={!hasWriteAccess}
                   tabIndex={7}
                 />
               </div>
@@ -861,11 +935,14 @@ function RelationshipEditorContent({
               <select
                 value={edgeStyle}
                 onChange={(e) => {
-                  const style = e.target.value as 'solid' | 'dashed'
-                  setEdgeStyle(style)
-                  handleSaveEdgeStyle({ edgeStyle: style })
+                  if (hasWriteAccess) {
+                    const style = e.target.value as 'solid' | 'dashed'
+                    setEdgeStyle(style)
+                    handleSaveEdgeStyle({ edgeStyle: style })
+                  }
                 }}
                 className="w-full px-2 py-1 text-xs border rounded"
+                disabled={!hasWriteAccess}
                 tabIndex={8}
               >
                 <option value="solid">Solid</option>
@@ -881,7 +958,7 @@ function RelationshipEditorContent({
               <button
                 onClick={handleAddMetadata}
                 className="p-1 text-primary hover:bg-primary/10 rounded"
-                disabled={isDeleting || isSaving}
+                disabled={isDeleting || isSaving || !hasWriteAccess}
                 tabIndex={9}
               >
                 <Plus className="h-4 w-4" />
@@ -897,6 +974,7 @@ function RelationshipEditorContent({
                     onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Key"
+                    disabled={!hasWriteAccess}
                     tabIndex={10 + index * 2}
                   />
                   <input
@@ -906,6 +984,7 @@ function RelationshipEditorContent({
                     onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Value"
+                    disabled={!hasWriteAccess}
                     tabIndex={11 + index * 2}
                   />
                   <button
@@ -914,6 +993,7 @@ function RelationshipEditorContent({
                       handleSaveMetadata()
                     }}
                     className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    disabled={!hasWriteAccess}
                     tabIndex={12 + index * 2}
                   >
                     <X className="h-4 w-4" />
@@ -931,7 +1011,7 @@ function RelationshipEditorContent({
         <div className="p-4 border-t bg-gray-50">
           <button
             onClick={handleDelete}
-            disabled={isDeleting || isSaving}
+            disabled={isDeleting || isSaving || !hasWriteAccess}
             className="w-full px-4 py-2 text-sm text-red-600 bg-white border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50 flex items-center justify-center gap-2"
             tabIndex={100}
           >
