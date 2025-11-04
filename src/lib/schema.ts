@@ -29,6 +29,7 @@ export interface Concept {
   metadata: Record<string, unknown> // flexible key-value pairs
   createdAt: Date
   updatedAt: Date
+  deletedAt: Date | null // Timestamp when soft-deleted, null if not deleted
 }
 
 /**
@@ -46,6 +47,7 @@ export interface Relationship {
   metadata: Record<string, unknown> // flexible key-value pairs
   createdAt: Date
   updatedAt: Date
+  deletedAt: Date | null // Timestamp when soft-deleted, null if not deleted
 }
 
 /**

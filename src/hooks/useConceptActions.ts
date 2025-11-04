@@ -93,17 +93,48 @@ export function useConceptActions() {
   }
 
   /**
-   * Delete a concept.
+   * Delete a concept (soft delete).
+   * Sets deletedAt timestamp instead of actually deleting the record.
    * 
    * @param conceptId - ID of the concept to delete
    */
   const deleteConcept = async (conceptId: string) => {
-    await db.transact([tx.concepts[conceptId].delete()])
+    await db.transact([
+      tx.concepts[conceptId].update({
+        deletedAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    ])
+  }
+
+  /**
+   * Undelete a concept (restore from soft delete).
+   * Clears the deletedAt timestamp to restore the concept.
+   * Uses merge with null to remove the deletedAt property.
+   * 
+   * @param conceptId - ID of the concept to undelete
+   */
+  const undeleteConcept = async (conceptId: string) => {
+    try {
+      // Use merge with null to remove the deletedAt property
+      // According to InstantDB docs: "Setting a key to null will remove the property"
+      await db.transact([
+        tx.concepts[conceptId].merge({
+          deletedAt: null,
+          updatedAt: Date.now(),
+        }),
+      ])
+      console.log('Successfully undeleted concept:', conceptId)
+    } catch (error) {
+      console.error('Error undeleting concept:', conceptId, error)
+      throw error
+    }
   }
 
   return {
     createConcept,
     updateConcept,
     deleteConcept,
+    undeleteConcept,
   }
 }

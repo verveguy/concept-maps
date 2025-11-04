@@ -42,7 +42,7 @@ export function useConcepts() {
             $: { where: { id: currentMapId } },
             concepts: conceptIds
               ? {
-                  $: { where: { id: { $in: conceptIds } } },
+                  $: { where: { id: { $in: conceptIds }, deletedAt: { $isNull: true } } },
                   map: {
                     creator: {},
                     readPermissions: {},
@@ -50,6 +50,7 @@ export function useConcepts() {
                   },
                 }
               : {
+                  $: { where: { deletedAt: { $isNull: true } } },
                   map: {
                     creator: {},
                     readPermissions: {},
@@ -72,6 +73,7 @@ export function useConcepts() {
       metadata: c.metadata ? JSON.parse(c.metadata) : {},
       createdAt: new Date(c.createdAt),
       updatedAt: new Date(c.updatedAt),
+      deletedAt: c.deletedAt ? new Date(c.deletedAt) : null,
     })) || []
 
   return concepts
@@ -94,6 +96,7 @@ export function useAllConcepts() {
           maps: {
             $: { where: { id: currentMapId } },
             concepts: {
+              $: { where: { deletedAt: { $isNull: true } } },
               map: {
                 creator: {},
                 readPermissions: {},
@@ -116,6 +119,7 @@ export function useAllConcepts() {
       metadata: c.metadata ? JSON.parse(c.metadata) : {},
       createdAt: new Date(c.createdAt),
       updatedAt: new Date(c.updatedAt),
+      deletedAt: c.deletedAt ? new Date(c.deletedAt) : null,
     })) || []
 
   return concepts

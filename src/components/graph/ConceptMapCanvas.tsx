@@ -13,6 +13,8 @@ import ReactFlow, {
   type Edge,
   type Connection,
   type OnConnectStart,
+  type NodeChange,
+  type EdgeChange,
   ConnectionLineType,
   useNodesState,
   useEdgesState,
@@ -26,6 +28,7 @@ import { useRelationships, useAllRelationships } from '@/hooks/useRelationships'
 import { usePerspectives } from '@/hooks/usePerspectives'
 import { useConceptActions } from '@/hooks/useConceptActions'
 import { useRelationshipActions } from '@/hooks/useRelationshipActions'
+import { useUndo } from '@/hooks/useUndo'
 import { useUIStore } from '@/stores/uiStore'
 import { useMapStore } from '@/stores/mapStore'
 import { db, tx, id } from '@/lib/instant'
@@ -103,8 +106,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   
   const concepts = isEditingPerspective ? allConcepts : filteredConcepts
   const relationships = isEditingPerspective ? allRelationships : filteredRelationships
-  const { updateConcept } = useConceptActions()
-  const { createRelationship } = useRelationshipActions()
+  const { updateConcept, deleteConcept } = useConceptActions()
+  const { createRelationship, deleteRelationship } = useRelationshipActions()
+  const { recordDeletion, startOperation, endOperation } = useUndo()
   const { 
     setSelectedConceptId, 
     setSelectedRelationshipId, 
@@ -229,8 +233,149 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const prevIsEditingPerspectiveRef = useRef(isEditingPerspective)
 
   // React Flow state management - initialize with data
-  const [nodes, setNodes, onNodesChange] = useNodesState(allNodes)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(newEdges)
+  const [nodes, setNodes, onNodesChangeBase] = useNodesState(allNodes)
+  const [edges, setEdges, onEdgesChangeBase] = useEdgesState(newEdges)
+
+  // Wrap onNodesChange to intercept deletions and delete from database
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      // Filter out remove actions for concept nodes and delete from database
+      const removeChanges = changes.filter(
+        (change) => change.type === 'remove' && change.id !== 'text-view-node'
+      )
+
+      // If user doesn't have write access, prevent deletions by filtering out remove changes
+      if (removeChanges.length > 0 && !hasWriteAccess) {
+        // Filter out remove changes before calling base handler
+        const filteredChanges = changes.filter((change) => change.type !== 'remove' || change.id === 'text-view-node')
+        onNodesChangeBase(filteredChanges)
+        return
+      }
+
+      if (removeChanges.length > 0 && hasWriteAccess && currentMapId) {
+        // Check if selected concept is being deleted
+        const deletedConceptIds = removeChanges
+          .map((change) => change.type === 'remove' ? change.id : undefined)
+          .filter((id): id is string => id !== undefined)
+        
+        if (selectedConceptId && deletedConceptIds.includes(selectedConceptId)) {
+          setSelectedConceptId(null)
+          setConceptEditorOpen(false)
+        }
+
+        // Delete concepts from database
+        void (async () => {
+          try {
+            // Start a deletion operation to group related deletions
+            startOperation()
+            
+            // Find all relationships connected to deleted concepts
+            const deletedConceptIds = removeChanges
+              .map((change) => change.type === 'remove' ? change.id : undefined)
+              .filter((id): id is string => id !== undefined)
+            
+            const connectedRelationships = relationships.filter(
+              (r) => deletedConceptIds.includes(r.fromConceptId) || deletedConceptIds.includes(r.toConceptId)
+            )
+            
+            // Delete relationships connected to deleted concepts (before deleting concepts)
+            // This ensures relationships are deleted and recorded before concepts
+            const relationshipDeletePromises = connectedRelationships.map((rel) => {
+              recordDeletion('relationship', rel.id)
+              return deleteRelationship(rel.id)
+            })
+            
+            // Delete concepts
+            const conceptDeletePromises = removeChanges.map((change) => {
+              if (change.type === 'remove' && change.id) {
+                // Only delete if it's a concept node (not text-view node)
+                const node = nodes.find((n) => n.id === change.id)
+                if (node && node.type === 'concept') {
+                  // Record deletion for undo
+                  recordDeletion('concept', change.id)
+                  return deleteConcept(change.id)
+                }
+              }
+              return Promise.resolve()
+            })
+            
+            // Execute all deletions
+            await Promise.all([...relationshipDeletePromises, ...conceptDeletePromises])
+            
+            // End the deletion operation
+            endOperation()
+          } catch (error) {
+            console.error('Failed to delete concepts:', error)
+            alert('Failed to delete concepts. Please try again.')
+            // End operation even on error
+            endOperation()
+          }
+        })()
+      }
+
+      // Always call the base handler to update React Flow state
+      onNodesChangeBase(changes)
+    },
+    [hasWriteAccess, currentMapId, deleteConcept, deleteRelationship, nodes, relationships, onNodesChangeBase, selectedConceptId, setSelectedConceptId, setConceptEditorOpen, recordDeletion, startOperation, endOperation]
+  )
+
+  // Wrap onEdgesChange to intercept deletions and delete from database
+  const onEdgesChange = useCallback(
+    (changes: EdgeChange[]) => {
+      // Filter out remove actions and delete from database
+      const removeChanges = changes.filter((change) => change.type === 'remove')
+
+      // If user doesn't have write access, prevent deletions by filtering out remove changes
+      if (removeChanges.length > 0 && !hasWriteAccess) {
+        // Filter out remove changes before calling base handler
+        const filteredChanges = changes.filter((change) => change.type !== 'remove')
+        onEdgesChangeBase(filteredChanges)
+        return
+      }
+
+      if (removeChanges.length > 0 && hasWriteAccess && currentMapId) {
+        // Check if selected relationship is being deleted
+        const deletedRelationshipIds = removeChanges
+          .map((change) => change.type === 'remove' ? change.id : undefined)
+          .filter((id): id is string => id !== undefined)
+        
+        if (selectedRelationshipId && deletedRelationshipIds.includes(selectedRelationshipId)) {
+          setSelectedRelationshipId(null)
+          setRelationshipEditorOpen(false)
+        }
+
+        // Delete relationships from database
+        void (async () => {
+          try {
+            // Start a deletion operation for standalone relationship deletions
+            startOperation()
+            
+            const deletePromises = removeChanges.map((change) => {
+              if (change.type === 'remove' && change.id) {
+                // Record deletion for undo
+                recordDeletion('relationship', change.id)
+                return deleteRelationship(change.id)
+              }
+              return Promise.resolve()
+            })
+            await Promise.all(deletePromises)
+            
+            // End the deletion operation
+            endOperation()
+          } catch (error) {
+            console.error('Failed to delete relationships:', error)
+            alert('Failed to delete relationships. Please try again.')
+            // End operation even on error
+            endOperation()
+          }
+        })()
+      }
+
+      // Always call the base handler to update React Flow state
+      onEdgesChangeBase(changes)
+    },
+    [hasWriteAccess, currentMapId, deleteRelationship, onEdgesChangeBase, selectedRelationshipId, setSelectedRelationshipId, setRelationshipEditorOpen, recordDeletion, startOperation, endOperation]
+  )
 
   // Expose layout handler via ref (must be after nodes/edges are initialized)
   useImperativeHandle(ref, () => ({

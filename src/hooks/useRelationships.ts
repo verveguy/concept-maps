@@ -42,7 +42,7 @@ export function useRelationships() {
             $: { where: { id: currentMapId } },
             relationships: relationshipIds
               ? {
-                  $: { where: { id: { $in: relationshipIds } } },
+                  $: { where: { id: { $in: relationshipIds }, deletedAt: { $isNull: true } } },
                   map: {
                     creator: {},
                     readPermissions: {},
@@ -52,6 +52,7 @@ export function useRelationships() {
                   toConcept: {},
                 }
               : {
+                  $: { where: { deletedAt: { $isNull: true } } },
                   map: {
                     creator: {},
                     readPermissions: {},
@@ -78,6 +79,7 @@ export function useRelationships() {
       metadata: r.metadata ? JSON.parse(r.metadata) : {},
       createdAt: new Date(r.createdAt),
       updatedAt: new Date(r.updatedAt),
+      deletedAt: r.deletedAt ? new Date(r.deletedAt) : null,
     })) || []
 
   return relationships
@@ -100,6 +102,7 @@ export function useAllRelationships() {
           maps: {
             $: { where: { id: currentMapId } },
             relationships: {
+              $: { where: { deletedAt: { $isNull: true } } },
               map: {
                 creator: {},
                 readPermissions: {},
@@ -126,6 +129,7 @@ export function useAllRelationships() {
       metadata: r.metadata ? JSON.parse(r.metadata) : {},
       createdAt: new Date(r.createdAt),
       updatedAt: new Date(r.updatedAt),
+      deletedAt: r.deletedAt ? new Date(r.deletedAt) : null,
     })) || []
 
   return relationships

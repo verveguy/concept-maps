@@ -99,17 +99,48 @@ export function useRelationshipActions() {
   }
 
   /**
-   * Delete a relationship.
+   * Delete a relationship (soft delete).
+   * Sets deletedAt timestamp instead of actually deleting the record.
    * 
    * @param relationshipId - ID of the relationship to delete
    */
   const deleteRelationship = async (relationshipId: string) => {
-    await db.transact([tx.relationships[relationshipId].delete()])
+    await db.transact([
+      tx.relationships[relationshipId].update({
+        deletedAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    ])
+  }
+
+  /**
+   * Undelete a relationship (restore from soft delete).
+   * Clears the deletedAt timestamp to restore the relationship.
+   * Uses merge with null to remove the deletedAt property.
+   * 
+   * @param relationshipId - ID of the relationship to undelete
+   */
+  const undeleteRelationship = async (relationshipId: string) => {
+    try {
+      // Use merge with null to remove the deletedAt property
+      // According to InstantDB docs: "Setting a key to null will remove the property"
+      await db.transact([
+        tx.relationships[relationshipId].merge({
+          deletedAt: null,
+          updatedAt: Date.now(),
+        }),
+      ])
+      console.log('Successfully undeleted relationship:', relationshipId)
+    } catch (error) {
+      console.error('Error undeleting relationship:', relationshipId, error)
+      throw error
+    }
   }
 
   return {
     createRelationship,
     updateRelationship,
     deleteRelationship,
+    undeleteRelationship,
   }
 }

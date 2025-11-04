@@ -12,6 +12,7 @@ import { UnifiedEditor } from '@/components/editor/UnifiedEditor'
 import { PerspectiveEditor } from '@/components/perspective/PerspectiveEditor'
 import { ShareDialog } from '@/components/share/ShareDialog'
 import { SearchBox } from '@/components/layout/SearchBox'
+import { UndoButton } from '@/components/ui/UndoButton'
 import { useMapStore } from '@/stores/mapStore'
 import { useConceptActions } from '@/hooks/useConceptActions'
 import { useMap } from '@/hooks/useMap'
@@ -123,6 +124,8 @@ export function MapPage() {
           <div className="flex-1" />
           {/* Search Box */}
           <SearchBox />
+          {/* Undo Button */}
+          <UndoButton />
           {currentPerspective && !isEditingPerspective && (
             <button
               onClick={() => setIsEditingPerspective(true)}

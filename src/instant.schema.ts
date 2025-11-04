@@ -15,6 +15,7 @@ const _schema = i.schema({
     }),
     concepts: i.entity({
       createdAt: i.number().indexed(),
+      deletedAt: i.number().optional(),
       label: i.string().indexed(),
       metadata: i.string().optional(),
       notes: i.string().optional(),
@@ -35,6 +36,7 @@ const _schema = i.schema({
     }),
     relationships: i.entity({
       createdAt: i.number().indexed(),
+      deletedAt: i.number().optional(),
       metadata: i.string().optional(),
       notes: i.string().optional(),
       primaryLabel: i.string().indexed(),
