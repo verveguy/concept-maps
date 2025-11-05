@@ -20,6 +20,19 @@ export function useSharing(mapId: string | null) {
   const currentUser = auth.user || null
   const userId = currentUser?.id || null
 
+  // Query the current user's email from the $users entity
+  const { data: currentUserData } = db.useQuery(
+    userId
+      ? {
+          $users: {
+            $: { where: { id: userId } },
+          },
+        }
+      : null
+  )
+
+  const currentUserEmail = currentUserData?.$users?.[0]?.email || null
+
   // Query share invitations and share records for the provided map
   // Include permission links for debugging and consistency
   // Include map link on shares so permission checks can traverse to map.creator
@@ -139,6 +152,7 @@ export function useSharing(mapId: string | null) {
    * Accept a collaboration invitation.
    * Updates the invitation record to accepted and creates an active share entry.
    * All operations are performed in a single atomic transaction.
+   * Validates that the authenticated user's email matches the invited email.
    *
    * @param invitationId - ID of the invitation to accept
    */
@@ -150,6 +164,19 @@ export function useSharing(mapId: string | null) {
       if (!invitation) throw new Error('Invitation not found')
       if (invitation.status !== 'pending') {
         throw new Error('Only pending invitations can be accepted')
+      }
+
+      // Validate that the authenticated user's email matches the invited email
+      if (!currentUserEmail) {
+        throw new Error('Unable to verify your email address. Please ensure your account has an email associated with it.')
+      }
+      
+      // Compare emails case-insensitively (invitedEmail is stored lowercase)
+      const invitedEmailLower = invitation.invitedEmail.toLowerCase()
+      const currentEmailLower = currentUserEmail.toLowerCase()
+      
+      if (invitedEmailLower !== currentEmailLower) {
+        throw new Error(`This invitation was sent to ${invitation.invitedEmail}, but you are signed in as ${currentUserEmail}. Please sign in with the correct email address.`)
       }
 
       // Get the map owner (invitation creator) from the raw query data
@@ -187,11 +214,12 @@ export function useSharing(mapId: string | null) {
           : [tx.maps[invitation.mapId].link({ readPermissions: userId })]),
       ])
     },
-    [invitations, userId, data]
+    [invitations, userId, data, currentUserEmail]
   )
 
   /**
    * Decline a collaboration invitation.
+   * Validates that the authenticated user's email matches the invited email.
    *
    * @param invitationId - ID of the invitation to decline
    */
@@ -205,6 +233,19 @@ export function useSharing(mapId: string | null) {
         throw new Error('Only pending invitations can be declined')
       }
 
+      // Validate that the authenticated user's email matches the invited email
+      if (!currentUserEmail) {
+        throw new Error('Unable to verify your email address. Please ensure your account has an email associated with it.')
+      }
+      
+      // Compare emails case-insensitively (invitedEmail is stored lowercase)
+      const invitedEmailLower = invitation.invitedEmail.toLowerCase()
+      const currentEmailLower = currentUserEmail.toLowerCase()
+      
+      if (invitedEmailLower !== currentEmailLower) {
+        throw new Error(`This invitation was sent to ${invitation.invitedEmail}, but you are signed in as ${currentUserEmail}. Please sign in with the correct email address.`)
+      }
+
       await db.transact([
         tx.shareInvitations[invitationId].update({
           status: 'declined',
@@ -213,7 +254,7 @@ export function useSharing(mapId: string | null) {
         }),
       ])
     },
-    [invitations, userId]
+    [invitations, userId, currentUserEmail]
   )
 
   /**

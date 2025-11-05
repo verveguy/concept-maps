@@ -268,6 +268,12 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
 
   const isAccepted = invitation.status === 'accepted'
   const isDeclined = invitation.status === 'declined'
+  
+  // Check if emails match (case-insensitive comparison)
+  // Returns false if user is not authenticated or email is not available
+  const emailsMatch = auth.user && currentUserEmail 
+    ? invitation.invitedEmail.toLowerCase() === currentUserEmail.toLowerCase()
+    : false
 
   return (
     <div className="flex items-center justify-center min-h-screen px-4">
@@ -327,6 +333,9 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
           <div><strong>Owner:</strong> {invitation.createdBy}</div>
           <div><strong>Permission:</strong> {invitation.permission}</div>
           <div><strong>Invited Email:</strong> {invitation.invitedEmail}</div>
+          {auth.user && currentUserEmail && (
+            <div><strong>Your Email:</strong> {currentUserEmail}</div>
+          )}
           <div><strong>Token:</strong> {inviteToken.slice(0, 12)}...</div>
         </div>
 
@@ -334,7 +343,7 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
           {!isAccepted && !isDeclined && (
             <button
               onClick={handleDecline}
-              disabled={isProcessing || invitation.status !== 'pending'}
+              disabled={isProcessing || invitation.status !== 'pending' || !!(auth.user && !emailsMatch)}
               className="px-4 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50"
             >
               Decline
@@ -350,7 +359,7 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
           ) : (
             <button
               onClick={handleAccept}
-              disabled={isProcessing || invitation.status !== 'pending'}
+              disabled={isProcessing || invitation.status !== 'pending' || !!(auth.user && !emailsMatch)}
               className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
             >
               {isProcessing ? 'Processing...' : 'Accept Invitation'}
