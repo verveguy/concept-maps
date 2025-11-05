@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { X, Plus, Play, ChevronRight, ChevronDown, Eye, Settings, Sun, Moon } from 'lucide-react'
+import { X, Plus, Play, ChevronRight, ChevronDown, Eye, Settings, Sun, Moon, BookOpen } from 'lucide-react'
 import { useMaps } from '@/hooks/useMaps'
 import { useMapActions } from '@/hooks/useMapActions'
 import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
@@ -362,6 +362,20 @@ export function Sidebar() {
             </div>
           </PopoverContent>
         </Popover>
+      </div>
+
+      {/* Documentation Link */}
+      <div className="p-4 border-t">
+        <a
+          href={import.meta.env.PROD ? '/concept-maps/docs/' : 'http://localhost:3000/concept-maps/docs/'}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded-md transition-colors flex items-center gap-2"
+          title="Open documentation in a new tab"
+        >
+          <BookOpen className="h-4 w-4" />
+          Documentation
+        </a>
       </div>
 
       {/* Theme Toggle */}
