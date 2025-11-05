@@ -11,4 +11,6 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // GitHub Pages deployment configuration
+  base: process.env.NODE_ENV === 'production' ? '/concept-maps/app/' : '/',
 })
