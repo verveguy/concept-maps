@@ -24,4 +24,3 @@ The `UnifiedEditor` component provides a unified interface that switches between
 ## Related Components
 
 - [ConceptMapCanvas](/docs/components/concept-map-canvas): Graph view implementation
-- [StructuredTextView](/docs/components/structured-text-view): Text view implementation

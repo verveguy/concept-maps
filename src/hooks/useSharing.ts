@@ -291,7 +291,7 @@ export function useSharing(mapId: string | null) {
       // Get userId from link - try shareRecord first, then fallback to transformed share.userId
       // The transformed share.userId comes from the same query data, so if one is missing, both will be
       // But we try both in case of timing/refresh issues
-      let userId = shareRecord.user?.id || share.userId
+      let userId: string | null = shareRecord.user?.id || share.userId || null
       if (!userId || userId.trim() === '') {
         // Last resort: try to get from the invitation if this share was created from one
         const matchingInvitation = invitations.find(

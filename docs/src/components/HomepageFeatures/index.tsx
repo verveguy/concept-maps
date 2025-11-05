@@ -1,6 +1,9 @@
 import type {ReactNode} from 'react';
 import clsx from 'clsx';
 import Heading from '@theme/Heading';
+import CollaborationSvg from './CollaborationSvg';
+import ViewsSvg from './ViewsSvg';
+import PerspectivesSvg from './PerspectivesSvg';
 import styles from './styles.module.css';
 
 type FeatureItem = {
@@ -11,32 +14,32 @@ type FeatureItem = {
 
 const FeatureList: FeatureItem[] = [
   {
-    title: 'Easy to Use',
-    Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
+    title: 'Real-Time Collaboration',
+    Svg: CollaborationSvg,
     description: (
       <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
+        Work together with your team in real-time. See changes instantly as
+        team members add concepts, edit relationships, and update perspectives.
       </>
     ),
   },
   {
-    title: 'Focus on What Matters',
-    Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
+    title: 'Visual & Text Views',
+    Svg: ViewsSvg,
     description: (
       <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
+        Switch between visual graph layouts and structured text views. Choose
+        the representation that works best for your workflow.
       </>
     ),
   },
   {
-    title: 'Powered by React',
-    Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
+    title: 'Powerful Perspectives',
+    Svg: PerspectivesSvg,
     description: (
       <>
-        Extend or customize your website layout by reusing React. Docusaurus can
-        be extended while reusing the same header and footer.
+        Create filtered views of your concept maps. Focus on specific concepts
+        and relationships to explore different aspects of your domain.
       </>
     ),
   },

@@ -17,8 +17,8 @@ The application provides real-time collaboration through InstantDB's automatic s
 
 The presence system tracks where users are working:
 
-- **Current User**: Tracked via \`usePresence()\` hook
-- **Other Users**: Visible via \`otherUsersPresence\` from \`usePresence()\`
+- **Current User**: Tracked via `usePresence()` hook
+- **Other Users**: Visible via `otherUsersPresence` from `usePresence()`
 - **Indicators**: Avatars, cursors, editing highlights
 
 ## Conflict Resolution

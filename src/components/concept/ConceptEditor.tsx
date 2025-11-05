@@ -8,6 +8,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Trash2, X, Plus } from 'lucide-react'
 import { useConceptActions } from '@/hooks/useConceptActions'
 import { useConcepts } from '@/hooks/useConcepts'
+import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { useUIStore } from '@/stores/uiStore'
 
 /**

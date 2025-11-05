@@ -12,7 +12,7 @@ The Concept Mapping Tool uses InstantDB as its data store. All data is stored as
 
 Maps are the top-level containers:
 
-\`\`\`typescript
+```typescript
 interface Map {
   id: string
   name: string
@@ -20,13 +20,13 @@ interface Map {
   createdAt: number
   updatedAt: number
 }
-\`\`\`
+```
 
 ### Concepts
 
 Concepts represent nodes in the concept map:
 
-\`\`\`typescript
+```typescript
 interface Concept {
   id: string
   mapId: string
@@ -38,13 +38,13 @@ interface Concept {
   createdAt: number
   updatedAt: number
 }
-\`\`\`
+```
 
 ### Relationships
 
 Relationships connect concepts:
 
-\`\`\`typescript
+```typescript
 interface Relationship {
   id: string
   mapId: string
@@ -57,13 +57,13 @@ interface Relationship {
   createdAt: number
   updatedAt: number
 }
-\`\`\`
+```
 
 ### Perspectives
 
 Perspectives define filtered views:
 
-\`\`\`typescript
+```typescript
 interface Perspective {
   id: string
   mapId: string
@@ -73,13 +73,13 @@ interface Perspective {
   createdBy: string
   createdAt: number
 }
-\`\`\`
+```
 
 ### Shares
 
 Shares control access:
 
-\`\`\`typescript
+```typescript
 interface Share {
   id: string
   mapId: string
@@ -87,7 +87,7 @@ interface Share {
   permission: 'view' | 'edit'
   createdAt: number
 }
-\`\`\`
+```
 
 ## Relationships
 
@@ -99,4 +99,4 @@ interface Share {
 
 ## Schema Definition
 
-The schema is defined in \`src/instant.schema.ts\` and synchronized with InstantDB.
+The schema is defined in `src/instant.schema.ts` and synchronized with InstantDB.

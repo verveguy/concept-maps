@@ -8,20 +8,20 @@ InstantDB serves as the complete backend for the application, handling data stor
 
 ## Setup
 
-InstantDB is configured in \`src/lib/instant.ts\`:
+InstantDB is configured in `src/lib/instant.ts`:
 
-\`\`\`typescript
+```typescript
 import { init } from '@instantdb/react'
 
 const db = init({
   appId: import.meta.env.VITE_INSTANTDB_APP_ID,
   apiKey: import.meta.env.VITE_INSTANTDB_API_KEY,
 })
-\`\`\`
+```
 
 ## Schema Definition
 
-The schema is defined in \`src/instant.schema.ts\` and includes:
+The schema is defined in `src/instant.schema.ts` and includes:
 
 - **Entities**: Maps, concepts, relationships, perspectives, shares, shareInvitations
 - **Links**: Relationships between entities (e.g., concepts → maps)
@@ -29,7 +29,7 @@ The schema is defined in \`src/instant.schema.ts\` and includes:
 
 ## Permissions
 
-Permissions are defined in \`src/instant.perms.ts\`:
+Permissions are defined in `src/instant.perms.ts`:
 
 - **Map Owners**: Full control over their maps
 - **Shared Users**: Based on share permission (view/edit)
@@ -37,9 +37,9 @@ Permissions are defined in \`src/instant.perms.ts\`:
 
 ## Querying Data
 
-Use \`useQuery()\` hook:
+Use `useQuery()` hook:
 
-\`\`\`typescript
+```typescript
 const { data, isLoading } = useQuery({
   concepts: {
     $: { where: { mapId } }
@@ -48,13 +48,13 @@ const { data, isLoading } = useQuery({
     $: { where: { mapId } }
   }
 })
-\`\`\`
+```
 
 ## Mutating Data
 
-Use \`useTransact()\` hook:
+Use `useTransact()` hook:
 
-\`\`\`typescript
+```typescript
 const { transact } = useTransact()
 
 // Create
@@ -65,7 +65,7 @@ transact.update({ concepts: { id: conceptId, label: 'Updated' } })
 
 // Delete
 transact.delete({ concepts: { id: conceptId } })
-\`\`\`
+```
 
 ## Real-time Updates
 

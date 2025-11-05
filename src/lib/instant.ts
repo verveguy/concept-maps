@@ -7,7 +7,8 @@
 
 import { init, tx, id } from '@instantdb/react'
 import schema from '../instant.schema'
-import rules from '../instant.perms'
+// Rules are configured in InstantDB dashboard, not passed here
+// import rules from '../instant.perms'
 
 /**
  * InstantDB application ID.

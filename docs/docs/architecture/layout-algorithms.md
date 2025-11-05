@@ -17,14 +17,14 @@ Based on d3-force, simulates physical forces:
 
 ### Implementation
 
-Located in \`src/lib/layouts/forceDirected.ts\`:
+Located in `src/lib/layouts/forceDirected.ts`:
 
-\`\`\`typescript
+```typescript
 export function calculateForceDirectedLayout(
   nodes: Node[],
   edges: Edge[]
 ): NodePosition[]
-\`\`\`
+```
 
 ## Hierarchical Layout
 
@@ -36,14 +36,14 @@ Based on dagre, arranges nodes in hierarchical layers:
 
 ### Implementation
 
-Located in \`src/lib/layouts/hierarchical.ts\`:
+Located in `src/lib/layouts/hierarchical.ts`:
 
-\`\`\`typescript
+```typescript
 export function calculateHierarchicalLayout(
   nodes: Node[],
   edges: Edge[]
 ): NodePosition[]
-\`\`\`
+```
 
 ## Layout Controls
 

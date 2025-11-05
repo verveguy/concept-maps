@@ -8,7 +8,7 @@ The application is optimized for performance with large concept maps and many co
 
 ## React Optimizations
 
-- **Memoization**: Components memoized with \`React.memo()\`
+- **Memoization**: Components memoized with `React.memo()`
 - **useMemo**: Expensive calculations memoized
 - **useCallback**: Event handlers memoized
 - **Code Splitting**: Lazy loading where possible

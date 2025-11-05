@@ -17,7 +17,7 @@ All persistent data is managed by InstantDB:
 
 ### Example
 
-\`\`\`typescript
+```typescript
 // Query data
 const { data } = useQuery({
   concepts: {
@@ -28,20 +28,20 @@ const { data } = useQuery({
 // Mutate data
 const { transact } = useTransact()
 transact.update({ concepts: { id: conceptId, label: newLabel } })
-\`\`\`
+```
 
 ## UI State (Zustand)
 
 Local UI state is managed with Zustand stores:
 
-### UI Store (\`uiStore.ts\`)
+### UI Store (`uiStore.ts`)
 
 Manages UI state like:
 - Selected concept/relationship IDs
 - Editor open/closed states
 - View mode (graph/text)
 
-### Map Store (\`mapStore.ts\`)
+### Map Store (`mapStore.ts`)
 
 Manages map-specific UI state:
 - Current map ID
@@ -50,11 +50,11 @@ Manages map-specific UI state:
 
 ## State Flow
 
-1. **Initial Load**: \`useQuery()\` fetches data from InstantDB
+1. **Initial Load**: `useQuery()` fetches data from InstantDB
 2. **User Action**: Component calls action hook
-3. **Mutation**: Action uses \`useTransact()\` to update InstantDB
+3. **Mutation**: Action uses `useTransact()` to update InstantDB
 4. **Sync**: InstantDB syncs to all clients
-5. **Update**: \`useQuery()\` hooks receive updates automatically
+5. **Update**: `useQuery()` hooks receive updates automatically
 6. **Render**: Components re-render with new data
 
 ## Benefits
