@@ -408,11 +408,9 @@ export const RelationshipEdge = memo(
               />
             ) : (
               <div
-                className={`px-2 py-1 text-xs font-medium bg-white rounded shadow-sm border ${
-                  selected
-                    ? 'border-primary bg-primary/5'
-                    : 'border-gray-300'
-                } cursor-pointer hover:bg-gray-50`}
+                className={`px-2 py-1 text-xs font-medium bg-white rounded cursor-pointer hover:bg-gray-50 ${
+                  selected ? 'bg-primary/5' : ''
+                }`}
                 style={{
                   opacity: isEditingPerspective && !isInPerspective ? 0.5 : 1,
                 }}
