@@ -81,6 +81,7 @@ export function StructuredTextView() {
           metadata: {},
           createdAt: new Date(),
           updatedAt: new Date(),
+          deletedAt: null,
         }
       }
 
@@ -108,10 +109,17 @@ export function StructuredTextView() {
           metadata: {},
           createdAt: new Date(),
           updatedAt: new Date(),
+          deletedAt: null,
         }
       }
 
       // Create relationship
+      // At this point, fromConcept and toConcept are guaranteed to be defined
+      // because we either found them or created them above
+      if (!fromConcept || !toConcept) {
+        throw new Error('Failed to ensure concepts exist')
+      }
+      
       await createRelationship({
         mapId: currentMapId,
         fromConceptId: fromConcept.id,
