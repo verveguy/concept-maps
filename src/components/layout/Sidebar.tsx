@@ -14,6 +14,8 @@ import { useUIStore } from '@/stores/uiStore'
 import { db } from '@/lib/instant'
 import { format } from 'date-fns'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+import { usePresence } from '@/hooks/usePresence'
+import { PresenceAvatar } from '@/components/presence/PresenceAvatar'
 
 /**
  * Sidebar component for browsing maps and perspectives.
@@ -44,6 +46,7 @@ export function Sidebar() {
   const { currentMapId, currentPerspectiveId, setCurrentMapId, setCurrentPerspectiveId } = useMapStore()
   const { setSidebarOpen } = useUIStore()
   const auth = db.useAuth()
+  const { currentUserPresence } = usePresence()
   const [isCreating, setIsCreating] = useState(false)
   const [newMapName, setNewMapName] = useState('')
   const [expandedMaps, setExpandedMaps] = useState<Set<string>>(new Set([currentMapId || '']))
@@ -152,7 +155,7 @@ export function Sidebar() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Maps</h2>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -162,9 +165,6 @@ export function Sidebar() {
             <X className="h-5 w-5" />
           </button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {auth.user?.email || 'Not signed in'}
-        </p>
       </div>
 
       {/* Create Map Form */}
@@ -398,6 +398,23 @@ export function Sidebar() {
           )}
         </button>
       </div>
+
+      {/* User Avatar */}
+      {currentUserPresence && (
+        <div className="p-4 border-t">
+          <div className="relative group cursor-pointer inline-block">
+            <PresenceAvatar presence={currentUserPresence} />
+            {/* Custom tooltip - positioned above and to the right */}
+            <div className="absolute bottom-full left-full mb-2 ml-2 px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+              {currentUserPresence.email && currentUserPresence.email.trim() !== currentUserPresence.userName.trim()
+                ? `${currentUserPresence.userName} (${currentUserPresence.email})`
+                : currentUserPresence.userName}
+              {/* Tooltip arrow pointing down-left to avatar */}
+              <div className="absolute top-full left-0 mt-0 border-4 border-transparent border-t-gray-900"></div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -6,9 +6,10 @@
  * @see https://www.instantdb.com/docs/presence-and-topics
  */
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useMemo } from 'react'
 import { db } from '@/lib/instant'
 import { useMapStore } from '@/stores/mapStore'
+import { getAvatarUrl } from '@/lib/avatar'
 
 /**
  * Presence data structure for a user.
@@ -19,6 +20,8 @@ export interface PresenceData {
   userId: string
   /** Display name for the user */
   userName: string
+  /** User's email address, or null if not available */
+  email: string | null
   /** Current cursor position on the canvas, or null if not hovering */
   cursor: { x: number; y: number } | null
   /** ID of the node currently being edited, or null */
@@ -27,6 +30,8 @@ export interface PresenceData {
   editingEdgeId: string | null
   /** Color assigned to this user for visual distinction */
   color: string
+  /** Avatar URL (from Gravatar or custom imageURL), or null if not available */
+  avatarUrl: string | null
 }
 
 /**
@@ -121,8 +126,28 @@ export function usePresence() {
   // Get current user info
   const auth = db.useAuth()
   const currentUser = auth.user || null
+  const currentUserId = currentUser?.id
+  
+  // Query current user's data to get email and imageURL
+  const { data: currentUserData } = db.useQuery(
+    currentUserId
+      ? {
+          $users: {
+            $: { where: { id: currentUserId } },
+          },
+        }
+      : null
+  )
+  
+  const currentUserEntity = currentUserData?.$users?.[0]
   const currentUserName = currentUser && typeof (currentUser as any).name === 'string' ? ((currentUser as any).name as string) : undefined
-  const currentUserEmail = currentUser && typeof (currentUser as any).email === 'string' ? ((currentUser as any).email as string) : undefined
+  const currentUserEmail = currentUserEntity?.email || (currentUser && typeof (currentUser as any).email === 'string' ? ((currentUser as any).email as string) : undefined)
+  const currentUserImageURL = currentUserEntity?.imageURL || undefined
+  
+  // Generate avatar URL for current user
+  const currentUserAvatarUrl = useMemo(() => {
+    return getAvatarUrl(currentUserEmail, currentUserImageURL, 80)
+  }, [currentUserEmail, currentUserImageURL])
   
   // Create a room for this map
   const room = currentMapId ? db.room('map', currentMapId) : null
@@ -141,6 +166,7 @@ export function usePresence() {
         editingNodeId: undefined,
         editingEdgeId: undefined,
         color: generateColorForUser(userId),
+        avatarUrl: currentUserAvatarUrl,
       },
     }
   )
@@ -154,11 +180,12 @@ export function usePresence() {
       const color = generateColorForUser(finalUserId)
       
       // If we don't have presence yet, or if user info changed, update it
-      if (!myPresence || myPresence.userId !== finalUserId || myPresence.userName !== userName) {
+      if (!myPresence || myPresence.userId !== finalUserId || myPresence.userName !== userName || myPresence.avatarUrl !== currentUserAvatarUrl) {
         publishPresence({
           userId: finalUserId,
           userName,
           color,
+          avatarUrl: currentUserAvatarUrl,
           // Preserve existing cursor/editing state
           cursor: myPresence?.cursor ?? null,
           editingNodeId: myPresence?.editingNodeId ?? undefined,
@@ -166,7 +193,38 @@ export function usePresence() {
         })
       }
     }
-  }, [currentUser, publishPresence, myPresence])
+  }, [currentUser, publishPresence, myPresence, currentUserAvatarUrl, currentUserName, currentUserEmail])
+  
+  // Query user data for all peer user IDs to get their email/imageURL for avatar generation
+  const peerUserIds = useMemo(() => {
+    if (!peers) return []
+    return Array.from(new Set(
+      Object.values(peers)
+        .map((peer: any) => peer.userId)
+        .filter((id: string | undefined): id is string => Boolean(id))
+    ))
+  }, [peers])
+  
+  const { data: peerUsersData } = db.useQuery(
+    peerUserIds.length > 0
+      ? {
+          $users: {
+            $: { where: { id: { $in: peerUserIds } } },
+          },
+        }
+      : null
+  )
+  
+  // Create a map of userId -> user entity for quick lookup
+  const peerUsersMap = useMemo(() => {
+    const map = new Map<string, { email?: string | null; imageURL?: string | null }>()
+    if (peerUsersData?.$users) {
+      for (const user of peerUsersData.$users) {
+        map.set(user.id, { email: user.email, imageURL: user.imageURL })
+      }
+    }
+    return map
+  }, [peerUsersData])
   
   // Transform peers to array format
   const otherUsersPresence = peers
@@ -180,13 +238,24 @@ export function usePresence() {
           // Generate a color if missing
           const peerColor = peer.color || generateColorForUser(peerUserId)
           
+          // Get avatar URL and email - prefer from presence, otherwise generate from user data
+          let peerAvatarUrl = peer.avatarUrl || null
+          const peerUserData = peerUsersMap.get(peerUserId)
+          let peerEmail = peerUserData?.email || null
+          
+          if (!peerAvatarUrl && peerUserData) {
+            peerAvatarUrl = getAvatarUrl(peerUserData.email, peerUserData.imageURL, 80)
+          }
+          
           return {
             userId: peerUserId,
             userName: peerUserName,
+            email: peerEmail,
             cursor: peer.cursor || null,
             editingNodeId: peer.editingNodeId || null,
             editingEdgeId: peer.editingEdgeId || null,
             color: peerColor,
+            avatarUrl: peerAvatarUrl,
           }
         })
         .filter((presence) => presence.userId && presence.userId.trim()) // Filter out empty/whitespace userIds
@@ -196,8 +265,40 @@ export function usePresence() {
         )
     : []
   
+  // Get current user's presence data (from myPresence)
+  const currentUserPresence: PresenceData | null = useMemo(() => {
+    if (!currentUser) return null
+    
+    // Use myPresence if available, otherwise construct from current user data
+    if (myPresence) {
+      return {
+        userId: currentUser.id,
+        userName: currentUserName || currentUserEmail || generateNameForUser(currentUser.id),
+        email: currentUserEmail || null,
+        cursor: myPresence.cursor || null,
+        editingNodeId: myPresence.editingNodeId || null,
+        editingEdgeId: myPresence.editingEdgeId || null,
+        color: myPresence.color || generateColorForUser(currentUser.id),
+        avatarUrl: currentUserAvatarUrl,
+      }
+    }
+    
+    // If myPresence not ready yet, still return presence data for display
+    return {
+      userId: currentUser.id,
+      userName: currentUserName || currentUserEmail || generateNameForUser(currentUser.id),
+      email: currentUserEmail || null,
+      cursor: null,
+      editingNodeId: null,
+      editingEdgeId: null,
+      color: generateColorForUser(currentUser.id),
+      avatarUrl: currentUserAvatarUrl,
+    }
+  }, [myPresence, currentUser, currentUserName, currentUserEmail, currentUserAvatarUrl])
+  
   return {
     currentUser,
+    currentUserPresence,
     otherUsersPresence,
     setCursor: useCallback(
       (cursor: { x: number; y: number } | null) => {

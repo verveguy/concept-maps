@@ -30,6 +30,19 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
+  // Query the current user's email from the $users entity
+  const { data: currentUserData } = db.useQuery(
+    auth.user?.id
+      ? {
+          $users: {
+            $: { where: { id: auth.user.id } },
+          },
+        }
+      : null
+  )
+
+  const currentUserEmail = currentUserData?.$users?.[0]?.email || null
+
   const invitationQuery = db.useQuery(
     inviteToken
       ? {
@@ -88,6 +101,7 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
 
   /**
    * Accepts the invitation and provisions a share for the authenticated user.
+   * Validates that the authenticated user's email matches the invited email.
    */
   const handleAccept = async () => {
     if (!auth.user?.id) {
@@ -104,6 +118,21 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
     }
     if (!invitation.map?.id) {
       setErrorMessage('Map information is missing. Please contact the map owner.')
+      return
+    }
+
+    // Validate that the authenticated user's email matches the invited email
+    if (!currentUserEmail) {
+      setErrorMessage('Unable to verify your email address. Please ensure your account has an email associated with it.')
+      return
+    }
+    
+    // Compare emails case-insensitively (invitedEmail is stored lowercase)
+    const invitedEmailLower = invitation.invitedEmail.toLowerCase()
+    const currentEmailLower = currentUserEmail.toLowerCase()
+    
+    if (invitedEmailLower !== currentEmailLower) {
+      setErrorMessage(`This invitation was sent to ${invitation.invitedEmail}, but you are signed in as ${currentUserEmail}. Please sign in with the correct email address.`)
       return
     }
 
@@ -158,6 +187,7 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
 
   /**
    * Declines the invitation for the authenticated user.
+   * Validates that the authenticated user's email matches the invited email.
    */
   const handleDecline = async () => {
     if (!auth.user?.id) {
@@ -170,6 +200,21 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
     }
     if (invitation.status !== 'pending') {
       setErrorMessage('This invitation is no longer pending.')
+      return
+    }
+
+    // Validate that the authenticated user's email matches the invited email
+    if (!currentUserEmail) {
+      setErrorMessage('Unable to verify your email address. Please ensure your account has an email associated with it.')
+      return
+    }
+    
+    // Compare emails case-insensitively (invitedEmail is stored lowercase)
+    const invitedEmailLower = invitation.invitedEmail.toLowerCase()
+    const currentEmailLower = currentUserEmail.toLowerCase()
+    
+    if (invitedEmailLower !== currentEmailLower) {
+      setErrorMessage(`This invitation was sent to ${invitation.invitedEmail}, but you are signed in as ${currentUserEmail}. Please sign in with the correct email address.`)
       return
     }
 
@@ -256,7 +301,13 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
 
         {!auth.user && (
           <div className="p-3 text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded-md">
-            Sign in with the email address that received this invitation to accept or decline.
+            Sign in with the email address that received this invitation ({invitation.invitedEmail}) to accept or decline.
+          </div>
+        )}
+
+        {auth.user && currentUserEmail && invitation.invitedEmail.toLowerCase() !== currentUserEmail.toLowerCase() && (
+          <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-md">
+            <strong>Email mismatch:</strong> This invitation was sent to <strong>{invitation.invitedEmail}</strong>, but you are signed in as <strong>{currentUserEmail}</strong>. Please sign out and sign in with the correct email address to accept this invitation.
           </div>
         )}
 

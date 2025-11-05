@@ -255,6 +255,7 @@ const _schema = i.schema({
         editingNodeId: i.string().optional(),
         userId: i.string(),
         userName: i.string(),
+        avatarUrl: i.string().optional(),
       }),
     },
   },

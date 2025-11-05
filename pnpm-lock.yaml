@@ -26,6 +26,9 @@ importers:
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
+      gravatar-url:
+        specifier: ^4.0.1
+        version: 4.0.1
       lucide-react:
         specifier: ^0.552.0
         version: 0.552.0(react@19.2.0)
@@ -3029,6 +3032,9 @@ packages:
     peerDependencies:
       react: '>=17.0.1'
 
+  blueimp-md5@2.19.0:
+    resolution: {integrity: sha512-DRQrD6gJyy8FbiE4s+bDoXS9hiW3Vbx5uCdwvcCf3zLHL+Iv7LtGHLpr+GZV8rHG8tK766FGYBwRbu8pELTt+w==}
+
   body-parser@1.20.3:
     resolution: {integrity: sha512-7rAxByjUMqQ3/bHJy7D6OGXvx/MMc4IqBn/X0fcM1QUcAItpZrBEYhWGem+tzXH90c+G01ypMcYJBO9Y30203g==}
     engines: {node: '>= 0.8', npm: 1.2.8000 || >= 1.4.16}
@@ -4140,6 +4146,10 @@ packages:
   graphlib@2.1.8:
     resolution: {integrity: sha512-jcLLfkpoVGmH7/InMC/1hIvOPSUh38oJtGhvrOFGzioE1DZ+0YW16RgmOJhHiuWTvGiJQ9Z1Ik43JvkRPRvE+A==}
 
+  gravatar-url@4.0.1:
+    resolution: {integrity: sha512-AiU83cghGg2D8vAUwrMXCByejkkm4RtLwMNGmPU7VhqBYhsxcBCV0SAzRpYNbUCpTci5v46J/KFKPmDYaG2oyA==}
+    engines: {node: '>=12'}
+
   gray-matter@4.0.3:
     resolution: {integrity: sha512-5v6yZd4JK3eMI3FqqCouswVqwugaA9r4dNZB1wwcmrD02QkV5H0y7XBQW8QwQqEaZY1pM9aqORSORhJRdNK44Q==}
     engines: {node: '>=6.0'}
@@ -4774,6 +4784,10 @@ packages:
   math-intrinsics@1.1.0:
     resolution: {integrity: sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==}
     engines: {node: '>= 0.4'}
+
+  md5-hex@4.0.0:
+    resolution: {integrity: sha512-di38zHPn4Tz8LCb5Lz8SpLb/20Hv23aPXpF4Bq1mR5r9JuCZQ/JpcDUxFfZF9Ur5GiUvqS5NQOkR+fm5cYZ0IQ==}
+    engines: {node: '>=12'}
 
   mdast-util-directive@3.1.0:
     resolution: {integrity: sha512-I3fNFt+DHmpWCYAT7quoM6lHf9wuqtI+oCOfvILnoicNIqjh5E3dEJWiXuYME2gNe8vl1iMQwyUHa7bgFmak6Q==}
@@ -10537,6 +10551,8 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
 
+  blueimp-md5@2.19.0: {}
+
   body-parser@1.20.3:
     dependencies:
       bytes: 3.1.2
@@ -11769,6 +11785,11 @@ snapshots:
     dependencies:
       lodash: 4.17.21
 
+  gravatar-url@4.0.1:
+    dependencies:
+      md5-hex: 4.0.0
+      type-fest: 1.4.0
+
   gray-matter@4.0.3:
     dependencies:
       js-yaml: 3.14.1
@@ -12417,6 +12438,10 @@ snapshots:
   marked@16.4.1: {}
 
   math-intrinsics@1.1.0: {}
+
+  md5-hex@4.0.0:
+    dependencies:
+      blueimp-md5: 2.19.0
 
   mdast-util-directive@3.1.0:
     dependencies:

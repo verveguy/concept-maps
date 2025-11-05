@@ -68,7 +68,7 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
     .filter((presence, index, self) => 
       // Ensure unique userIds
       index === self.findIndex((p) => p.userId === presence.userId)
-    ) as Array<{ userId: string; userName: string; color: string; editingNodeId: string }>
+    )
 
   // Extract node style from metadata
   const metadataKey = data.concept?.metadata ? JSON.stringify(data.concept.metadata) : ''
@@ -231,10 +231,12 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
           presence={{
             userId: presence.userId,
             userName: presence.userName,
+            email: presence.email || null,
             cursor: null,
             editingNodeId: presence.editingNodeId,
             editingEdgeId: null,
             color: presence.color,
+            avatarUrl: presence.avatarUrl || null,
           }}
           nodeId={data.concept.id}
         />
@@ -249,10 +251,12 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
               presence={{
                 userId: presence.userId,
                 userName: presence.userName,
+                email: presence.email || null,
                 cursor: null,
                 editingNodeId: presence.editingNodeId,
                 editingEdgeId: null,
                 color: presence.color,
+                avatarUrl: presence.avatarUrl || null,
               }}
             />
           ))}
