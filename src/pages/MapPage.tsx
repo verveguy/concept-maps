@@ -5,7 +5,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react'
-import { Plus, X, Share2, Eye, Edit } from 'lucide-react'
+import { Plus, X, Share2, Eye, Edit, PanelLeft } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ConceptMapCanvas, type ConceptMapCanvasRef } from '@/components/graph/ConceptMapCanvas'
 import { UnifiedEditor } from '@/components/editor/UnifiedEditor'
@@ -15,6 +15,7 @@ import { SearchBox } from '@/components/layout/SearchBox'
 import { UndoButton } from '@/components/ui/UndoButton'
 import { PresenceHeader } from '@/components/presence/PresenceHeader'
 import { useMapStore } from '@/stores/mapStore'
+import { useUIStore } from '@/stores/uiStore'
 import { useConceptActions } from '@/hooks/useConceptActions'
 import { useMap } from '@/hooks/useMap'
 import { usePerspectives } from '@/hooks/usePerspectives'
@@ -32,6 +33,8 @@ export function MapPage() {
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
   const isEditingPerspective = useMapStore((state) => state.isEditingPerspective)
   const setIsEditingPerspective = useMapStore((state) => state.setIsEditingPerspective)
+  const sidebarOpen = useUIStore((state) => state.sidebarOpen)
+  const setSidebarOpen = useUIStore((state) => state.setSidebarOpen)
   const map = useMap()
   const perspectives = usePerspectives()
   const currentPerspective = perspectives.find((p) => p.id === currentPerspectiveId)
@@ -103,7 +106,18 @@ export function MapPage() {
       <div className="h-full w-full flex flex-col">
         {/* Toolbar */}
         <div className="border-b bg-card px-4 py-2 flex items-center gap-2">
-          <div className="flex items-center gap-2">
+          {/* Sidebar toggle button - only show when sidebar is closed */}
+          {!sidebarOpen && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-1.5 rounded-md hover:bg-accent transition-colors -ml-1"
+              title="Open sidebar"
+              aria-label="Open sidebar"
+            >
+              <PanelLeft className="h-4 w-4" />
+            </button>
+          )}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             <h1 className="text-lg font-semibold">{map?.name || 'Untitled Map'}</h1>
             {currentPerspective && (
               <>

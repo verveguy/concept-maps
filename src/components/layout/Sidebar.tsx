@@ -14,9 +14,7 @@ import { useUIStore } from '@/stores/uiStore'
 import { db } from '@/lib/instant'
 import { format } from 'date-fns'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
-import { useCurrentUserPresence } from '@/hooks/useCurrentUserPresence'
-import { PresenceAvatar } from '@/components/presence/PresenceAvatar'
-import type { PresenceData } from '@/lib/presence'
+import { UserAvatarSection } from './UserAvatarSection'
 
 /**
  * Memoized video popover component.
@@ -104,33 +102,6 @@ const ThemeToggle = memo(({ isDarkMode, toggleTheme }: { isDarkMode: boolean; to
 ThemeToggle.displayName = 'ThemeToggle'
 
 /**
- * User avatar section component.
- * This component will re-render when presence updates, which is expected behavior.
- * 
- * @param currentUserPresence - Current user's presence data
- */
-const UserAvatarSection = memo(({ currentUserPresence }: { currentUserPresence: PresenceData | null }) => {
-  if (!currentUserPresence) return null
-  
-  return (
-    <div className="p-4 border-t">
-      <div className="relative group cursor-pointer inline-block">
-        <PresenceAvatar presence={currentUserPresence} />
-        {/* Custom tooltip - positioned above and to the right */}
-        <div className="absolute bottom-full left-full mb-2 ml-2 px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-          {currentUserPresence.email && currentUserPresence.email.trim() !== currentUserPresence.userName.trim()
-            ? `${currentUserPresence.userName} (${currentUserPresence.email})`
-            : currentUserPresence.userName}
-          {/* Tooltip arrow pointing down-left to avatar */}
-          <div className="absolute top-full left-0 mt-0 border-4 border-transparent border-t-gray-900"></div>
-        </div>
-      </div>
-    </div>
-  )
-})
-UserAvatarSection.displayName = 'UserAvatarSection'
-
-/**
  * Sidebar component for browsing maps and perspectives.
  * Displays list of maps, allows creating new maps, and selecting a map.
  * 
@@ -141,7 +112,6 @@ export const Sidebar = () => {
   const { createPerspective } = usePerspectiveActions()
   const { currentMapId, currentPerspectiveId, setCurrentMapId, setCurrentPerspectiveId } = useMapStore()
   const { setSidebarOpen } = useUIStore()
-  const { currentUserPresence } = useCurrentUserPresence()
   const [isCreating, setIsCreating] = useState(false)
   const [newMapName, setNewMapName] = useState('')
   const [expandedMaps, setExpandedMaps] = useState<Set<string>>(new Set([currentMapId || '']))
@@ -471,8 +441,8 @@ export const Sidebar = () => {
       {/* Theme Toggle - Memoized to prevent re-renders */}
       <ThemeToggle isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
 
-      {/* User Avatar - Will re-render when presence updates (expected) */}
-      <UserAvatarSection currentUserPresence={currentUserPresence} />
+      {/* User Avatar - Isolated component with its own hook, won't cause Sidebar re-renders */}
+      <UserAvatarSection />
     </div>
   )
 }
