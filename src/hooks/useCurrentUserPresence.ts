@@ -53,6 +53,8 @@ export function useCurrentUserPresence() {
   const userId = currentUser?.id || generateAnonymousUserId()
   
   // Subscribe to presence updates (but we ignore peers - not subscribed to peer updates)
+  // Use keys selection to exclude cursor field - Sidebar doesn't need cursor positions
+  // This prevents re-renders when cursor moves
   const { user: myPresence, publishPresence } = db.rooms.usePresence(
     room || db.room('map', 'default'),
     {
@@ -65,16 +67,19 @@ export function useCurrentUserPresence() {
         color: generateColorForUser(userId),
         avatarUrl: currentUserAvatarUrl || undefined,
       },
+      // Exclude cursor from selection - Sidebar doesn't need cursor tracking
+      // This prevents re-renders when cursors move
+      keys: ['userId', 'userName', 'editingNodeId', 'editingEdgeId', 'color', 'avatarUrl'],
     }
   )
   
   // Extract primitive values from myPresence and currentUser BEFORE the useEffect to ensure stable dependencies
   // This prevents the effect from running when object references change but values are the same
+  // Note: cursor is not extracted since we exclude it from keys selection
   const currentUserIdForEffect = currentUser?.id ?? null
   const myPresenceUserId = myPresence?.userId ?? null
   const myPresenceUserName = myPresence?.userName ?? null
   const myPresenceAvatarUrl = myPresence?.avatarUrl ?? null
-  const myPresenceCursor = myPresence?.cursor ?? null
   const myPresenceEditingNodeId = myPresence?.editingNodeId ?? null
   const myPresenceEditingEdgeId = myPresence?.editingEdgeId ?? null
   const myPresenceExists = myPresence ? true : false
@@ -95,14 +100,13 @@ export function useCurrentUserPresence() {
           userName,
           color,
           avatarUrl: currentUserAvatarUrl || undefined,
-          // Preserve existing cursor/editing state using extracted primitives
-          cursor: myPresenceCursor,
+          // Preserve existing editing state (cursor is not included since we don't track it)
           editingNodeId: myPresenceEditingNodeId ?? undefined,
           editingEdgeId: myPresenceEditingEdgeId ?? undefined,
         })
       }
     }
-  }, [publishPresence, currentUserIdForEffect, myPresenceUserId, myPresenceUserName, myPresenceAvatarUrl, currentUserAvatarUrl, currentUserName, currentUserEmail, myPresenceExists, myPresenceCursor, myPresenceEditingNodeId, myPresenceEditingEdgeId])
+  }, [publishPresence, currentUserIdForEffect, myPresenceUserId, myPresenceUserName, myPresenceAvatarUrl, currentUserAvatarUrl, currentUserName, currentUserEmail, myPresenceExists, myPresenceEditingNodeId, myPresenceEditingEdgeId])
   
   // Extract primitive values from myPresence for stable memoization (reuse from above)
   const myPresenceColor = myPresence?.color ?? null
