@@ -240,22 +240,27 @@ export function usePresence() {
   // This ensures we only re-render when non-cursor presence data changes
   // Extract primitive values from peers object to create stable key
   // This avoids recomputation when peers object reference changes but values are the same
+  // IMPORTANT: Even with keys selection, InstantDB may still update peers object reference
+  // when cursor changes, so we need to manually filter cursor from the dependency
   const peersKeyWithoutCursors = useMemo(() => {
     if (!peers) return ''
-    // Extract primitives from peers to avoid dependency on object reference
-    const peerEntries = Object.entries(peers)
-    return peerEntries
-      .map(([key, peer]: [string, any]) => {
-        // Include all fields except cursor in the key
-        // Use nullish coalescing to handle undefined values consistently
-        return `${key}:${peer.userId ?? ''}:${peer.userName ?? ''}:${peer.editingNodeId ?? ''}:${peer.editingEdgeId ?? ''}:${peer.color ?? ''}:${peer.avatarUrl ?? ''}`
-      })
-      .sort()
-      .join('|')
-    // Depend on the actual peer data, not the object reference
-    // We need to extract a stable representation of the peers data
+    // Serialize only non-cursor fields to create stable key
+    // This ensures we only recompute when non-cursor fields actually change
+    return JSON.stringify(
+      Object.entries(peers).map(([key, peer]: [string, any]) => [
+        key,
+        peer.userId,
+        peer.userName,
+        peer.editingNodeId,
+        peer.editingEdgeId,
+        peer.color,
+        peer.avatarUrl
+        // Explicitly exclude peer.cursor from serialization
+      ]).sort()
+    )
   }, [
-    // Create a stable key from peer data by serializing the relevant fields
+    // Create a stable key from peer data by serializing ONLY non-cursor fields
+    // This prevents re-renders when only cursor changes
     peers ? JSON.stringify(
       Object.entries(peers).map(([key, peer]: [string, any]) => [
         key,
@@ -265,6 +270,7 @@ export function usePresence() {
         peer.editingEdgeId,
         peer.color,
         peer.avatarUrl
+        // Explicitly exclude peer.cursor
       ]).sort()
     ) : ''
   ])
