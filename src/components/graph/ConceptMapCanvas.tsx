@@ -36,8 +36,9 @@ import { nodeTypes, edgeTypes } from './reactFlowTypes'
 import type { LayoutType } from '@/lib/layouts'
 import { applyForceDirectedLayout, applyHierarchicalLayout } from '@/lib/layouts'
 import { Network, Layers, FileText } from 'lucide-react'
-import { usePresence } from '@/hooks/usePresence'
-import { PresenceCursor } from '@/components/presence/PresenceCursor'
+import { usePresenceEditing } from '@/hooks/usePresenceEditing'
+import { usePresenceCursorSetter } from '@/hooks/usePresenceCursorSetter'
+import { PeerCursors } from '@/components/presence/PeerCursors'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 
 /**
@@ -119,10 +120,14 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     textViewPosition,
     setTextViewPosition,
   } = useUIStore()
-  const { screenToFlowPosition, flowToScreenPosition, fitView } = useReactFlow()
+  const { screenToFlowPosition, fitView } = useReactFlow()
   
-  // Presence tracking
-  const { otherUsersPresence, setCursor, setEditingNode, setEditingEdge } = usePresence()
+  // Presence tracking - split into separate hooks to prevent unnecessary re-renders
+  // Cursor setter: only updates cursor position, doesn't subscribe to peer cursors
+  const { setCursor } = usePresenceCursorSetter()
+  // Editing hook: updates only when editing state changes
+  const { setEditingNode, setEditingEdge } = usePresenceEditing()
+  
   const selectedConceptId = useUIStore((state) => state.selectedConceptId)
   const selectedRelationshipId = useUIStore((state) => state.selectedRelationshipId)
   
@@ -839,14 +844,8 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
 
   return (
     <div className="w-full h-full relative" onDoubleClick={handleDoubleClick}>
-      {/* Render presence cursors for other users */}
-      {otherUsersPresence.map((presence) => (
-        <PresenceCursor
-          key={presence.userId}
-          presence={presence}
-          flowToScreenPosition={flowToScreenPosition}
-        />
-      ))}
+      {/* Render presence cursors for other users - isolated component with its own hook */}
+      <PeerCursors />
       
       <ReactFlow
         nodes={nodes}

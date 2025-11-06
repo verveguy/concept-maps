@@ -3,7 +3,7 @@
  * Provides visual feedback for collaborative editing.
  */
 
-import type { PresenceData } from '@/hooks/usePresence'
+import type { PresenceData } from '@/lib/presence'
 
 /**
  * Component to highlight nodes/areas being edited by other users.

@@ -4,7 +4,7 @@
  * Also provides perspective management within each map.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, memo, useCallback } from 'react'
 import { X, Plus, Play, ChevronRight, ChevronDown, Eye, Settings, Sun, Moon, BookOpen } from 'lucide-react'
 import { useMaps } from '@/hooks/useMaps'
 import { useMapActions } from '@/hooks/useMapActions'
@@ -14,8 +14,121 @@ import { useUIStore } from '@/stores/uiStore'
 import { db } from '@/lib/instant'
 import { format } from 'date-fns'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
-import { usePresence } from '@/hooks/usePresence'
+import { useCurrentUserPresence } from '@/hooks/useCurrentUserPresence'
 import { PresenceAvatar } from '@/components/presence/PresenceAvatar'
+import type { PresenceData } from '@/lib/presence'
+
+/**
+ * Memoized video popover component.
+ * Extracted to prevent re-renders when parent Sidebar re-renders due to presence updates.
+ */
+const VideoPopover = memo(() => {
+  return (
+    <div className="p-4 border-t">
+      <Popover>
+        <PopoverTrigger asChild>
+          <button className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded-md transition-colors flex items-center gap-2">
+            <Play className="h-4 w-4" />
+            Watch James Ross Video
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[800px] max-w-[90vw] p-0" align="start">
+          <div className="relative aspect-video w-full">
+            <iframe
+              className="absolute inset-0 w-full h-full rounded-lg"
+              src="https://www.youtube.com/embed/0tsUpOmUv88"
+              title="James Ross Video"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  )
+})
+VideoPopover.displayName = 'VideoPopover'
+
+/**
+ * Memoized documentation link component.
+ * Extracted to prevent re-renders when parent Sidebar re-renders due to presence updates.
+ */
+const DocumentationLink = memo(() => {
+  return (
+    <div className="p-4 border-t">
+      <a
+        href={import.meta.env.PROD ? '/concept-maps/docs/' : 'http://localhost:3000/concept-maps/docs/'}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded-md transition-colors flex items-center gap-2"
+        title="Open documentation in a new tab"
+      >
+        <BookOpen className="h-4 w-4" />
+        Documentation
+      </a>
+    </div>
+  )
+})
+DocumentationLink.displayName = 'DocumentationLink'
+
+/**
+ * Memoized theme toggle component.
+ * Extracted to prevent re-renders when parent Sidebar re-renders due to presence updates.
+ * 
+ * @param isDarkMode - Current dark mode state
+ * @param toggleTheme - Function to toggle theme
+ */
+const ThemeToggle = memo(({ isDarkMode, toggleTheme }: { isDarkMode: boolean; toggleTheme: () => void }) => {
+  return (
+    <div className="p-4 border-t">
+      <button
+        onClick={toggleTheme}
+        className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded-md transition-colors flex items-center gap-2"
+        title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {isDarkMode ? (
+          <>
+            <Sun className="h-4 w-4" />
+            Light Mode
+          </>
+        ) : (
+          <>
+            <Moon className="h-4 w-4" />
+            Dark Mode
+          </>
+        )}
+      </button>
+    </div>
+  )
+})
+ThemeToggle.displayName = 'ThemeToggle'
+
+/**
+ * User avatar section component.
+ * This component will re-render when presence updates, which is expected behavior.
+ * 
+ * @param currentUserPresence - Current user's presence data
+ */
+const UserAvatarSection = memo(({ currentUserPresence }: { currentUserPresence: PresenceData | null }) => {
+  if (!currentUserPresence) return null
+  
+  return (
+    <div className="p-4 border-t">
+      <div className="relative group cursor-pointer inline-block">
+        <PresenceAvatar presence={currentUserPresence} />
+        {/* Custom tooltip - positioned above and to the right */}
+        <div className="absolute bottom-full left-full mb-2 ml-2 px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+          {currentUserPresence.email && currentUserPresence.email.trim() !== currentUserPresence.userName.trim()
+            ? `${currentUserPresence.userName} (${currentUserPresence.email})`
+            : currentUserPresence.userName}
+          {/* Tooltip arrow pointing down-left to avatar */}
+          <div className="absolute top-full left-0 mt-0 border-4 border-transparent border-t-gray-900"></div>
+        </div>
+      </div>
+    </div>
+  )
+})
+UserAvatarSection.displayName = 'UserAvatarSection'
 
 /**
  * Sidebar component for browsing maps and perspectives.
@@ -23,7 +136,19 @@ import { PresenceAvatar } from '@/components/presence/PresenceAvatar'
  * 
  * @returns The sidebar JSX
  */
-export function Sidebar() {
+export const Sidebar = () => {
+  const { createMap } = useMapActions()
+  const { createPerspective } = usePerspectiveActions()
+  const { currentMapId, currentPerspectiveId, setCurrentMapId, setCurrentPerspectiveId } = useMapStore()
+  const { setSidebarOpen } = useUIStore()
+  const { currentUserPresence } = useCurrentUserPresence()
+  const [isCreating, setIsCreating] = useState(false)
+  const [newMapName, setNewMapName] = useState('')
+  const [expandedMaps, setExpandedMaps] = useState<Set<string>>(new Set([currentMapId || '']))
+  const [isCreatingPerspective, setIsCreatingPerspective] = useState<string | null>(null)
+  const [newPerspectiveName, setNewPerspectiveName] = useState('')
+  const [isDarkMode, setIsDarkMode] = useState(false)
+
   const maps = useMaps()
   // Get all perspectives for all maps (not filtered by currentMapId)
   const { data: perspectivesData } = db.useQuery({
@@ -32,28 +157,21 @@ export function Sidebar() {
       map: {},
     },
   })
-  const allPerspectives = (perspectivesData?.perspectives || []).map((p: any) => ({
-    id: p.id,
-    mapId: p.map?.id || '',
-    name: p.name,
-    conceptIds: p.conceptIds ? JSON.parse(p.conceptIds) : [],
-    relationshipIds: p.relationshipIds ? JSON.parse(p.relationshipIds) : [],
-    createdBy: p.creator?.id || '',
-    createdAt: new Date(p.createdAt),
-  }))
-  const { createMap } = useMapActions()
-  const { createPerspective } = usePerspectiveActions()
-  const { currentMapId, currentPerspectiveId, setCurrentMapId, setCurrentPerspectiveId } = useMapStore()
-  const { setSidebarOpen } = useUIStore()
-  const auth = db.useAuth()
-  const { currentUserPresence } = usePresence()
-  const [isCreating, setIsCreating] = useState(false)
-  const [newMapName, setNewMapName] = useState('')
-  const [expandedMaps, setExpandedMaps] = useState<Set<string>>(new Set([currentMapId || '']))
-  const [isCreatingPerspective, setIsCreatingPerspective] = useState<string | null>(null)
-  const [newPerspectiveName, setNewPerspectiveName] = useState('')
-  const [isDarkMode, setIsDarkMode] = useState(false)
+  // Memoize allPerspectives to avoid creating new array/object references on every render
+  // This prevents unnecessary re-renders when component parent re-renders
+  const allPerspectives = useMemo(() => {
+    return (perspectivesData?.perspectives || []).map((p: any) => ({
+      id: p.id,
+      mapId: p.map?.id || '',
+      name: p.name,
+      conceptIds: p.conceptIds ? JSON.parse(p.conceptIds) : [],
+      relationshipIds: p.relationshipIds ? JSON.parse(p.relationshipIds) : [],
+      createdBy: p.creator?.id || '',
+      createdAt: new Date(p.createdAt),
+    }))
+  }, [perspectivesData])
 
+  
   // Initialize theme from localStorage or system preference
   useEffect(() => {
     const stored = localStorage.getItem('theme')
@@ -68,19 +186,22 @@ export function Sidebar() {
     }
   }, [])
 
-  // Toggle theme
-  const toggleTheme = () => {
-    const newIsDark = !isDarkMode
-    setIsDarkMode(newIsDark)
-    
-    if (newIsDark) {
-      document.documentElement.classList.add('dark')
-      localStorage.setItem('theme', 'dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-      localStorage.setItem('theme', 'light')
-    }
-  }
+  // Toggle theme - wrapped in useCallback to maintain stable reference for memoized ThemeToggle component
+  const toggleTheme = useCallback(() => {
+    setIsDarkMode((prev) => {
+      const newIsDark = !prev
+      
+      if (newIsDark) {
+        document.documentElement.classList.add('dark')
+        localStorage.setItem('theme', 'dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+        localStorage.setItem('theme', 'light')
+      }
+      
+      return newIsDark
+    })
+  }, [])
 
   // Auto-expand map when a perspective is selected
   useEffect(() => {
@@ -341,80 +462,17 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* Video Link */}
-      <div className="p-4 border-t">
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded-md transition-colors flex items-center gap-2">
-              <Play className="h-4 w-4" />
-              Watch James Ross Video
-            </button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[800px] max-w-[90vw] p-0" align="start">
-            <div className="relative aspect-video w-full">
-              <iframe
-                className="absolute inset-0 w-full h-full rounded-lg"
-                src="https://www.youtube.com/embed/0tsUpOmUv88"
-                title="James Ross Video"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
-          </PopoverContent>
-        </Popover>
-      </div>
+      {/* Video Link - Memoized to prevent re-renders */}
+      <VideoPopover />
 
-      {/* Documentation Link */}
-      <div className="p-4 border-t">
-        <a
-          href={import.meta.env.PROD ? '/concept-maps/docs/' : 'http://localhost:3000/concept-maps/docs/'}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded-md transition-colors flex items-center gap-2"
-          title="Open documentation in a new tab"
-        >
-          <BookOpen className="h-4 w-4" />
-          Documentation
-        </a>
-      </div>
+      {/* Documentation Link - Memoized to prevent re-renders */}
+      <DocumentationLink />
 
-      {/* Theme Toggle */}
-      <div className="p-4 border-t">
-        <button
-          onClick={toggleTheme}
-          className="w-full text-left px-3 py-2 text-sm hover:bg-accent rounded-md transition-colors flex items-center gap-2"
-          title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          {isDarkMode ? (
-            <>
-              <Sun className="h-4 w-4" />
-              Light Mode
-            </>
-          ) : (
-            <>
-              <Moon className="h-4 w-4" />
-              Dark Mode
-            </>
-          )}
-        </button>
-      </div>
+      {/* Theme Toggle - Memoized to prevent re-renders */}
+      <ThemeToggle isDarkMode={isDarkMode} toggleTheme={toggleTheme} />
 
-      {/* User Avatar */}
-      {currentUserPresence && (
-        <div className="p-4 border-t">
-          <div className="relative group cursor-pointer inline-block">
-            <PresenceAvatar presence={currentUserPresence} />
-            {/* Custom tooltip - positioned above and to the right */}
-            <div className="absolute bottom-full left-full mb-2 ml-2 px-2 py-1 text-xs text-white bg-gray-900 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-              {currentUserPresence.email && currentUserPresence.email.trim() !== currentUserPresence.userName.trim()
-                ? `${currentUserPresence.userName} (${currentUserPresence.email})`
-                : currentUserPresence.userName}
-              {/* Tooltip arrow pointing down-left to avatar */}
-              <div className="absolute top-full left-0 mt-0 border-4 border-transparent border-t-gray-900"></div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* User Avatar - Will re-render when presence updates (expected) */}
+      <UserAvatarSection currentUserPresence={currentUserPresence} />
     </div>
   )
 }

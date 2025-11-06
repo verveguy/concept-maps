@@ -1,126 +1,84 @@
 /**
- * Hook for managing real-time presence and collaboration.
- * Tracks cursor positions, editing state, and user information for collaborative editing.
- * Based on InstantDB presence API.
+ * Hook for tracking presence for the current map (without cursor positions).
+ * Uses InstantDB presence API to track editing state and user information.
+ * This hook does NOT include cursor positions in otherUsersPresence to avoid
+ * unnecessary re-renders when cursors move.
  * 
- * @see https://www.instantdb.com/docs/presence-and-topics
+ * Use this hook for components that need BOTH current user presence AND
+ * other users' presence (e.g., ConceptNode, PresenceHeader).
+ * 
+ * For components that ONLY need current user presence, use useCurrentUserPresence() instead.
+ * For components that need cursor positions, use usePresenceCursors() from '@/hooks/usePresenceCursors' instead.
+ * 
+ * @returns Object containing current user info, other users' presence (without cursors), and setters
  */
 
-import { useEffect, useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useEffect } from 'react'
 import { db } from '@/lib/instant'
 import { useMapStore } from '@/stores/mapStore'
 import { getAvatarUrl } from '@/lib/avatar'
+import { generateAnonymousUserId, generateNameForUser, generateColorForUser, type PresenceData } from '@/lib/presence'
 
 /**
- * Presence data structure for a user.
- * Tracks their cursor position and what they're currently editing.
+ * Helper function to transform peers into presence data array.
+ * Used by usePresence() to transform peer data (without cursors).
+ * 
+ * @param peers - Raw peers object from InstantDB presence
+ * @param peerUsersMap - Map of userId -> user entity for avatar/email lookup
+ * @param includeCursors - Whether to include cursor positions in the result (always false for usePresence)
+ * @returns Array of PresenceData objects
  */
-export interface PresenceData {
-  /** Unique user identifier */
-  userId: string
-  /** Display name for the user */
-  userName: string
-  /** User's email address, or null if not available */
-  email: string | null
-  /** Current cursor position on the canvas, or null if not hovering */
-  cursor: { x: number; y: number } | null
-  /** ID of the node currently being edited, or null */
-  editingNodeId: string | null
-  /** ID of the edge currently being edited, or null */
-  editingEdgeId: string | null
-  /** Color assigned to this user for visual distinction */
-  color: string
-  /** Avatar URL (from Gravatar or custom imageURL), or null if not available */
-  avatarUrl: string | null
+function transformPeersToPresence(
+  peers: Record<string, any> | null | undefined,
+  peerUsersMap: Map<string, { email?: string | null; imageURL?: string | null }>,
+  includeCursors: boolean
+): PresenceData[] {
+  if (!peers) return []
+  
+  return Object.entries(peers)
+    .map(([peerKey, peer]: [string, any]) => {
+      // Use peer key as fallback ID if userId is missing
+      // This ensures we always have a unique identifier for each peer
+      const peerUserId = peer.userId || peerKey || `peer_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+      // Generate a name if missing
+      const peerUserName = peer.userName || generateNameForUser(peerUserId)
+      // Generate a color if missing
+      const peerColor = peer.color || generateColorForUser(peerUserId)
+      
+      // Get avatar URL and email - prefer from presence, otherwise generate from user data
+      let peerAvatarUrl = peer.avatarUrl || null
+      const peerUserData = peerUsersMap.get(peerUserId)
+      let peerEmail = peerUserData?.email || null
+      
+      if (!peerAvatarUrl && peerUserData) {
+        peerAvatarUrl = getAvatarUrl(peerUserData.email, peerUserData.imageURL, 80)
+      }
+      
+      return {
+        userId: peerUserId,
+        userName: peerUserName,
+        email: peerEmail,
+        cursor: includeCursors ? (peer.cursor || null) : null,
+        editingNodeId: peer.editingNodeId || null,
+        editingEdgeId: peer.editingEdgeId || null,
+        color: peerColor,
+        avatarUrl: peerAvatarUrl,
+      }
+    })
+    .filter((presence) => presence.userId && presence.userId.trim()) // Filter out empty/whitespace userIds
+    .filter((presence, index, self) => 
+      // Ensure unique userIds
+      index === self.findIndex((p) => p.userId === presence.userId)
+    )
 }
 
 /**
- * List of adjectives for generating user names.
- */
-const ADJECTIVES = [
-  'Stately', 'Gibbous', 'Curious', 'Brilliant', 'Swift', 'Majestic', 'Serene', 'Vibrant',
-  'Elegant', 'Mysterious', 'Radiant', 'Graceful', 'Bold', 'Gentle', 'Dynamic', 'Calm',
-  'Fierce', 'Luminous', 'Resilient', 'Noble', 'Playful', 'Sage', 'Valiant', 'Whimsical',
-  'Prismatic', 'Harmonious', 'Celestial', 'Intrepid', 'Sophisticated', 'Ethereal'
-]
-
-/**
- * List of animals for generating user names.
- */
-const ANIMALS = [
-  'Lama', 'Aardvark', 'Koala', 'Panther', 'Falcon', 'Dolphin', 'Tiger', 'Eagle',
-  'Jaguar', 'Owl', 'Leopard', 'Shark', 'Wolf', 'Lion', 'Hawk', 'Bear',
-  'Fox', 'Raven', 'Stag', 'Stallion', 'Puma', 'Hawk', 'Jaguar', 'Serpent',
-  'Phoenix', 'Unicorn', 'Griffin', 'Dragon', 'Pegasus', 'Kraken'
-]
-
-/**
- * Generate a consistent anonymous user ID based on session/localStorage.
- * This ensures the same browser session gets the same anonymous ID.
+ * Shared helper function to get base presence data.
+ * Contains common logic for usePresence hook.
  * 
- * @returns A consistent anonymous user ID string
+ * @returns Object containing base presence data (currentUser, peers, publishPresence, etc.)
  */
-function generateAnonymousUserId(): string {
-  // Try to get existing anonymous ID from localStorage
-  const storageKey = 'anonymous_user_id'
-  let anonymousId = localStorage.getItem(storageKey)
-  
-  if (!anonymousId) {
-    // Generate a new anonymous ID
-    anonymousId = `anonymous_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-    localStorage.setItem(storageKey, anonymousId)
-  }
-  
-  return anonymousId
-}
-
-/**
- * Generate a consistent random name (Adjective + Animal) for a user based on their ID.
- * Uses the same hash-based approach as color generation for consistency.
- * 
- * @param userId - User ID to generate name for
- * @returns A consistent name string
- */
-function generateNameForUser(userId: string): string {
-  // Hash the user ID to get consistent indices
-  let hash = 0
-  for (let i = 0; i < userId.length; i++) {
-    hash = userId.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  
-  // Use hash to select adjective and animal
-  const adjectiveIndex = Math.abs(hash) % ADJECTIVES.length
-  const animalIndex = Math.abs(hash >> 8) % ANIMALS.length
-  
-  return `${ADJECTIVES[adjectiveIndex]} ${ANIMALS[animalIndex]}`
-}
-
-/**
- * Generate a consistent color for a user based on their ID.
- * Uses HSL color space for better color distribution.
- * 
- * @param userId - User ID to generate color for
- * @returns HSL color string
- */
-function generateColorForUser(userId: string): string {
-  // Hash the user ID to get a consistent color
-  let hash = 0
-  for (let i = 0; i < userId.length; i++) {
-    hash = userId.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  
-  // Generate a color from the hash
-  const hue = Math.abs(hash) % 360
-  return `hsl(${hue}, 70%, 50%)`
-}
-
-/**
- * Hook to track presence for the current map.
- * Uses InstantDB presence API to track cursor positions and editing state.
- * 
- * @returns Object containing current user info, other users' presence, and setters for cursor/editing state
- */
-export function usePresence() {
+function usePresenceBase() {
   const currentMapId = useMapStore((state) => state.currentMapId)
   
   // Get current user info
@@ -156,6 +114,8 @@ export function usePresence() {
   const userId = currentUser?.id || generateAnonymousUserId()
   
   // Subscribe to presence updates
+  // Use keys selection to exclude cursor field - we don't need cursor positions
+  // This ensures we only re-render when non-cursor presence data changes
   const { user: myPresence, peers, publishPresence } = db.rooms.usePresence(
     room || db.room('map', 'default'),
     {
@@ -166,8 +126,11 @@ export function usePresence() {
         editingNodeId: undefined,
         editingEdgeId: undefined,
         color: generateColorForUser(userId),
-        avatarUrl: currentUserAvatarUrl,
+        avatarUrl: currentUserAvatarUrl || undefined,
       },
+      // Exclude cursor from selection - we don't need cursor positions
+      // This prevents re-renders when cursors move
+      keys: ['userId', 'userName', 'editingNodeId', 'editingEdgeId', 'color', 'avatarUrl'],
     }
   )
   
@@ -185,9 +148,8 @@ export function usePresence() {
           userId: finalUserId,
           userName,
           color,
-          avatarUrl: currentUserAvatarUrl,
-          // Preserve existing cursor/editing state
-          cursor: myPresence?.cursor ?? null,
+          avatarUrl: currentUserAvatarUrl || undefined,
+          // Preserve existing editing state (cursor is not included since we don't track it)
           editingNodeId: myPresence?.editingNodeId ?? undefined,
           editingEdgeId: myPresence?.editingEdgeId ?? undefined,
         })
@@ -216,7 +178,20 @@ export function usePresence() {
   )
   
   // Create a map of userId -> user entity for quick lookup
+  // Memoize based on actual data values, not the object reference, for stability
+  // Create a stable key from the user data to detect actual changes
+  const peerUsersDataKey = useMemo(() => {
+    if (!peerUsersData?.$users) return ''
+    return peerUsersData.$users
+      .map((user: any) => `${user.id}:${user.email || ''}:${user.imageURL || ''}`)
+      .sort()
+      .join('|')
+  }, [peerUsersData])
+  
   const peerUsersMap = useMemo(() => {
+    // Read from peerUsersData at computation time (key ensures we recompute when data changes)
+    // Note: peerUsersData is intentionally not in deps - we use peerUsersDataKey to detect changes
+    // and React's closure ensures we read the latest peerUsersData when key changes
     const map = new Map<string, { email?: string | null; imageURL?: string | null }>()
     if (peerUsersData?.$users) {
       for (const user of peerUsersData.$users) {
@@ -224,77 +199,139 @@ export function usePresence() {
       }
     }
     return map
-  }, [peerUsersData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [peerUsersDataKey])
   
-  // Transform peers to array format
-  const otherUsersPresence = peers
-    ? Object.entries(peers)
-        .map(([peerKey, peer]: [string, any]) => {
-          // Use peer key as fallback ID if userId is missing
-          // This ensures we always have a unique identifier for each peer
-          const peerUserId = peer.userId || peerKey || `peer_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-          // Generate a name if missing
-          const peerUserName = peer.userName || generateNameForUser(peerUserId)
-          // Generate a color if missing
-          const peerColor = peer.color || generateColorForUser(peerUserId)
-          
-          // Get avatar URL and email - prefer from presence, otherwise generate from user data
-          let peerAvatarUrl = peer.avatarUrl || null
-          const peerUserData = peerUsersMap.get(peerUserId)
-          let peerEmail = peerUserData?.email || null
-          
-          if (!peerAvatarUrl && peerUserData) {
-            peerAvatarUrl = getAvatarUrl(peerUserData.email, peerUserData.imageURL, 80)
-          }
-          
-          return {
-            userId: peerUserId,
-            userName: peerUserName,
-            email: peerEmail,
-            cursor: peer.cursor || null,
-            editingNodeId: peer.editingNodeId || null,
-            editingEdgeId: peer.editingEdgeId || null,
-            color: peerColor,
-            avatarUrl: peerAvatarUrl,
-          }
-        })
-        .filter((presence) => presence.userId && presence.userId.trim()) // Filter out empty/whitespace userIds
-        .filter((presence, index, self) => 
-          // Ensure unique userIds
-          index === self.findIndex((p) => p.userId === presence.userId)
-        )
-    : []
+  return {
+    currentUser,
+    currentUserName,
+    currentUserEmail,
+    currentUserAvatarUrl,
+    myPresence,
+    peers,
+    publishPresence,
+    peerUsersMap,
+  }
+}
+
+export function usePresence() {
+  const {
+    currentUser,
+    currentUserName,
+    currentUserEmail,
+    currentUserAvatarUrl,
+    myPresence,
+    peers,
+    publishPresence,
+    peerUsersMap,
+  } = usePresenceBase()
+  
+  // Extract primitive values from myPresence for stable memoization
+  // InstantDB returns new objects on each render, so we need to extract primitives
+  // NOTE: For usePresence(), we exclude cursor from dependencies since components using
+  // this hook don't need cursor tracking and shouldn't re-render when cursor moves
+  const myPresenceEditingNodeId = myPresence?.editingNodeId ?? null
+  const myPresenceEditingEdgeId = myPresence?.editingEdgeId ?? null
+  const myPresenceColor = myPresence?.color ?? null
+  const currentUserId = currentUser?.id ?? null
+  
+  // Transform peers to array format, but memoize to ignore cursor changes
+  // Create a stable key that excludes cursor positions
+  // This ensures we only re-render when non-cursor presence data changes
+  // Extract primitive values from peers object to create stable key
+  // This avoids recomputation when peers object reference changes but values are the same
+  const peersKeyWithoutCursors = useMemo(() => {
+    if (!peers) return ''
+    // Extract primitives from peers to avoid dependency on object reference
+    const peerEntries = Object.entries(peers)
+    return peerEntries
+      .map(([key, peer]: [string, any]) => {
+        // Include all fields except cursor in the key
+        // Use nullish coalescing to handle undefined values consistently
+        return `${key}:${peer.userId ?? ''}:${peer.userName ?? ''}:${peer.editingNodeId ?? ''}:${peer.editingEdgeId ?? ''}:${peer.color ?? ''}:${peer.avatarUrl ?? ''}`
+      })
+      .sort()
+      .join('|')
+    // Depend on the actual peer data, not the object reference
+    // We need to extract a stable representation of the peers data
+  }, [
+    // Create a stable key from peer data by serializing the relevant fields
+    peers ? JSON.stringify(
+      Object.entries(peers).map(([key, peer]: [string, any]) => [
+        key,
+        peer.userId,
+        peer.userName,
+        peer.editingNodeId,
+        peer.editingEdgeId,
+        peer.color,
+        peer.avatarUrl
+      ]).sort()
+    ) : ''
+  ])
+  
+  // Create a stable key from peerUsersMap contents to avoid recomputation when Map reference changes
+  const peerUsersMapKey = useMemo(() => {
+    if (peerUsersMap.size === 0) return ''
+    return Array.from(peerUsersMap.entries())
+      .map(([userId, data]) => `${userId}:${data.email || ''}:${data.imageURL || ''}`)
+      .sort()
+      .join('|')
+  }, [peerUsersMap])
+  
+  const otherUsersPresence = useMemo(() => {
+    // Transform peers, but exclude cursor positions
+    // Read from peerUsersMap at computation time (key ensures we recompute when data changes)
+    return transformPeersToPresence(peers, peerUsersMap, false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [peersKeyWithoutCursors, peerUsersMapKey])
   
   // Get current user's presence data (from myPresence)
+  // Use primitive dependencies to ensure stable memoization
+  // NOTE: Cursor is intentionally excluded from dependencies - components using usePresence()
+  // don't need cursor tracking and shouldn't re-render when cursor moves
+  // We always set cursor to null since it's not needed by components using this hook
   const currentUserPresence: PresenceData | null = useMemo(() => {
-    if (!currentUser) return null
+    if (!currentUserId) return null
     
     // Use myPresence if available, otherwise construct from current user data
+    // Always set cursor to null since components using usePresence() don't need it
     if (myPresence) {
       return {
-        userId: currentUser.id,
-        userName: currentUserName || currentUserEmail || generateNameForUser(currentUser.id),
+        userId: currentUserId,
+        userName: currentUserName || currentUserEmail || generateNameForUser(currentUserId),
         email: currentUserEmail || null,
-        cursor: myPresence.cursor || null,
-        editingNodeId: myPresence.editingNodeId || null,
-        editingEdgeId: myPresence.editingEdgeId || null,
-        color: myPresence.color || generateColorForUser(currentUser.id),
+        cursor: null, // Always null for usePresence() - components don't need cursor tracking
+        editingNodeId: myPresenceEditingNodeId,
+        editingEdgeId: myPresenceEditingEdgeId,
+        color: myPresenceColor || generateColorForUser(currentUserId),
         avatarUrl: currentUserAvatarUrl,
       }
     }
     
     // If myPresence not ready yet, still return presence data for display
     return {
-      userId: currentUser.id,
-      userName: currentUserName || currentUserEmail || generateNameForUser(currentUser.id),
+      userId: currentUserId,
+      userName: currentUserName || currentUserEmail || generateNameForUser(currentUserId),
       email: currentUserEmail || null,
       cursor: null,
       editingNodeId: null,
       editingEdgeId: null,
-      color: generateColorForUser(currentUser.id),
+      color: generateColorForUser(currentUserId),
       avatarUrl: currentUserAvatarUrl,
     }
-  }, [myPresence, currentUser, currentUserName, currentUserEmail, currentUserAvatarUrl])
+  }, [
+    currentUserId,
+    // NOTE: Cursor is intentionally NOT in dependencies - cursor changes
+    // should not trigger re-renders for components using usePresence()
+    myPresenceEditingNodeId,
+    myPresenceEditingEdgeId,
+    myPresenceColor,
+    currentUserName,
+    currentUserEmail,
+    currentUserAvatarUrl,
+    // Include myPresence existence check as a boolean to detect when it becomes available
+    !!myPresence,
+  ])
   
   return {
     currentUser,
@@ -326,3 +363,4 @@ export function usePresence() {
     ),
   }
 }
+

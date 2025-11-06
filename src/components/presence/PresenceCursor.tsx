@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import type { PresenceData } from '@/hooks/usePresence'
+import type { PresenceData } from '@/lib/presence'
 
 /**
  * Component to display a user's cursor on the canvas.

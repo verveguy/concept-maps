@@ -3,7 +3,7 @@
  * Typically shown near nodes being edited to indicate who is editing.
  */
 
-import type { PresenceData } from '@/hooks/usePresence'
+import type { PresenceData } from '@/lib/presence'
 import { useState } from 'react'
 
 /**
