@@ -9,10 +9,43 @@ import { usePresence } from '@/hooks/usePresence'
 import { PresenceAvatar } from './PresenceAvatar'
 
 /**
- * Component to display all currently present users as avatars.
- * Shows current user and all other users in a horizontal row.
+ * Component to display all currently present users as a collection of avatars.
  * 
- * @returns The presence header component JSX
+ * Shows user avatars (from Gravatar or initials) in a horizontal row, similar to
+ * Google Docs' presence indicator. Displays the current user first, followed by
+ * other users. Supports expanding to show all users when there are many.
+ * 
+ * **Features:**
+ * - Shows up to 5 visible avatars, then "+N more" indicator
+ * - Click "+N more" to expand and see all users
+ * - Tooltips show user name and email on hover
+ * - Current user has a small indicator dot
+ * - Click outside to close expanded view
+ * 
+ * **User Display:**
+ * - Current user is always shown first
+ * - Other users follow in order
+ * - Duplicate users are filtered out (by userId)
+ * 
+ * **Expanded View:**
+ * When there are more than 5 users, clicking the "+N more" button shows a dropdown
+ * with all users, their names, and email addresses.
+ * 
+ * @returns The presence header component JSX, or null if no users are present
+ * 
+ * @example
+ * ```tsx
+ * import { PresenceHeader } from '@/components/presence/PresenceHeader'
+ * 
+ * function Header() {
+ *   return (
+ *     <div className="flex items-center gap-4">
+ *       <PresenceHeader />
+ *       <OtherControls />
+ *     </div>
+ *   )
+ * }
+ * ```
  */
 export function PresenceHeader() {
   const { currentUser, currentUserPresence, otherUsersPresence } = usePresence()

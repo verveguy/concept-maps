@@ -30,9 +30,43 @@ function getNonStyleMetadata(metadata: Record<string, unknown>, styleAttributes:
 
 /**
  * Unified Editor component that switches between Concept and Relationship editing.
- * Shows the editor for the most recently selected item (concept or relationship).
  * 
- * @returns The unified editor JSX
+ * Shows the editor for the most recently selected item (concept or relationship).
+ * Only one editor is displayed at a time - selecting a new item closes the previous
+ * editor and opens the new one.
+ * 
+ * **Editor Priority:**
+ * - Concept editor takes priority if both a concept and relationship are selected
+ * - Relationship editor shows only if no concept is selected
+ * - Editors close when their respective item is deselected
+ * 
+ * **Features:**
+ * - Auto-saves on field blur
+ * - Supports markdown notes
+ * - Metadata editing
+ * - Style customization (colors, borders, edge types)
+ * - Delete functionality with undo support
+ * - Read-only mode for users without write access
+ * 
+ * **Deletion Handling:**
+ * Deletions are tracked in the undo store for undo functionality. When a concept
+ * or relationship is deleted, it's recorded as part of a deletion operation.
+ * 
+ * @returns The unified editor JSX (ConceptEditor or RelationshipEditor), or null if nothing is selected
+ * 
+ * @example
+ * ```tsx
+ * import { UnifiedEditor } from '@/components/editor/UnifiedEditor'
+ * 
+ * function ConceptMap() {
+ *   return (
+ *     <>
+ *       <ConceptMapCanvas />
+ *       <UnifiedEditor />
+ *     </>
+ *   )
+ * }
+ * ```
  */
 export function UnifiedEditor() {
   const selectedConceptId = useUIStore((state) => state.selectedConceptId)

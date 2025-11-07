@@ -1,11 +1,51 @@
 /**
  * Hook for tracking cursor positions in real-time collaboration.
+ * 
  * Subscribes to InstantDB presence room and extracts only cursor-related data.
- * This hook will trigger re-renders when cursors move, but NOT when editing state changes.
+ * This hook will trigger re-renders when cursors move, but NOT when editing state
+ * changes, optimizing performance for cursor rendering components.
  * 
- * Use this hook for components that need to render remote cursors (e.g., ConceptMapCanvas).
+ * **Use Cases:**
+ * - Components that need to render remote cursors (e.g., ConceptMapCanvas)
+ * - Components that track mouse positions for collaboration
+ * - Components that don't need editing state (which node/edge is being edited)
  * 
- * @returns Object containing other users' cursor positions and setter for current user's cursor
+ * **Performance:**
+ * By excluding editing state, this hook prevents re-renders when editing state
+ * changes, improving performance for cursor rendering components.
+ * 
+ * **Alternative Hooks:**
+ * - `usePresence()`: Current user + other users' presence (without cursors, with editing state)
+ * - `useCurrentUserPresence()`: Only current user presence (no peer subscriptions)
+ * - `usePresenceEditing()`: Editing state setters only (write-only)
+ * - `usePresenceCursorSetter()`: Cursor position setter only (write-only)
+ * 
+ * @returns Object containing:
+ * - `otherUsersPresence`: Array of other users' presence with cursor positions
+ * - `setCursor`: Function to update current user's cursor position
+ * 
+ * @example
+ * ```tsx
+ * import { usePresenceCursors } from '@/hooks/usePresenceCursors'
+ * import { PresenceCursor } from '@/components/presence/PresenceCursor'
+ * 
+ * function ConceptMapCanvas() {
+ *   const { otherUsersPresence, setCursor } = usePresenceCursors()
+ *   
+ *   const onMouseMove = (event) => {
+ *     setCursor({ x: event.clientX, y: event.clientY })
+ *   }
+ *   
+ *   return (
+ *     <>
+ *       <ReactFlow onMouseMove={onMouseMove} />
+ *       {otherUsersPresence.map(presence => (
+ *         <PresenceCursor key={presence.userId} presence={presence} />
+ *       ))}
+ *     </>
+ *   )
+ * }
+ * ```
  */
 
 import { useMemo, useCallback } from 'react'

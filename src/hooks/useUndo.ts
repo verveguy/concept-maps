@@ -44,9 +44,34 @@ export function useUndo() {
 
   /**
    * Undo the most recent deletion operation.
-   * Restores all items deleted in the most recent operation (concepts and their relationships).
    * 
-   * @returns Promise that resolves to true if undo was successful, false otherwise
+   * Restores all items deleted in the most recent operation (concepts and their
+   * relationships). Processes concepts first, then relationships, executing all
+   * restorations in parallel for performance.
+   * 
+   * **Operation Grouping:**
+   * All deletions within a short time window are grouped into a single operation.
+   * This ensures that related deletions (e.g., a concept and its relationships)
+   * are restored together.
+   * 
+   * **Return Value:**
+   * Returns `true` if undo was successful, `false` if there was nothing to undo.
+   * 
+   * @returns Promise that resolves to `true` if undo was successful, `false` otherwise
+   * 
+   * @example
+   * ```tsx
+   * const { undo } = useUndo()
+   * 
+   * const handleUndo = async () => {
+   *   const success = await undo()
+   *   if (success) {
+   *     console.log('Undo successful')
+   *   } else {
+   *     console.log('Nothing to undo')
+   *   }
+   * }
+   * ```
    */
   const undo = useCallback(async (): Promise<boolean> => {
     const operation = getMostRecentOperation()

@@ -1,16 +1,51 @@
 /**
  * Hook for tracking presence for the current map (without cursor positions).
- * Uses InstantDB presence API to track editing state and user information.
- * This hook does NOT include cursor positions in otherUsersPresence to avoid
- * unnecessary re-renders when cursors move.
  * 
- * Use this hook for components that need BOTH current user presence AND
- * other users' presence (e.g., ConceptNode, PresenceHeader).
+ * Uses InstantDB presence API to track editing state and user information for
+ * real-time collaboration. This hook does NOT include cursor positions in
+ * `otherUsersPresence` to avoid unnecessary re-renders when cursors move.
  * 
- * For components that ONLY need current user presence, use useCurrentUserPresence() instead.
- * For components that need cursor positions, use usePresenceCursors() from '@/hooks/usePresenceCursors' instead.
+ * **Use Cases:**
+ * - Components that need BOTH current user presence AND other users' presence
+ * - Components that need editing state (which node/edge is being edited)
+ * - Components that don't need cursor positions (e.g., ConceptNode, PresenceHeader)
  * 
- * @returns Object containing current user info, other users' presence (without cursors), and setters
+ * **Performance:**
+ * By excluding cursor positions, this hook prevents re-renders when cursors move,
+ * improving performance for components that don't need cursor data.
+ * 
+ * **Alternative Hooks:**
+ * - `useCurrentUserPresence()`: Only current user presence (no peer subscriptions)
+ * - `usePresenceCursors()`: Cursor positions only (no editing state)
+ * - `usePresenceEditing()`: Editing state setters only (write-only)
+ * - `usePresenceCursorSetter()`: Cursor position setter only (write-only)
+ * 
+ * @returns Object containing:
+ * - `currentUser`: Current authenticated user object
+ * - `currentUserPresence`: Current user's presence data
+ * - `otherUsersPresence`: Array of other users' presence (without cursors)
+ * - `publishPresence`: Function to update current user's presence
+ * 
+ * @example
+ * ```tsx
+ * import { usePresence } from '@/hooks/usePresence'
+ * 
+ * function ConceptNode({ concept }) {
+ *   const { otherUsersPresence } = usePresence()
+ *   const editingUsers = otherUsersPresence.filter(
+ *     p => p.editingNodeId === concept.id
+ *   )
+ *   
+ *   return (
+ *     <div>
+ *       {editingUsers.map(user => (
+ *         <Avatar key={user.userId} user={user} />
+ *       ))}
+ *       <ConceptContent concept={concept} />
+ *     </div>
+ *   )
+ * }
+ * ```
  */
 
 import { useCallback, useMemo, useEffect } from 'react'

@@ -1,11 +1,47 @@
 /**
  * Hook for tracking editing state (which node/edge is being edited) in real-time collaboration.
- * Subscribes to InstantDB presence room and extracts only editing state data.
- * This hook will trigger re-renders when editing state changes, but NOT when cursors move.
  * 
- * Use this hook for components that need to track what other users are editing.
+ * Write-only hook that provides setters for updating the current user's editing state.
+ * Does NOT subscribe to peer editing state, preventing re-renders when other users
+ * start/stop editing. Uses write-only mode for optimal performance.
  * 
- * @returns Setters for current user's editing node and edge state
+ * **Use Cases:**
+ * - Components that need to update editing state (e.g., ConceptNode, RelationshipEdge)
+ * - Components that don't need to read peer editing state
+ * - Performance-critical components that should avoid peer subscriptions
+ * 
+ * **Performance:**
+ * Uses write-only mode (`peers: []`, `user: false`) to prevent re-renders when
+ * presence changes. Only provides setters, not readers.
+ * 
+ * **Alternative Hooks:**
+ * - `usePresence()`: Current user + other users' presence (with editing state, without cursors)
+ * - `useCurrentUserPresence()`: Only current user presence (no peer subscriptions)
+ * - `usePresenceCursors()`: Cursor positions for all users
+ * - `usePresenceCursorSetter()`: Cursor position setter only (write-only)
+ * 
+ * @returns Object containing:
+ * - `setEditingNode`: Function to set which node the current user is editing (or null)
+ * - `setEditingEdge`: Function to set which edge the current user is editing (or null)
+ * 
+ * @example
+ * ```tsx
+ * import { usePresenceEditing } from '@/hooks/usePresenceEditing'
+ * 
+ * function ConceptNode({ concept }) {
+ *   const { setEditingNode } = usePresenceEditing()
+ *   
+ *   const onFocus = () => {
+ *     setEditingNode(concept.id)
+ *   }
+ *   
+ *   const onBlur = () => {
+ *     setEditingNode(null)
+ *   }
+ *   
+ *   return <input onFocus={onFocus} onBlur={onBlur} />
+ * }
+ * ```
  */
 
 import { useCallback } from 'react'

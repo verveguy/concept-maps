@@ -1,6 +1,70 @@
 /**
- * Custom edge component for Relationship edges.
- * Provides inline editing capabilities and supports multiple edge types.
+ * Custom React Flow edge component for Relationship edges.
+ * 
+ * Renders a relationship as an edge connecting two concept nodes with inline editing
+ * capabilities. Supports multiple edge types (bezier, smoothstep, straight) and
+ * visual feedback for collaborative editing.
+ * 
+ * **Features:**
+ * - Inline label editing (click label to edit)
+ * - Multiple edge types (bezier, smoothstep, straight)
+ * - Directional labels (primary and reverse)
+ * - Markdown notes preview (expandable)
+ * - Metadata display (expandable)
+ * - Style customization (edge type, color, style)
+ * - Perspective editing (visual feedback for included/excluded relationships)
+ * - Collaborative editing indicators
+ * - Permission-based editing (read-only for users without write access)
+ * 
+ * **Edge Types:**
+ * - `bezier`: Curved edge with control points (default)
+ * - `smoothstep`: Step-like edge with rounded corners
+ * - `straight`: Direct line between nodes
+ * 
+ * **Edge Styling:**
+ * Style properties are stored in metadata:
+ * - `edgeType`: 'bezier' | 'smoothstep' | 'straight'
+ * - `edgeColor`: Edge color (default: gray)
+ * - `edgeStyle`: Edge style ('solid', 'dashed', 'dotted')
+ * 
+ * **Label Display:**
+ * Shows the primary label (from → to direction) by default. The reverse label
+ * is available when viewing from the opposite direction.
+ * 
+ * **Perspective Editing:**
+ * When in perspective editing mode:
+ * - Edges included in perspective are shown normally
+ * - Edges not in perspective are greyed out
+ * 
+ * **Collaborative Editing:**
+ * Shows visual feedback when other users are editing this relationship.
+ * 
+ * @param props - Edge props from React Flow
+ * @param props.data - Edge data containing relationship entity and perspective state
+ * @param props.selected - Whether the edge is currently selected
+ * @param props.id - Edge ID (relationship ID)
+ * @param props.source - Source node ID
+ * @param props.target - Target node ID
+ * @param props.sourceX - Source X coordinate
+ * @param props.sourceY - Source Y coordinate
+ * @param props.targetX - Target X coordinate
+ * @param props.targetY - Target Y coordinate
+ * @param props.sourcePosition - Source handle position
+ * @param props.targetPosition - Target handle position
+ * @returns The relationship edge JSX
+ * 
+ * @example
+ * ```tsx
+ * import { RelationshipEdge } from '@/components/relationship/RelationshipEdge'
+ * 
+ * // Register as a custom edge type
+ * const edgeTypes = {
+ *   default: RelationshipEdge
+ * }
+ * 
+ * // Use in React Flow
+ * <ReactFlow edgeTypes={edgeTypes} edges={edges} />
+ * ```
  */
 
 import { memo, useState, useRef, useEffect, useMemo } from 'react'

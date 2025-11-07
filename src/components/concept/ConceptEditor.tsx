@@ -13,10 +13,48 @@ import { useUIStore } from '@/stores/uiStore'
 
 /**
  * ConceptEditor component - Side panel for editing concept properties.
- * Opens when a concept is selected via conceptEditorOpen state.
- * Auto-saves on field blur.
  * 
- * @returns The concept editor JSX
+ * Opens when a concept is selected via `conceptEditorOpen` state. Provides
+ * a comprehensive editing interface for all concept properties with auto-save
+ * on field blur.
+ * 
+ * **Features:**
+ * - Label editing (text input)
+ * - Notes editing (markdown editor with preview)
+ * - Metadata editing (key-value pairs)
+ * - Node style customization (fill color, border color, border style, text color)
+ * - Delete functionality with confirmation
+ * - Read-only mode for users without write access
+ * 
+ * **Auto-save Behavior:**
+ * - Saves automatically when a field loses focus (onBlur)
+ * - Prevents saving while user is actively typing
+ * - Reverts to original value on save error
+ * 
+ * **Style Attributes:**
+ * Style properties (fillColor, borderColor, borderStyle, textColor) are stored
+ * in metadata but treated as special attributes. They're separated from regular
+ * metadata in the UI for easier access.
+ * 
+ * **Metadata:**
+ * Supports flexible key-value metadata storage. Values can be strings or JSON
+ * objects (automatically parsed/stringified).
+ * 
+ * @returns The concept editor JSX, or null if no concept is selected
+ * 
+ * @example
+ * ```tsx
+ * import { ConceptEditor } from '@/components/concept/ConceptEditor'
+ * 
+ * function ConceptMap() {
+ *   return (
+ *     <>
+ *       <ConceptMapCanvas />
+ *       <ConceptEditor />
+ *     </>
+ *   )
+ * }
+ * ```
  */
 export function ConceptEditor() {
   const selectedConceptId = useUIStore((state) => state.selectedConceptId)

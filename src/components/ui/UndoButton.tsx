@@ -10,9 +10,41 @@ import { useUndo } from '@/hooks/useUndo'
 import { useUndoStore } from '@/stores/undoStore'
 
 /**
- * Undo button component.
- * Shows a button in the toolbar when there are deletions to undo.
- * Button is disabled when there's nothing to undo.
+ * Undo button component for toolbar.
+ * 
+ * Displays an undo button when there are recent deletions to undo. Supports
+ * both click interaction and keyboard shortcut (Cmd+Z / Ctrl+Z). The button
+ * is disabled when there's nothing to undo.
+ * 
+ * **Undo Functionality:**
+ * - Undoes the most recent deletion operation
+ * - Restores all items deleted in that operation (concepts and relationships)
+ * - Uses the undo store to track deletion history
+ * 
+ * **Keyboard Shortcut:**
+ * - `Cmd+Z` (Mac) or `Ctrl+Z` (Windows/Linux) triggers undo
+ * - Only works when not typing in an input/textarea field
+ * - Prevents default browser undo behavior
+ * 
+ * **Button States:**
+ * - Enabled: When there are deletions in history
+ * - Disabled: When deletion history is empty
+ * 
+ * @returns The undo button JSX element
+ * 
+ * @example
+ * ```tsx
+ * import { UndoButton } from '@/components/ui/UndoButton'
+ * 
+ * function Toolbar() {
+ *   return (
+ *     <div className="flex gap-2">
+ *       <UndoButton />
+ *       <OtherToolbarButtons />
+ *     </div>
+ *   )
+ * }
+ * ```
  */
 export function UndoButton() {
   const { undo, getHistory } = useUndo()

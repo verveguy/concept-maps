@@ -1,11 +1,47 @@
 /**
  * Hook for setting current user's cursor position only.
- * Does NOT subscribe to peer cursor positions, so it won't cause re-renders when cursors move.
  * 
- * Use this hook in components that need to update the current user's cursor position
- * but don't need to render peer cursors.
+ * Write-only hook that provides a setter for updating the current user's cursor position.
+ * Does NOT subscribe to peer cursor positions, preventing re-renders when cursors move.
+ * Uses write-only mode for optimal performance.
  * 
- * @returns Setter function for current user's cursor position
+ * **Use Cases:**
+ * - Components that need to update cursor position (e.g., ConceptMapCanvas on mouse move)
+ * - Components that don't need to render peer cursors
+ * - Performance-critical components that should avoid peer subscriptions
+ * 
+ * **Performance:**
+ * Uses write-only mode (`peers: []`, `user: false`) to prevent re-renders when
+ * presence changes. Only provides a setter, not readers.
+ * 
+ * **Alternative Hooks:**
+ * - `usePresenceCursors()`: Cursor positions for all users (read + write)
+ * - `usePresence()`: Current user + other users' presence (without cursors, with editing state)
+ * - `useCurrentUserPresence()`: Only current user presence (no peer subscriptions)
+ * - `usePresenceEditing()`: Editing state setters only (write-only)
+ * 
+ * @returns Object containing:
+ * - `setCursor`: Function to update current user's cursor position (or null to clear)
+ * 
+ * @example
+ * ```tsx
+ * import { usePresenceCursorSetter } from '@/hooks/usePresenceCursorSetter'
+ * 
+ * function ConceptMapCanvas() {
+ *   const { setCursor } = usePresenceCursorSetter()
+ *   
+ *   const onMouseMove = (event) => {
+ *     const position = { x: event.clientX, y: event.clientY }
+ *     setCursor(position)
+ *   }
+ *   
+ *   const onMouseLeave = () => {
+ *     setCursor(null)
+ *   }
+ *   
+ *   return <ReactFlow onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} />
+ * }
+ * ```
  */
 
 import { useCallback } from 'react'

@@ -24,8 +24,41 @@ import {
 } from '@/components/ui/alert-dialog'
 
 /**
- * User avatar section component.
- * This component will re-render when presence updates, which is expected behavior.
+ * User avatar section component for the Sidebar.
+ * 
+ * Displays the current user's avatar with a tooltip showing their name and email.
+ * Also includes an "Empty Trash" button to permanently delete soft-deleted entities.
+ * 
+ * **Performance:**
+ * This component uses `useCurrentUserPresence()` internally, so it will re-render
+ * when presence updates, but the Sidebar component will not. This prevents unnecessary
+ * re-renders of the entire sidebar when only user presence changes.
+ * 
+ * **Features:**
+ * - Current user avatar (image or initials)
+ * - Tooltip with user name and email
+ * - Empty Trash button with confirmation dialog
+ * - Trash management for permanently deleting soft-deleted items
+ * 
+ * **Empty Trash:**
+ * Permanently deletes all soft-deleted entities (maps, concepts, relationships)
+ * owned by the current user. This operation cannot be undone.
+ * 
+ * @returns The user avatar section JSX, or null if no user is present
+ * 
+ * @example
+ * ```tsx
+ * import { UserAvatarSection } from '@/components/layout/UserAvatarSection'
+ * 
+ * function Sidebar() {
+ *   return (
+ *     <div>
+ *       <MapList />
+ *       <UserAvatarSection />
+ *     </div>
+ *   )
+ * }
+ * ```
  */
 export const UserAvatarSection = memo(() => {
   const { currentUserPresence } = useCurrentUserPresence()

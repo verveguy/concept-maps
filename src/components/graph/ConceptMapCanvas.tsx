@@ -1,7 +1,55 @@
 /**
  * Concept map canvas component.
+ * 
  * Main React Flow-based visualization component for displaying and interacting with concept maps.
  * Provides node/edge rendering, drag-and-drop, layout algorithms, and real-time collaboration.
+ * 
+ * **Features:**
+ * - Real-time visualization of concepts and relationships
+ * - Drag-and-drop node positioning
+ * - Inline editing of concepts and relationships
+ * - Layout algorithms (force-directed, hierarchical)
+ * - Perspective filtering (shows only selected concepts/relationships)
+ * - Real-time collaboration (presence, cursors, editing highlights)
+ * - Connection creation (drag from node to node)
+ * - Keyboard shortcuts (Delete, Escape)
+ * - Permission-based editing (read-only for users without write access)
+ * 
+ * **Data Flow:**
+ * - Reads concepts and relationships from InstantDB via hooks
+ * - Converts domain models to React Flow nodes/edges
+ * - Updates positions when nodes are dragged
+ * - Creates/updates/deletes concepts and relationships via action hooks
+ * 
+ * **Performance Optimizations:**
+ * - Memoized node/edge transformations
+ * - Separate component for peer cursors (prevents re-renders)
+ * - Stable nodeTypes/edgeTypes references
+ * - Perspective filtering at data layer
+ * 
+ * **Layout Algorithms:**
+ * - Force-directed: Organic, physics-based layout
+ * - Hierarchical: Tree-like, top-to-bottom layout
+ * - Sticky layouts: Auto-apply when new nodes are added
+ * 
+ * @param props - Component props
+ * @param props.onCreateConcept - Optional callback when user requests to create a new concept
+ * @returns The concept map canvas JSX wrapped in ReactFlowProvider
+ * 
+ * @example
+ * ```tsx
+ * import { ConceptMapCanvas } from '@/components/graph/ConceptMapCanvas'
+ * 
+ * function ConceptMapView() {
+ *   return (
+ *     <ConceptMapCanvas
+ *       onCreateConcept={(position) => {
+ *         console.log('Create concept at', position)
+ *       }}
+ *     />
+ *   )
+ * }
+ * ```
  */
 
 import React, { useCallback, useMemo, useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react'

@@ -35,13 +35,58 @@ function getNonStyleMetadata(metadata: Record<string, unknown>): Record<string, 
 }
 
 /**
- * Custom node component for Concept nodes.
- * Supports inline editing on double-click.
- * Includes centered handles for source and target connections.
+ * Custom React Flow node component for Concept nodes.
  * 
- * @param data - Node data containing concept information
- * @param selected - Whether the node is currently selected
+ * Renders a concept as a draggable node on the canvas with inline editing capabilities.
+ * Supports double-click to edit, handles for connections, and visual feedback for
+ * collaborative editing.
+ * 
+ * **Features:**
+ * - Inline label editing (double-click to edit)
+ * - Drag-and-drop positioning
+ * - Connection handles (top/bottom for multiple edges)
+ * - Markdown notes preview (expandable)
+ * - Metadata display (expandable)
+ * - Style customization (fill color, border color, border style, text color)
+ * - Perspective editing (Shift+Click to toggle inclusion)
+ * - Collaborative editing indicators (avatars for users editing this node)
+ * - Permission-based editing (read-only for users without write access)
+ * 
+ * **Node Styling:**
+ * Style properties are stored in metadata but treated as special attributes:
+ * - `fillColor`: Background color (default: white/dark based on theme)
+ * - `borderColor`: Border color (default: gray)
+ * - `borderStyle`: Border style ('solid', 'dashed', 'dotted')
+ * - `textColor`: Text color (default: black/white based on theme)
+ * 
+ * **Perspective Editing:**
+ * When in perspective editing mode (Shift+Click):
+ * - Nodes included in perspective are shown normally
+ * - Nodes not in perspective are greyed out
+ * - Clicking toggles inclusion in the current perspective
+ * 
+ * **Collaborative Editing:**
+ * Shows avatars of other users currently editing this node, providing visual
+ * feedback for collaborative editing.
+ * 
+ * @param props - Node props from React Flow
+ * @param props.data - Node data containing concept entity and perspective state
+ * @param props.selected - Whether the node is currently selected
+ * @param props.id - Node ID (concept ID)
  * @returns The concept node JSX
+ * 
+ * @example
+ * ```tsx
+ * import { ConceptNode } from '@/components/concept/ConceptNode'
+ * 
+ * // Register as a custom node type
+ * const nodeTypes = {
+ *   concept: ConceptNode
+ * }
+ * 
+ * // Use in React Flow
+ * <ReactFlow nodeTypes={nodeTypes} nodes={nodes} />
+ * ```
  */
 export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<ConceptNodeData>) => {
   const { getEdges, setEdges, getNode, fitView } = useReactFlow()

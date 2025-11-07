@@ -58,8 +58,58 @@ function useMapNamesForResults(results: Array<{ mapId: string }>) {
 
 /**
  * Hook that performs the actual search query using InstantDB's $like operator.
- * Permissions automatically filter results to only accessible maps.
- * Only queries when there's an active search query to avoid unnecessary reactive updates.
+ * 
+ * Searches concepts and relationships across all accessible maps using server-side
+ * pattern matching. Permissions automatically filter results to only maps the user
+ * can view. Only queries when there's an active search query to avoid unnecessary
+ * reactive updates.
+ * 
+ * **Search Behavior:**
+ * - Uses InstantDB's `$ilike` operator for case-insensitive pattern matching
+ * - Searches concept labels
+ * - Searches relationship primary and reverse labels
+ * - Escapes special SQL LIKE characters (% and _)
+ * - Wraps search term with wildcards (e.g., "react" becomes "%react%")
+ * 
+ * **Permission Filtering:**
+ * InstantDB permissions automatically filter results. Users only see concepts
+ * and relationships from maps they have access to.
+ * 
+ * **Performance:**
+ * - Only queries when `query` is non-empty (null/empty query returns empty array)
+ * - Uses debouncing in SearchBox component (300ms) to limit query frequency
+ * - Fetches map names separately to avoid unnecessary queries
+ * 
+ * **Result Format:**
+ * Returns an array of SearchResult objects containing:
+ * - `type`: 'concept' or 'relationship'
+ * - `id`: Entity ID
+ * - `mapId`: Map ID
+ * - `label`: Display label
+ * - `secondaryLabel`: Relationship reverse label (if applicable)
+ * - `mapName`: Map name (fetched separately)
+ * 
+ * @param query - Search query string (empty/null returns empty results)
+ * @returns Array of search results matching the query
+ * 
+ * @example
+ * ```tsx
+ * import { useSearchQuery } from '@/hooks/useSearch'
+ * 
+ * function SearchResults({ query }) {
+ *   const results = useSearchQuery(query)
+ *   
+ *   return (
+ *     <ul>
+ *       {results.map(result => (
+ *         <li key={`${result.type}-${result.id}`}>
+ *           {result.label} ({result.mapName})
+ *         </li>
+ *       ))}
+ *     </ul>
+ *   )
+ * }
+ * ```
  */
 export function useSearchQuery(query: string) {
   // Escape special characters for the like pattern

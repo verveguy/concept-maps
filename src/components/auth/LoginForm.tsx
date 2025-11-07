@@ -8,10 +8,38 @@ import { useState } from 'react'
 import { db } from '@/lib/instant'
 
 /**
- * Login form component.
- * Handles user authentication using InstantDB magic code authentication.
+ * Login form component for user authentication.
  * 
- * @returns The login form JSX
+ * Implements a two-step authentication flow:
+ * 1. User enters their email address and receives a verification code
+ * 2. User enters the verification code to complete authentication
+ * 
+ * Uses InstantDB's magic code authentication system, which automatically
+ * creates accounts for new users on first sign-in.
+ * 
+ * Features:
+ * - Email validation
+ * - Loading states during API calls
+ * - Error handling and display
+ * - Ability to switch to a different email
+ * 
+ * @returns The login form JSX element
+ * 
+ * @example
+ * ```tsx
+ * // Use in your app routing
+ * import { LoginForm } from '@/components/auth/LoginForm'
+ * 
+ * function App() {
+ *   const auth = db.useAuth()
+ *   
+ *   if (!auth.user) {
+ *     return <LoginForm />
+ *   }
+ *   
+ *   return <MainApp />
+ * }
+ * ```
  */
 export function LoginForm() {
   const [email, setEmail] = useState('')

@@ -21,11 +21,46 @@ import { db, tx, id } from '@/lib/instant'
 
 /**
  * StructuredTextView component - Text view for concept maps.
- * Displays Concept->Relationship->Concept triples as editable text.
- * Format: "Noun verb phrase Noun" (e.g., "Diagrams explain Architecture").
- * Both views read/write directly to InstantDB (no sync logic needed).
+ * 
+ * Displays Concept->Relationship->Concept triples as editable text in the format:
+ * "Noun verb phrase Noun" (e.g., "Diagrams explain Architecture").
+ * 
+ * **Features:**
+ * - Displays all relationships as text triples
+ * - Editable triples (inline editing)
+ * - Add new triples via text input
+ * - Shows orphan concepts (concepts with no relationships)
+ * - Auto-creates concepts if they don't exist when adding triples
+ * 
+ * **Data Flow:**
+ * Both graph and text views read/write directly to InstantDB. No sync logic
+ * is needed - changes in one view are immediately reflected in the other via
+ * real-time subscriptions.
+ * 
+ * **Triple Format:**
+ * Each relationship is displayed as: `"[From Concept] [Relationship Label] [To Concept]"`
+ * 
+ * **Adding Triples:**
+ * Users can add new triples by typing in the format "Noun verb phrase Noun".
+ * The parser automatically:
+ * - Creates concepts if they don't exist
+ * - Creates the relationship
+ * - Positions new concepts at default coordinates
  * 
  * @returns The structured text view JSX
+ * 
+ * @example
+ * ```tsx
+ * import { StructuredTextView } from '@/components/text/StructuredTextView'
+ * 
+ * function TextView() {
+ *   return (
+ *     <div className="h-full">
+ *       <StructuredTextView />
+ *     </div>
+ *   )
+ * }
+ * ```
  */
 export function StructuredTextView() {
   const concepts = useConcepts()

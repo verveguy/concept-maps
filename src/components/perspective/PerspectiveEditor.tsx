@@ -13,9 +13,48 @@ import { db } from '@/lib/instant'
 
 /**
  * Perspective Editor component.
- * Allows editing which concepts and relationships are included in a perspective.
  * 
- * @returns The perspective editor JSX
+ * Allows editing which concepts and relationships are included in a perspective.
+ * Provides a side panel interface for managing perspective content with checkboxes
+ * for concepts and relationships.
+ * 
+ * **Features:**
+ * - Edit perspective name
+ * - Toggle concepts in/out of perspective
+ * - Toggle relationships in/out of perspective
+ * - Delete perspective
+ * - View/edit mode toggle
+ * 
+ * **Edit Mode:**
+ * - Shows all concepts and relationships in the map
+ * - Concepts/relationships not in perspective are shown greyed out
+ * - Checkboxes allow toggling inclusion
+ * - Shift+Click on canvas can also toggle concepts
+ * 
+ * **View Mode:**
+ * - Shows only concepts and relationships included in the perspective
+ * - Read-only display
+ * - Can switch back to edit mode to modify
+ * 
+ * **Relationship Constraints:**
+ * Relationships can only be included if both their source and target concepts
+ * are already in the perspective. This ensures perspective consistency.
+ * 
+ * @returns The perspective editor JSX, or null if no perspective is selected
+ * 
+ * @example
+ * ```tsx
+ * import { PerspectiveEditor } from '@/components/perspective/PerspectiveEditor'
+ * 
+ * function ConceptMap() {
+ *   return (
+ *     <>
+ *       <ConceptMapCanvas />
+ *       <PerspectiveEditor />
+ *     </>
+ *   )
+ * }
+ * ```
  */
 export function PerspectiveEditor() {
   const currentMapId = useMapStore((state) => state.currentMapId)

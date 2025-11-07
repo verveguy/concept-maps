@@ -7,10 +7,45 @@ import type { PresenceData } from '@/lib/presence'
 import { useState } from 'react'
 
 /**
- * Component to display a user's avatar (typically shown near nodes being edited).
+ * Component to display a user's avatar.
  * 
- * @param presence - Presence data containing user information
- * @returns The avatar component JSX
+ * Renders a user avatar with fallback to initials. Typically shown near nodes
+ * being edited to indicate who is editing, or in presence indicators.
+ * 
+ * **Avatar Priority:**
+ * 1. Custom image URL from presence data (if available and loads successfully)
+ * 2. Initials generated from user name (fallback)
+ * 
+ * **Styling:**
+ * - Avatar image: 32x32px (h-8 w-8) rounded circle with border
+ * - Border color matches user's presence color for visual distinction
+ * - Shadow for depth
+ * - Cursor pointer for interactivity
+ * 
+ * **Error Handling:**
+ * If the image fails to load, automatically falls back to initials display.
+ * 
+ * @param props - Component props
+ * @param props.presence - Presence data containing user information (userId, userName, avatarUrl, color)
+ * @returns The avatar component JSX (image or initials div)
+ * 
+ * @example
+ * ```tsx
+ * import { PresenceAvatar } from '@/components/presence/PresenceAvatar'
+ * import { usePresence } from '@/hooks/usePresence'
+ * 
+ * function UserList() {
+ *   const { otherUsersPresence } = usePresence()
+ *   
+ *   return (
+ *     <div>
+ *       {otherUsersPresence.map(presence => (
+ *         <PresenceAvatar key={presence.userId} presence={presence} />
+ *       ))}
+ *     </div>
+ *   )
+ * }
+ * ```
  */
 export function PresenceAvatar({ presence }: { presence: PresenceData }) {
   // Get initials from user name

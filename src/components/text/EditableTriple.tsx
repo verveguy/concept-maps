@@ -22,9 +22,46 @@ export interface EditableTripleProps {
 
 /**
  * EditableTriple component - Individual triple editor in text view.
- * Uses a single text field with Noun <verb phrase> Noun format.
  * 
+ * Displays a single triple (Concept->Relationship->Concept) as an editable
+ * text field using the "Noun verb phrase Noun" format. Users can edit the
+ * entire triple in a single input field, and the parser extracts the components.
+ * 
+ * **Editing Behavior:**
+ * - Single text field for the entire triple
+ * - Format: "Noun verb phrase Noun"
+ * - On blur, parses the text and updates the relationship and concepts
+ * - Auto-creates concepts if they don't exist
+ * - Updates relationship label if changed
+ * 
+ * **Parsing:**
+ * Uses `parseTripleText()` to extract the from concept, verb phrase, and
+ * to concept from the text input. The parser identifies nouns by title case
+ * (words starting with uppercase letters).
+ * 
+ * @param props - Component props
+ * @param props.triple - The triple data to edit (fromConceptLabel, relationshipLabel, toConceptLabel, etc.)
+ * @param props.onUpdate - Callback when triple is updated (for refreshing the view)
  * @returns The editable triple component JSX
+ * 
+ * @example
+ * ```tsx
+ * import { EditableTriple } from '@/components/text/EditableTriple'
+ * 
+ * function TripleList({ triples }) {
+ *   return (
+ *     <div>
+ *       {triples.map(triple => (
+ *         <EditableTriple
+ *           key={triple.relationshipId}
+ *           triple={triple}
+ *           onUpdate={() => console.log('Updated')}
+ *         />
+ *       ))}
+ *     </div>
+ *   )
+ * }
+ * ```
  */
 export function EditableTriple({ triple, onUpdate }: EditableTripleProps) {
   const { updateConcept } = useConceptActions()

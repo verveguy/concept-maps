@@ -1,7 +1,53 @@
 /**
  * Sidebar component for browsing maps and perspectives.
- * Displays list of maps, allows creating new maps, and selecting a map.
- * Also provides perspective management within each map.
+ * 
+ * Provides the main navigation interface for the application, displaying maps,
+ * perspectives, and user controls. The sidebar can be collapsed/expanded and
+ * includes various utility features.
+ * 
+ * **Features:**
+ * - Map list with creation and selection
+ * - Perspective management (create, edit, delete, select)
+ * - User avatar and profile
+ * - Theme toggle (light/dark mode)
+ * - Documentation link
+ * - Video tutorial link
+ * - Empty trash functionality
+ * - Collapsible/expandable sections
+ * 
+ * **Map Management:**
+ * - Lists all accessible maps (owned or shared)
+ * - Create new maps with name input
+ * - Select map to view/edit
+ * - Delete maps (with confirmation)
+ * - Shows map creation date
+ * 
+ * **Perspective Management:**
+ * - Lists perspectives for the current map
+ * - Create new perspectives
+ * - Edit perspective (toggle concepts/relationships)
+ * - Delete perspectives
+ * - Select perspective to filter view
+ * 
+ * **Performance:**
+ * Uses memoized sub-components to prevent unnecessary re-renders when presence
+ * updates occur. Only the UserAvatarSection re-renders on presence changes.
+ * 
+ * @returns The sidebar JSX component
+ * 
+ * @example
+ * ```tsx
+ * import { Sidebar } from '@/components/layout/Sidebar'
+ * 
+ * function App() {
+ *   return (
+ *     <div className="flex">
+ *       <Sidebar />
+ *       <MainContent />
+ *     </div>
+ *   )
+ * }
+ * ```
  */
 
 import { useState, useEffect, useMemo, memo, useCallback } from 'react'

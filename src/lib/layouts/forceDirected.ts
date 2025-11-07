@@ -31,12 +31,58 @@ export interface ForceDirectedLayoutOptions {
 
 /**
  * Force-directed layout algorithm using d3-force.
- * Positions nodes based on forces between connected nodes.
+ * 
+ * Positions nodes based on physics simulation with forces between connected nodes.
+ * This creates an organic, natural-looking graph layout where:
+ * - Connected nodes are pulled together
+ * - All nodes repel each other (preventing overlap)
+ * - Nodes are centered in the canvas
+ * - Collision detection prevents node overlap
+ * 
+ * **Algorithm:**
+ * Uses d3-force's physics simulation with multiple forces:
+ * - **Link force**: Attracts connected nodes to a specified distance
+ * - **Charge force**: Repels all nodes from each other (negative charge)
+ * - **Center force**: Pulls all nodes toward the canvas center
+ * - **Collision force**: Prevents nodes from overlapping
+ * 
+ * **Configuration:**
+ * The algorithm runs for a fixed number of iterations (default: 300) to
+ * allow the simulation to stabilize. More iterations produce more stable
+ * layouts but take longer to compute.
  * 
  * @param nodes - React Flow nodes to position
  * @param edges - React Flow edges connecting the nodes
  * @param options - Layout configuration options
- * @returns Updated nodes with new positions
+ * @param options.width - Canvas width in pixels (default: 1000)
+ * @param options.height - Canvas height in pixels (default: 1000)
+ * @param options.strength - Charge strength for repulsion between nodes (default: -300, negative = repulsion)
+ * @param options.distance - Ideal distance between connected nodes (default: 150)
+ * @param options.iterations - Number of simulation iterations (default: 300)
+ * @returns Updated nodes with new positions calculated by the force simulation
+ * 
+ * @example
+ * ```tsx
+ * import { applyForceDirectedLayout } from '@/lib/layouts/forceDirected'
+ * 
+ * function ConceptMap() {
+ *   const [nodes, setNodes] = useState(initialNodes)
+ *   const edges = useRelationshipsToEdges()
+ *   
+ *   const handleApplyLayout = () => {
+ *     const newNodes = applyForceDirectedLayout(nodes, edges, {
+ *       width: 2000,
+ *       height: 1500,
+ *       strength: -400,
+ *       distance: 200,
+ *       iterations: 500
+ *     })
+ *     setNodes(newNodes)
+ *   }
+ *   
+ *   return <ReactFlow nodes={nodes} edges={edges} />
+ * }
+ * ```
  */
 export function applyForceDirectedLayout(
   nodes: Node[],

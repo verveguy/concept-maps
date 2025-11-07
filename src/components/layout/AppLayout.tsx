@@ -9,10 +9,35 @@ import { Sidebar } from './Sidebar'
 
 /**
  * Application layout component.
- * Renders a collapsible sidebar and main content area.
  * 
- * @param children - React children to render in the main content area
+ * Provides the main application shell with a collapsible sidebar and main content area.
+ * The sidebar can be toggled open/closed, and the layout adapts responsively.
+ * 
+ * **Layout Structure:**
+ * - Sidebar: Collapsible navigation panel (left side)
+ * - Main Content: Scrollable content area (right side)
+ * 
+ * **Sidebar Behavior:**
+ * - Can be toggled open/closed via UI state
+ * - Smooth transitions when opening/closing
+ * - Width: 256px (w-64) when open, 0px when closed
+ * 
+ * @param props - Component props
+ * @param props.children - React children to render in the main content area
  * @returns The application layout JSX
+ * 
+ * @example
+ * ```tsx
+ * import { AppLayout } from '@/components/layout/AppLayout'
+ * 
+ * function App() {
+ *   return (
+ *     <AppLayout>
+ *       <ConceptMapCanvas />
+ *     </AppLayout>
+ *   )
+ * }
+ * ```
  */
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const sidebarOpen = useUIStore((state) => state.sidebarOpen)

@@ -1,14 +1,45 @@
 /**
  * Hook for tracking current user's presence only.
- * Lightweight hook that ONLY tracks current user's presence.
- * Does NOT subscribe to peer presence data, making it ideal for components
- * that only need current user info (e.g., Sidebar).
  * 
- * This hook will NOT trigger re-renders when remote users join/leave or move cursors.
+ * Lightweight hook that ONLY tracks current user's presence. Does NOT subscribe
+ * to peer presence data, making it ideal for components that only need current
+ * user info without the overhead of tracking other users.
  * 
- * For components that need other users' presence, use usePresence() instead.
+ * **Performance:**
+ * This hook will NOT trigger re-renders when remote users join/leave or move
+ * cursors, making it perfect for components like Sidebar that only need to display
+ * the current user's information.
  * 
- * @returns Object containing current user presence and setters
+ * **Use Cases:**
+ * - Components that only need current user info (e.g., Sidebar, UserAvatarSection)
+ * - Components that don't need to track other users' presence
+ * - Performance-critical components that should avoid peer presence subscriptions
+ * 
+ * **Alternative Hooks:**
+ * - `usePresence()`: Current user + other users' presence (without cursors)
+ * - `usePresenceCursors()`: Cursor positions for all users
+ * - `usePresenceEditing()`: Editing state setters only (write-only)
+ * - `usePresenceCursorSetter()`: Cursor position setter only (write-only)
+ * 
+ * @returns Object containing:
+ * - `currentUserPresence`: Current user's presence data
+ * - `publishPresence`: Function to update current user's presence
+ * 
+ * @example
+ * ```tsx
+ * import { useCurrentUserPresence } from '@/hooks/useCurrentUserPresence'
+ * 
+ * function Sidebar() {
+ *   const { currentUserPresence } = useCurrentUserPresence()
+ *   
+ *   return (
+ *     <div>
+ *       <Avatar user={currentUserPresence} />
+ *       <UserName name={currentUserPresence.userName} />
+ *     </div>
+ *   )
+ * }
+ * ```
  */
 
 import { useEffect, useCallback, useMemo } from 'react'

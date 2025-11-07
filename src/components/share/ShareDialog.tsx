@@ -22,7 +22,58 @@ export interface ShareDialogProps {
 /**
  * Dialog component for managing map sharing and permissions.
  * 
+ * Provides a comprehensive interface for sharing maps with other users, managing
+ * invitations, and controlling access permissions. Supports both view and edit
+ * permission levels.
+ * 
+ * **Features:**
+ * - Create invitations by email address
+ * - View active shares and pending invitations
+ * - Update permission levels (view/edit)
+ * - Revoke shares and invitations
+ * - Generate shareable links with invitation tokens
+ * - Accept/decline invitations (for invitees)
+ * 
+ * **Permission Levels:**
+ * - `'view'`: Read-only access - can view but not modify
+ * - `'edit'`: Read-write access - can view and modify
+ * 
+ * **Invitation Flow:**
+ * 1. Owner enters email and selects permission level
+ * 2. Invitation is created with a secure token
+ * 3. Shareable link is generated (can be copied/shared)
+ * 4. Invitee clicks link and accepts invitation
+ * 5. Share record is created and permissions are granted
+ * 
+ * **Access Control:**
+ * Only map owners can manage shares. Users with edit access cannot share the map
+ * with others (only owners can).
+ * 
+ * @param props - Component props
+ * @param props.mapId - Map ID to share, or null if no map is selected
+ * @param props.onClose - Callback when dialog should close
  * @returns The share dialog JSX
+ * 
+ * @example
+ * ```tsx
+ * import { ShareDialog } from '@/components/share/ShareDialog'
+ * 
+ * function MapHeader() {
+ *   const [showShare, setShowShare] = useState(false)
+ *   
+ *   return (
+ *     <>
+ *       <button onClick={() => setShowShare(true)}>Share Map</button>
+ *       {showShare && (
+ *         <ShareDialog
+ *           mapId={currentMapId}
+ *           onClose={() => setShowShare(false)}
+ *         />
+ *       )}
+ *     </>
+ *   )
+ * }
+ * ```
  */
 export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
   const {

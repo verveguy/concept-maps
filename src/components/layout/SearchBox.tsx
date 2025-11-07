@@ -10,11 +10,47 @@ import { useSearchQuery, type SearchResult } from '@/hooks/useSearch'
 import { useMapStore } from '@/stores/mapStore'
 
 /**
- * Search box component.
- * Provides a search input with dropdown results that allows navigation to concepts/relationships.
- * Uses debouncing to limit query frequency and only queries when there's an active search query.
+ * Search box component for searching concepts and relationships across all maps.
  * 
- * @returns The search box JSX
+ * Provides a search input with dropdown results that allows navigation to concepts
+ * and relationships. Uses debouncing to limit query frequency and only queries when
+ * there's an active search query.
+ * 
+ * **Features:**
+ * - Real-time search as you type (with 300ms debounce)
+ * - Searches across all accessible maps (permissions automatically filter results)
+ * - Displays concepts and relationships in dropdown
+ * - Keyboard navigation (arrow keys, enter, escape)
+ * - Click outside to close dropdown
+ * - Navigates to selected item's map and selects it
+ * 
+ * **Search Behavior:**
+ * - Only queries when there's text in the search box
+ * - Uses InstantDB's `$ilike` operator for case-insensitive pattern matching
+ * - Searches concept labels and relationship labels (both primary and reverse)
+ * - Results are automatically filtered by user permissions
+ * 
+ * **Keyboard Navigation:**
+ * - `ArrowDown`: Move to next result
+ * - `ArrowUp`: Move to previous result
+ * - `Enter`: Select current result
+ * - `Escape`: Close dropdown and clear search
+ * 
+ * @returns The search box JSX element
+ * 
+ * @example
+ * ```tsx
+ * import { SearchBox } from '@/components/layout/SearchBox'
+ * 
+ * function Header() {
+ *   return (
+ *     <div className="flex items-center gap-4">
+ *       <SearchBox />
+ *       <OtherControls />
+ *     </div>
+ *   )
+ * }
+ * ```
  */
 export function SearchBox() {
   const [query, setQuery] = useState('')

@@ -28,9 +28,54 @@ export interface MarkdownEditorProps {
 
 /**
  * Markdown editor component with preview mode.
- * Supports editing markdown text and previewing rendered markdown.
  * 
+ * Provides a textarea for editing markdown text with a toggle to switch between
+ * edit and preview modes. Uses `react-markdown` for rendering markdown with
+ * GitHub Flavored Markdown (GFM) support.
+ * 
+ * **Features:**
+ * - Edit mode: Textarea for markdown editing
+ * - Preview mode: Rendered markdown display
+ * - Toggle between edit and preview
+ * - GitHub Flavored Markdown support (tables, strikethrough, task lists, etc.)
+ * - Auto-save on blur (via onBlur callback)
+ * - Placeholder text support
+ * - Disabled state support
+ * 
+ * **Markdown Support:**
+ * Supports standard markdown plus GFM extensions:
+ * - Tables
+ * - Strikethrough
+ * - Task lists
+ * - Autolinks
+ * - And more
+ * 
+ * @param props - Component props
+ * @param props.value - Current markdown text value
+ * @param props.onChange - Callback when value changes
+ * @param props.onBlur - Optional callback when editor loses focus (for auto-save)
+ * @param props.placeholder - Placeholder text (default: 'Add notes...')
+ * @param props.disabled - Whether editing is disabled (default: false)
+ * @param props.className - Additional CSS classes
  * @returns The markdown editor JSX
+ * 
+ * @example
+ * ```tsx
+ * import { MarkdownEditor } from '@/components/notes/MarkdownEditor'
+ * 
+ * function ConceptEditor() {
+ *   const [notes, setNotes] = useState('')
+ *   
+ *   return (
+ *     <MarkdownEditor
+ *       value={notes}
+ *       onChange={setNotes}
+ *       onBlur={() => saveNotes(notes)}
+ *       placeholder="Add notes about this concept..."
+ *     />
+ *   )
+ * }
+ * ```
  */
 export function MarkdownEditor({
   value,

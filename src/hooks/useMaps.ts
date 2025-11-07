@@ -8,11 +8,43 @@ import { useMemo } from 'react'
 import type { Map } from '@/lib/schema'
 
 /**
- * Hook to get all maps accessible to the current user (owned or shared).
- * Uses InstantDB useQuery() for real-time updates.
- * Permissions automatically filter results to only maps the user can view.
+ * Hook to get all maps accessible to the current user.
+ * 
+ * Uses InstantDB `useQuery()` for real-time updates. Automatically filters
+ * results to only maps the user can view based on permissions:
+ * - Maps created by the user (ownership)
+ * - Maps shared with the user via shares or invitations
+ * 
+ * **Permission Filtering:**
+ * InstantDB permissions automatically filter query results. The user will only
+ * see maps they have read or write access to. No manual filtering is required.
+ * 
+ * **Soft Deletes:**
+ * Soft-deleted maps (with `deletedAt` set) are automatically excluded from
+ * the results.
+ * 
+ * **Real-time Updates:**
+ * The hook subscribes to real-time updates, so the returned array will
+ * automatically update when maps are created, modified, or shared.
  * 
  * @returns Array of maps created by or shared with the authenticated user
+ * 
+ * @example
+ * ```tsx
+ * import { useMaps } from '@/hooks/useMaps'
+ * 
+ * function MapList() {
+ *   const maps = useMaps()
+ *   
+ *   return (
+ *     <ul>
+ *       {maps.map(map => (
+ *         <li key={map.id}>{map.name}</li>
+ *       ))}
+ *     </ul>
+ *   )
+ * }
+ * ```
  */
 export function useMaps() {
   const auth = db.useAuth()

@@ -36,10 +36,40 @@ const MAX_HANDLES_PER_SIDE = 5
 /**
  * Convert Concept entities to React Flow nodes.
  * 
- * @param concepts - Array of concepts to convert
- * @param perspectiveConceptIds - Optional set of concept IDs included in perspective (for styling)
- * @param isEditingPerspective - Whether we're editing a perspective (affects styling)
- * @returns Array of React Flow nodes
+ * Transforms domain model concepts into React Flow node format for visualization.
+ * Each concept becomes a node with position, label, and metadata. The function
+ * also handles perspective-based styling by marking nodes as included/excluded
+ * from the current perspective.
+ * 
+ * **Node Data Structure:**
+ * - `id`: Concept ID
+ * - `type`: Always `'concept'` (for React Flow node type mapping)
+ * - `position`: Concept's x/y coordinates
+ * - `data.label`: Concept display label
+ * - `data.concept`: Full concept entity
+ * - `data.isInPerspective`: Whether concept is in current perspective (if applicable)
+ * - `data.isEditingPerspective`: Whether perspective editing mode is active
+ * 
+ * **Filtering:**
+ * Concepts with empty or whitespace-only IDs are automatically filtered out.
+ * 
+ * @param concepts - Array of concepts to convert to nodes
+ * @param perspectiveConceptIds - Optional set of concept IDs included in the current perspective (used for styling)
+ * @param isEditingPerspective - Whether perspective editing mode is active (affects node styling)
+ * @returns Array of React Flow nodes ready for visualization
+ * 
+ * @example
+ * ```tsx
+ * import { conceptsToNodes } from '@/lib/data'
+ * import { useConcepts } from '@/hooks/useConcepts'
+ * 
+ * function ConceptMap() {
+ *   const concepts = useConcepts()
+ *   const nodes = conceptsToNodes(concepts)
+ *   
+ *   return <ReactFlow nodes={nodes} edges={edges} />
+ * }
+ * ```
  */
 export function conceptsToNodes(
   concepts: Concept[],
@@ -65,14 +95,54 @@ export function conceptsToNodes(
 
 /**
  * Convert Relationship entities to React Flow edges.
- * Uses custom RelationshipEdge component for inline editing.
- * Adds arrow markers to show directionality.
- * Assigns handles to edges to prevent overlap when multiple edges connect the same nodes.
  * 
- * @param relationships - Array of relationships to convert
- * @param perspectiveRelationshipIds - Optional set of relationship IDs included in perspective (for styling)
- * @param isEditingPerspective - Whether we're editing a perspective (affects styling)
- * @returns Array of React Flow edges
+ * Transforms domain model relationships into React Flow edge format for visualization.
+ * Each relationship becomes an edge connecting two concept nodes. The function handles
+ * multiple edges between the same nodes by distributing them across different handles
+ * to prevent visual overlap.
+ * 
+ * **Edge Features:**
+ * - Uses custom `RelationshipEdge` component for inline editing capabilities
+ * - Adds arrow markers to show directionality (from concept → to concept)
+ * - Distributes multiple edges between the same nodes across handles (up to 5 per side)
+ * - Supports perspective-based styling
+ * 
+ * **Handle Distribution:**
+ * When multiple relationships connect the same two concepts, edges are distributed
+ * symmetrically around the center handle to prevent overlap. Single edges use the
+ * center handle, while multiple edges are spread evenly.
+ * 
+ * **Edge Data Structure:**
+ * - `id`: Relationship ID
+ * - `source`: Source concept ID
+ * - `target`: Target concept ID
+ * - `sourceHandle`/`targetHandle`: Handle IDs for multi-edge distribution
+ * - `type`: Always `'default'` (maps to RelationshipEdge component)
+ * - `markerEnd`: Arrow marker configuration
+ * - `data.relationship`: Full relationship entity
+ * - `data.isInPerspective`: Whether relationship is in current perspective
+ * - `data.hasMultipleEdges`: Flag indicating multiple edges between same nodes
+ * 
+ * **Filtering:**
+ * Relationships with empty or whitespace-only IDs are automatically filtered out.
+ * 
+ * @param relationships - Array of relationships to convert to edges
+ * @param perspectiveRelationshipIds - Optional set of relationship IDs included in the current perspective (used for styling)
+ * @param isEditingPerspective - Whether perspective editing mode is active (affects edge styling)
+ * @returns Array of React Flow edges ready for visualization
+ * 
+ * @example
+ * ```tsx
+ * import { relationshipsToEdges } from '@/lib/data'
+ * import { useRelationships } from '@/hooks/useRelationships'
+ * 
+ * function ConceptMap() {
+ *   const relationships = useRelationships()
+ *   const edges = relationshipsToEdges(relationships)
+ *   
+ *   return <ReactFlow nodes={nodes} edges={edges} />
+ * }
+ * ```
  */
 export function relationshipsToEdges(
   relationships: Relationship[],
@@ -175,11 +245,44 @@ export function relationshipsToEdges(
 }
 
 /**
- * Convert React Flow nodes to Concept entities.
- * Extracts position data from nodes for updating concept positions.
+ * Convert React Flow nodes back to Concept entities.
  * 
- * @param nodes - React Flow nodes to convert
- * @returns Array of partial Concept objects with id and position
+ * Extracts position data from React Flow nodes after they've been moved or
+ * repositioned. This is used to update concept positions in the database when
+ * nodes are dragged on the canvas.
+ * 
+ * **Use Case:**
+ * When a user drags a node on the canvas, React Flow updates the node's position.
+ * This function extracts the new position and concept ID so the position can be
+ * saved back to InstantDB.
+ * 
+ * **Return Value:**
+ * Returns partial Concept objects containing only `id` and `position` fields,
+ * suitable for use with `updateConcept()` which accepts partial updates.
+ * 
+ * @param nodes - React Flow nodes to extract position data from
+ * @returns Array of partial Concept objects with `id` and `position` fields
+ * 
+ * @example
+ * ```tsx
+ * import { nodesToConcepts } from '@/lib/data'
+ * import { useConceptActions } from '@/hooks/useConceptActions'
+ * 
+ * function ConceptMap() {
+ *   const { updateConcept } = useConceptActions()
+ *   
+ *   const onNodesChange = (changes) => {
+ *     // Handle position changes
+ *     const positionChanges = changes.filter(c => c.type === 'position')
+ *     const concepts = nodesToConcepts(positionChanges.map(c => c.node))
+ *     
+ *     // Update each concept's position
+ *     concepts.forEach(concept => {
+ *       updateConcept(concept.id!, { position: concept.position! })
+ *     })
+ *   }
+ * }
+ * ```
  */
 export function nodesToConcepts(nodes: Node[]): Partial<Concept>[] {
   return nodes.map((node) => ({

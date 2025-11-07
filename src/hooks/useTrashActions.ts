@@ -8,10 +8,45 @@ import { db, tx } from '@/lib/instant'
 
 /**
  * Hook for trash management operations.
- * Provides a function to permanently delete all soft-deleted entities owned by the current user.
- * Uses db.queryOnce() to fetch data on-demand rather than maintaining reactive subscriptions.
  * 
- * @returns Object containing emptyTrash function
+ * Provides a function to permanently delete all soft-deleted entities owned by
+ * the current user. Uses `db.queryOnce()` to fetch data on-demand rather than
+ * maintaining reactive subscriptions, making it efficient for one-time operations.
+ * 
+ * **Empty Trash Behavior:**
+ * - Queries all soft-deleted entities (maps, concepts, relationships)
+ * - Filters to only entities owned by the current user
+ * - Permanently deletes all matching entities in a single transaction
+ * - Returns deletion counts for feedback
+ * 
+ * **Permanent Deletion:**
+ * This operation permanently removes entities from the database. Unlike soft
+ * deletes, these cannot be undone. Use with caution.
+ * 
+ * **Performance:**
+ * Uses `queryOnce()` instead of `useQuery()` to avoid creating reactive subscriptions
+ * for a one-time operation. This is more efficient than maintaining subscriptions
+ * for entities that will be deleted.
+ * 
+ * @returns Object containing `emptyTrash` function
+ * 
+ * @example
+ * ```tsx
+ * import { useTrashActions } from '@/hooks/useTrashActions'
+ * 
+ * function TrashManagement() {
+ *   const { emptyTrash } = useTrashActions()
+ *   
+ *   const handleEmptyTrash = async () => {
+ *     if (confirm('Permanently delete all trashed items?')) {
+ *       const result = await emptyTrash()
+ *       console.log(`Deleted ${result.totalDeletedCount} items`)
+ *     }
+ *   }
+ *   
+ *   return <button onClick={handleEmptyTrash}>Empty Trash</button>
+ * }
+ * ```
  */
 export function useTrashActions() {
   const auth = db.useAuth()
@@ -19,11 +54,35 @@ export function useTrashActions() {
 
   /**
    * Permanently deletes all soft-deleted entities owned by the current user.
-   * Queries the database once to find all deleted entities, then permanently deletes them.
-   * This operation cannot be undone.
+   * 
+   * Queries the database once to find all deleted entities, then permanently
+   * deletes them in a single transaction. This operation cannot be undone.
+   * 
+   * **Entities Deleted:**
+   * - Soft-deleted maps owned by the user
+   * - Soft-deleted concepts in maps owned by the user
+   * - Soft-deleted relationships in maps owned by the user
+   * 
+   * **Ownership Check:**
+   * Only entities owned by the current user are deleted. This ensures users
+   * can only permanently delete their own content.
+   * 
+   * **Transaction:**
+   * All deletions are performed in a single transaction for atomicity. If
+   * any deletion fails, the entire operation is rolled back.
    * 
    * @throws Error if user is not authenticated
    * @returns Promise that resolves with deletion counts when all deletions are complete
+   * 
+   * @example
+   * ```tsx
+   * const { emptyTrash } = useTrashActions()
+   * 
+   * const result = await emptyTrash()
+   * console.log(`Deleted ${result.deletedMapsCount} maps`)
+   * console.log(`Deleted ${result.deletedConceptsCount} concepts`)
+   * console.log(`Deleted ${result.deletedRelationshipsCount} relationships`)
+   * ```
    */
   const emptyTrash = async () => {
     if (!userId) {

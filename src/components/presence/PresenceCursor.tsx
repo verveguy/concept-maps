@@ -8,9 +8,54 @@ import type { PresenceData } from '@/lib/presence'
 
 /**
  * Component to display a user's cursor on the canvas.
- * Converts flow coordinates to screen coordinates for display.
  * 
+ * Renders a cursor indicator showing where another user's mouse is positioned
+ * on the concept map canvas. Converts flow coordinates (from presence data)
+ * to screen coordinates for display.
+ * 
+ * **Visual Design:**
+ * - Small colored circle representing the cursor position
+ * - Color matches the user's presence color for identification
+ * - User name label above the cursor
+ * - Smooth positioning updates as cursor moves
+ * 
+ * **Coordinate Conversion:**
+ * Uses the `flowToScreenPosition` function from React Flow to convert from
+ * flow coordinate space (where nodes are positioned) to screen pixel coordinates.
+ * 
+ * **Rendering:**
+ * Only renders if the presence data includes a cursor position. If `cursor`
+ * is `null`, the component returns `null` and nothing is rendered.
+ * 
+ * @param props - Component props
+ * @param props.presence - Presence data containing cursor position and user info
+ * @param props.flowToScreenPosition - Function to convert flow coordinates to screen coordinates
  * @returns The cursor component JSX, or null if no cursor position
+ * 
+ * @example
+ * ```tsx
+ * import { PresenceCursor } from '@/components/presence/PresenceCursor'
+ * import { useReactFlow } from 'reactflow'
+ * import { usePresenceCursors } from '@/hooks/usePresenceCursors'
+ * 
+ * function ConceptMapCanvas() {
+ *   const { flowToScreenPosition } = useReactFlow()
+ *   const { otherUsersPresence } = usePresenceCursors()
+ *   
+ *   return (
+ *     <>
+ *       <ReactFlow nodes={nodes} edges={edges} />
+ *       {otherUsersPresence.map(presence => (
+ *         <PresenceCursor
+ *           key={presence.userId}
+ *           presence={presence}
+ *           flowToScreenPosition={flowToScreenPosition}
+ *         />
+ *       ))}
+ *     </>
+ *   )
+ * }
+ * ```
  */
 export function PresenceCursor({
   presence,

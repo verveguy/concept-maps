@@ -10,10 +10,61 @@ import { useCallback, useMemo } from 'react'
 
 /**
  * Hook for managing map sharing and permissions.
- * Uses db.useQuery() for reading shares and db.transact() for mutations.
+ * 
+ * Provides functionality to share maps with other users and manage access permissions.
+ * Uses `db.useQuery()` for reading shares and `db.transact()` for mutations.
+ * 
+ * **Features:**
+ * - Create invitations by email
+ * - Accept/decline invitations
+ * - Revoke invitations and shares
+ * - Update permission levels
+ * - View active shares and pending invitations
+ * 
+ * **Invitation Flow:**
+ * 1. Owner creates invitation with target email and permission level
+ * 2. Secure token is generated (UUID)
+ * 3. Shareable link is created with token
+ * 4. Invitee clicks link and accepts (email validation)
+ * 5. Share record is created and permissions are granted
+ * 
+ * **Permission Management:**
+ * - `'view'`: Read-only access (readPermissions link)
+ * - `'edit'`: Read-write access (writePermissions link)
+ * - Permissions are updated atomically in transactions
+ * 
+ * **Email Validation:**
+ * When accepting invitations, the authenticated user's email must match the
+ * invitation's `invitedEmail` (case-insensitive comparison).
  * 
  * @param mapId - ID of the map to manage sharing for, or null
- * @returns Object containing shares array and sharing management functions
+ * @returns Object containing:
+ * - `currentUser`: Current authenticated user
+ * - `shares`: Array of active shares
+ * - `invitations`: Array of pending/accepted invitations
+ * - `createInvitation`: Create a new invitation
+ * - `acceptInvitation`: Accept an invitation
+ * - `declineInvitation`: Decline an invitation
+ * - `revokeInvitation`: Revoke an invitation (owner only)
+ * - `updateSharePermission`: Update permission level (owner only)
+ * - `revokeShare`: Revoke a share (owner only)
+ * 
+ * @example
+ * ```tsx
+ * import { useSharing } from '@/hooks/useSharing'
+ * 
+ * function ShareDialog({ mapId }) {
+ *   const { shares, invitations, createInvitation } = useSharing(mapId)
+ *   
+ *   const handleInvite = async (email: string) => {
+ *     const token = await createInvitation(email, 'edit')
+ *     const link = generateShareLink(mapId, token)
+ *     // Share the link with the user
+ *   }
+ *   
+ *   return <ShareUI shares={shares} invitations={invitations} />
+ * }
+ * ```
  */
 export function useSharing(mapId: string | null) {
   const auth = db.useAuth()
@@ -441,11 +492,30 @@ export function useSharing(mapId: string | null) {
 
 /**
  * Generate a shareable link for a map.
- * Creates a URL that can be used to access the map.
+ * 
+ * Creates a URL that can be used to access the map via an invitation token.
+ * The link includes the map ID and invitation token as query parameters.
+ * 
+ * **Link Format:**
+ * `{origin}/map/{mapId}?inviteToken={token}`
+ * 
+ * **Use Case:**
+ * After creating an invitation, generate a shareable link to send to the invitee.
+ * When they click the link, the InvitationPage component will detect the token
+ * and prompt them to accept the invitation.
  * 
  * @param mapId - ID of the map to generate a link for
  * @param token - Invitation token that authenticates access to the invitation
- * @returns URL string for accessing the map
+ * @returns URL string for accessing the map with the invitation token
+ * 
+ * @example
+ * ```tsx
+ * import { generateShareLink } from '@/hooks/useSharing'
+ * 
+ * const token = await createInvitation(email, 'edit')
+ * const shareLink = generateShareLink(mapId, token)
+ * // Share shareLink with the invitee
+ * ```
  */
 export function generateShareLink(mapId: string, token: string): string {
   const baseUrl = window.location.origin
