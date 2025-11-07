@@ -3,7 +3,6 @@
  * Provides the main application shell with sidebar and content area.
  */
 
-import { PanelLeft } from 'lucide-react'
 import { useUIStore } from '@/stores/uiStore'
 import { Sidebar } from './Sidebar'
 
@@ -41,7 +40,6 @@ import { Sidebar } from './Sidebar'
  */
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const sidebarOpen = useUIStore((state) => state.sidebarOpen)
-  const setSidebarOpen = useUIStore((state) => state.setSidebarOpen)
 
   return (
     <div className="flex h-screen overflow-hidden">

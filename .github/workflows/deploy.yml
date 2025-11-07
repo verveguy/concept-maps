@@ -50,7 +50,7 @@ jobs:
           VITE_INSTANTDB_API_KEY: ${{ secrets.VITE_INSTANTDB_API_KEY }}
 
       - name: Build docs
-        run: cd docs && pnpm build
+        run: pnpm build:docs:full
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

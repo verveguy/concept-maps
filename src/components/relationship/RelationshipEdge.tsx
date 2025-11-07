@@ -359,7 +359,6 @@ function findBezierBoundaryIntersection(
   // Use adaptive sampling: more samples for longer curves
   const curveLength = Math.sqrt((x3 - x0) ** 2 + (y3 - y0) ** 2)
   const sampleCount = Math.max(500, Math.min(2000, Math.floor(curveLength / 2))) // Adaptive: 500-2000 samples based on curve length
-  let lastOutsideT = 0
   let lastOutsidePoint = bezierPoint(0, x0, y0, x1, y1, x2, y2, x3, y3)
   let prevPoint = lastOutsidePoint
   let prevT = 0
@@ -428,7 +427,6 @@ function findBezierBoundaryIntersection(
     
     // Update tracking
     if (!isNowInside) {
-      lastOutsideT = t
       lastOutsidePoint = point
     }
     prevPoint = point
@@ -982,20 +980,6 @@ function getNodeBoundaryIntersection(
   const halfWidth = nodeWidth / 2
   const halfHeight = nodeHeight / 2
   
-  // Determine entry edge based on source position relative to target
-  const aspectRatio = nodeWidth / nodeHeight
-  const normalizedDx = dx / halfWidth
-  const normalizedDy = dy / halfHeight
-  
-  let entryEdge: 'top' | 'bottom' | 'left' | 'right'
-  if (Math.abs(normalizedDx) > Math.abs(normalizedDy) * aspectRatio) {
-    // Horizontal entry
-    entryEdge = dx > 0 ? 'right' : 'left'
-  } else {
-    // Vertical entry
-    entryEdge = dy > 0 ? 'bottom' : 'top'
-  }
-  
   // Visual offset to account for node border (2px) and padding
   // Top entries appear too far back, so we move them down (increase Y)
   // Bottom entries appear too deep, so we move them up (decrease Y)
@@ -1096,176 +1080,6 @@ function getNodeBoundaryIntersection(
     y: nodeCenterY, 
     angle: 0
   }
-}
-
-/**
- * Modify an SVG path string to end at a different point.
- * For bezier curves, also adjusts the second control point to maintain proper curve shape.
- * 
- * @param path - Original SVG path string
- * @param originalEndX - Original X coordinate of the endpoint (center)
- * @param originalEndY - Original Y coordinate of the endpoint (center)
- * @param newEndX - New X coordinate for the endpoint (boundary)
- * @param newEndY - New Y coordinate for the endpoint (boundary)
- * @returns Modified path string ending at the new coordinates
- */
-function modifyPathEndpoint(
-  path: string,
-  originalEndX: number,
-  originalEndY: number,
-  newEndX: number,
-  newEndY: number
-): string {
-  // Calculate the offset vector from center to boundary
-  const offsetX = newEndX - originalEndX
-  const offsetY = newEndY - originalEndY
-  
-  // Check if this is a bezier curve path (contains "C" command)
-  const isBezier = /C\s/i.test(path)
-  
-  if (isBezier) {
-    // For bezier curves: "M x,y C cx1,cy1 cx2,cy2 x,y"
-    // We need to adjust both the second control point (cx2,cy2) and the endpoint
-    // The second control point should be adjusted by the same offset to maintain curve shape
-    
-    // Find all coordinate pairs in the path
-    // Match pattern: number,number (with optional whitespace)
-    const coordinatePattern = /([+-]?\d+\.?\d*)\s*,\s*([+-]?\d+\.?\d*)/g
-    const matches = [...path.matchAll(coordinatePattern)]
-    
-    if (matches.length >= 4) {
-      // Bezier curve has: M start, C control1, control2, end
-      // matches[0] = start point (M)
-      // matches[1] = first control point (cx1, cy1)
-      // matches[2] = second control point (cx2, cy2) - need to adjust this
-      // matches[3] = endpoint - need to replace this
-      
-      const control2Match = matches[2]
-      const endMatch = matches[3]
-      
-      // Calculate adjusted second control point
-      const originalControl2X = parseFloat(control2Match[1])
-      const originalControl2Y = parseFloat(control2Match[2])
-      const adjustedControl2X = originalControl2X + offsetX
-      const adjustedControl2Y = originalControl2Y + offsetY
-      
-      // Build the modified path
-      // Replace second control point
-      const beforeControl2 = path.substring(0, control2Match.index!)
-      const afterControl2 = path.substring(control2Match.index! + control2Match[0].length)
-      const pathWithAdjustedControl2 = beforeControl2 + `${adjustedControl2X},${adjustedControl2Y}` + afterControl2
-      
-      // Now replace the endpoint in the modified path
-      // Find the endpoint again (its index may have shifted slightly)
-      const endPattern = /([+-]?\d+\.?\d*)\s*,\s*([+-]?\d+\.?\d*)\s*$/g
-      const endMatches = [...pathWithAdjustedControl2.matchAll(endPattern)]
-      
-      if (endMatches.length > 0) {
-        const finalEndMatch = endMatches[endMatches.length - 1]
-        const beforeEnd = pathWithAdjustedControl2.substring(0, finalEndMatch.index!)
-        const afterEnd = pathWithAdjustedControl2.substring(finalEndMatch.index! + finalEndMatch[0].length)
-        return beforeEnd + `${newEndX},${newEndY}` + afterEnd
-      }
-    }
-  }
-  
-  // For non-bezier paths (straight lines, smoothstep), just replace the endpoint
-  // Find the last coordinate pair in the path
-  const coordinatePattern = /([+-]?\d+\.?\d*)\s*,\s*([+-]?\d+\.?\d*)\s*$/g
-  const matches = [...path.matchAll(coordinatePattern)]
-  
-  if (matches.length > 0) {
-    // Replace the last match (final coordinates) with new endpoint
-    const lastMatch = matches[matches.length - 1]
-    const before = path.substring(0, lastMatch.index!)
-    const after = path.substring(lastMatch.index! + lastMatch[0].length)
-    return before + `${newEndX},${newEndY}` + after
-  }
-  
-  // Fallback: if no match found, try to find last two space-separated numbers
-  const spaceSeparatedPattern = /([+-]?\d+\.?\d*)\s+([+-]?\d+\.?\d*)\s*$/g
-  const spaceMatches = [...path.matchAll(spaceSeparatedPattern)]
-  
-  if (spaceMatches.length > 0) {
-    const lastMatch = spaceMatches[spaceMatches.length - 1]
-    const before = path.substring(0, lastMatch.index!)
-    const after = path.substring(lastMatch.index! + lastMatch[0].length)
-    return before + `${newEndX},${newEndY}` + after
-  }
-  
-  // Final fallback: append the new endpoint
-  return path + ` ${newEndX},${newEndY}`
-}
-
-/**
- * Calculate bezier control points using React Flow's logic.
- * Returns control points that match what React Flow's getBezierPath would use.
- * 
- * @param sourceX - Source X coordinate
- * @param sourceY - Source Y coordinate
- * @param targetX - Target X coordinate
- * @param targetY - Target Y coordinate
- * @param sourcePosition - Source handle position
- * @param targetPosition - Target handle position
- * @returns Object with control points { x1, y1, x2, y2 }
- */
-function calculateBezierControlPoints(
-  sourceX: number,
-  sourceY: number,
-  targetX: number,
-  targetY: number,
-  sourcePosition: Position,
-  targetPosition: Position
-): { x1: number; y1: number; x2: number; y2: number } {
-  const offset = getControlPointOffset(sourcePosition, sourceX, sourceY, targetX, targetY)
-  
-  let controlX1: number
-  let controlY1: number
-  let controlX2: number
-  let controlY2: number
-  
-  // Calculate control points based on handle positions
-  switch (sourcePosition) {
-    case Position.Right:
-      controlX1 = sourceX + offset
-      controlY1 = sourceY
-      break
-    case Position.Left:
-      controlX1 = sourceX - offset
-      controlY1 = sourceY
-      break
-    case Position.Top:
-      controlX1 = sourceX
-      controlY1 = sourceY - offset
-      break
-    case Position.Bottom:
-    default:
-      controlX1 = sourceX
-      controlY1 = sourceY + offset
-      break
-  }
-  
-  switch (targetPosition) {
-    case Position.Right:
-      controlX2 = targetX + offset
-      controlY2 = targetY
-      break
-    case Position.Left:
-      controlX2 = targetX - offset
-      controlY2 = targetY
-      break
-    case Position.Top:
-      controlX2 = targetX
-      controlY2 = targetY - offset
-      break
-    case Position.Bottom:
-    default:
-      controlX2 = targetX
-      controlY2 = targetY + offset
-      break
-  }
-  
-  return { x1: controlX1, y1: controlY1, x2: controlX2, y2: controlY2 }
 }
 
 /**
@@ -1395,7 +1209,6 @@ function getBezierPathWithOffset(
  * @param targetHandle - Target handle ID
  * @param data - Edge data containing relationship information
  * @param selected - Whether the edge is selected
- * @param markerEnd - Arrow marker configuration
  * @returns The relationship edge component JSX
  */
 export const RelationshipEdge = memo(
@@ -1412,7 +1225,6 @@ export const RelationshipEdge = memo(
     target,
     data,
     selected,
-    markerEnd,
   }: EdgeProps<RelationshipEdgeData>) => {
     const { updateRelationship } = useRelationshipActions()
     const { getNode, setNodes } = useReactFlow()
@@ -1506,10 +1318,6 @@ export const RelationshipEdge = memo(
     const { path: edgePath, labelX, labelY, labelOffsetX, labelOffsetY, arrowhead, trimLength } = useMemo(() => {
       // Get target node to calculate boundary intersection
       const targetNode = target ? getNode(target) : null
-      
-      // Use node dimensions if available, otherwise use estimated dimensions
-      const nodeWidth = targetNode?.width ?? 150
-      const nodeHeight = targetNode?.height ?? 80
       
       // Calculate path using CENTER coordinates - path ends at center handle
       const params = {
