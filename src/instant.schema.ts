@@ -25,6 +25,7 @@ const _schema = i.schema({
     }),
     maps: i.entity({
       createdAt: i.number().indexed(),
+      deletedAt: i.number().optional(),
       name: i.string().indexed(),
       updatedAt: i.number().indexed(),
     }),
@@ -249,13 +250,13 @@ const _schema = i.schema({
   rooms: {
     map: {
       presence: i.entity({
+        avatarUrl: i.string().optional(),
         color: i.string(),
         cursor: i.json().optional(),
         editingEdgeId: i.string().optional(),
         editingNodeId: i.string().optional(),
         userId: i.string(),
         userName: i.string(),
-        avatarUrl: i.string().optional(),
       }),
     },
   },

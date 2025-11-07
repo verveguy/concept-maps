@@ -46,8 +46,19 @@ export function useMapActions() {
     await db.transact([tx.maps[mapId].update(updateData)])
   }
 
+  /**
+   * Delete a map (soft delete).
+   * Sets deletedAt timestamp instead of actually deleting the record.
+   * 
+   * @param mapId - ID of the map to delete
+   */
   const deleteMap = async (mapId: string) => {
-    await db.transact([tx.maps[mapId].delete()])
+    await db.transact([
+      tx.maps[mapId].update({
+        deletedAt: Date.now(),
+        updatedAt: Date.now(),
+      }),
+    ])
   }
 
   return {

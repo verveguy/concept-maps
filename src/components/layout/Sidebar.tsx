@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useMemo, memo, useCallback } from 'react'
-import { X, Plus, Play, ChevronRight, ChevronDown, Eye, Settings, Sun, Moon, BookOpen } from 'lucide-react'
+import { X, Plus, Play, ChevronRight, ChevronDown, Eye, Settings, Sun, Moon, BookOpen, Trash2 } from 'lucide-react'
 import { useMaps } from '@/hooks/useMaps'
 import { useMapActions } from '@/hooks/useMapActions'
 import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
@@ -14,6 +14,16 @@ import { useUIStore } from '@/stores/uiStore'
 import { db } from '@/lib/instant'
 import { format } from 'date-fns'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { UserAvatarSection } from './UserAvatarSection'
 
 /**
@@ -108,7 +118,7 @@ ThemeToggle.displayName = 'ThemeToggle'
  * @returns The sidebar JSX
  */
 export const Sidebar = () => {
-  const { createMap } = useMapActions()
+  const { createMap, deleteMap } = useMapActions()
   const { createPerspective } = usePerspectiveActions()
   const { currentMapId, currentPerspectiveId, setCurrentMapId, setCurrentPerspectiveId } = useMapStore()
   const { setSidebarOpen } = useUIStore()
@@ -118,6 +128,7 @@ export const Sidebar = () => {
   const [isCreatingPerspective, setIsCreatingPerspective] = useState<string | null>(null)
   const [newPerspectiveName, setNewPerspectiveName] = useState('')
   const [isDarkMode, setIsDarkMode] = useState(false)
+  const [mapToDelete, setMapToDelete] = useState<{ id: string; name: string } | null>(null)
 
   const maps = useMaps()
   // Get all perspectives for all maps (not filtered by currentMapId)
@@ -242,6 +253,40 @@ export const Sidebar = () => {
     setCurrentPerspectiveId(perspectiveId)
   }
 
+  /**
+   * Open the delete confirmation dialog for a map.
+   * 
+   * @param mapId - ID of the map to delete
+   * @param mapName - Name of the map (for confirmation message)
+   * @param e - Mouse event to stop propagation
+   */
+  const handleDeleteMapClick = (mapId: string, mapName: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setMapToDelete({ id: mapId, name: mapName })
+  }
+
+  /**
+   * Handle map deletion after confirmation.
+   * Soft deletes the map and clears selection if it's the current map.
+   */
+  const handleConfirmDelete = async () => {
+    if (!mapToDelete) return
+
+    try {
+      await deleteMap(mapToDelete.id)
+      // If the deleted map is the current map, clear the selection
+      if (currentMapId === mapToDelete.id) {
+        setCurrentMapId(null)
+        setCurrentPerspectiveId(null)
+      }
+      setMapToDelete(null)
+    } catch (error) {
+      console.error('Failed to delete map:', error)
+      alert('Failed to delete map. Please try again.')
+      setMapToDelete(null)
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -303,34 +348,45 @@ export const Sidebar = () => {
                 <li key={map.id}>
                   <div>
                     {/* Map Header */}
-                    <button
-                      onClick={() => {
-                        toggleMapExpanded(map.id)
-                        handleSelectMap(map.id)
-                      }}
-                      className={`w-full text-left p-4 hover:bg-accent transition-colors flex items-center gap-2 ${
-                        isSelected 
-                          ? 'bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-500 font-semibold text-black dark:text-white' 
-                          : ''
-                      }`}
-                    >
-                      {perspectives.length > 0 && (
-                        <div className="flex-shrink-0">
-                          {isExpanded ? (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                          )}
+                    <div className="group relative">
+                      <button
+                        onClick={() => {
+                          toggleMapExpanded(map.id)
+                          handleSelectMap(map.id)
+                        }}
+                        className={`w-full text-left p-4 hover:bg-accent transition-colors flex items-center gap-2 ${
+                          isSelected 
+                            ? 'bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-500 font-semibold text-black dark:text-white' 
+                            : ''
+                        }`}
+                      >
+                        {perspectives.length > 0 && (
+                          <div className="flex-shrink-0">
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            )}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium">{map.name}</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Updated {format(map.updatedAt, 'MMM d, yyyy')}
+                            {perspectives.length > 0 && ` ? ${perspectives.length} perspective${perspectives.length === 1 ? '' : 's'}`}
+                          </div>
                         </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium">{map.name}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Updated {format(map.updatedAt, 'MMM d, yyyy')}
-                          {perspectives.length > 0 && ` ? ${perspectives.length} perspective${perspectives.length === 1 ? '' : 's'}`}
-                        </div>
-                      </div>
-                    </button>
+                      </button>
+                      {/* Delete button - shows on hover only */}
+                      <button
+                        onClick={(e) => handleDeleteMapClick(map.id, map.name, e)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Delete map"
+                        aria-label={`Delete ${map.name}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                      </button>
+                    </div>
 
                     {/* Perspectives List */}
                     {isExpanded && perspectives.length > 0 && (
@@ -443,6 +499,27 @@ export const Sidebar = () => {
 
       {/* User Avatar - Isolated component with its own hook, won't cause Sidebar re-renders */}
       <UserAvatarSection />
+
+      {/* Delete Map Confirmation Dialog */}
+      <AlertDialog open={!!mapToDelete} onOpenChange={(open) => !open && setMapToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Map</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{mapToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -14,6 +14,7 @@ export interface Map {
   createdBy: string
   createdAt: Date
   updatedAt: Date
+  deletedAt: Date | null // Timestamp when soft-deleted, null if not deleted
 }
 
 /**

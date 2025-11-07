@@ -77,6 +77,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   // When a new concept is created, the relationship enters edit mode first
   const newlyCreatedRelationshipIdsRef = useRef<Map<string, string>>(new Map()) // conceptId -> relationshipId
   
+  // Track active layout for sticky behavior - auto-apply when nodes are added
+  const [activeLayout, setActiveLayout] = useState<LayoutType | null>(null)
+  
   const currentMapId = useMapStore((state) => state.currentMapId)
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
   const isEditingPerspective = useMapStore((state) => state.isEditingPerspective)
@@ -534,29 +537,45 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     },
   }), [nodes, edges, currentMapId, fitView])
 
+  // Get React Flow instance for accessing latest nodes/edges
+  const { getNodes, getEdges } = useReactFlow()
+  
   // Layout handler function for buttons
   const handleApplyLayout = useCallback(
-    async (layoutType: LayoutType) => {
+    async (layoutType: LayoutType, makeSticky: boolean = false) => {
       if (!currentMapId) return
       
-      const conceptNodesArray = nodes.filter(n => n.type === 'concept')
+      // Use getNodes/getEdges to get the latest state (important for auto-apply)
+      const currentNodes = getNodes()
+      const currentEdges = getEdges()
+      
+      const conceptNodesArray = currentNodes.filter(n => n.type === 'concept')
       if (conceptNodesArray.length === 0) return
 
       let layoutNodes: Node[]
       
       if (layoutType === 'force-directed') {
-        layoutNodes = applyForceDirectedLayout(conceptNodesArray, edges, {
+        layoutNodes = applyForceDirectedLayout(conceptNodesArray, currentEdges, {
           width: 2000,
           height: 2000,
         })
       } else if (layoutType === 'hierarchical') {
-        layoutNodes = applyHierarchicalLayout(conceptNodesArray, edges, {
+        layoutNodes = applyHierarchicalLayout(conceptNodesArray, currentEdges, {
           direction: 'TB',
           nodeWidth: 150,
           nodeHeight: 100,
         })
       } else {
-        return // Manual layout - no changes
+        // Manual layout - clear active layout
+        setActiveLayout(null)
+        return
+      }
+
+      // Set active layout for sticky behavior only if makeSticky is true
+      if (makeSticky) {
+        setActiveLayout(layoutType)
+      } else {
+        setActiveLayout(null)
       }
 
       // Batch update all concept positions in InstantDB
@@ -579,8 +598,59 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         alert('Failed to apply layout. Please try again.')
       }
     },
-    [nodes, edges, currentMapId, fitView]
+    [currentMapId, getNodes, getEdges, fitView]
   )
+  
+  // Track previous concept IDs to detect new nodes (more reliable than count)
+  const prevConceptIdsRef = useRef<Set<string>>(new Set())
+  
+  // Initialize ref on first render
+  useEffect(() => {
+    if (prevConceptIdsRef.current.size === 0) {
+      prevConceptIdsRef.current = new Set(concepts.map(c => c.id))
+    }
+  }, [])
+  
+  // Create a stable string representation of concept IDs for dependency tracking
+  const conceptIdsString = useMemo(
+    () => concepts.map(c => c.id).sort().join(','),
+    [concepts]
+  )
+  
+  // Auto-apply active layout when new nodes are added
+  useEffect(() => {
+    if (!activeLayout) {
+      // Update ref even if no active layout
+      prevConceptIdsRef.current = new Set(concepts.map(c => c.id))
+      return
+    }
+    
+    const currentConceptIds = new Set(concepts.map(c => c.id))
+    const previousConceptIds = prevConceptIdsRef.current
+    
+    // Check if any new concepts were added (not just count change)
+    const newConceptIds = Array.from(currentConceptIds).filter(id => !previousConceptIds.has(id))
+    
+    // If new nodes were added and we have an active layout, re-apply it
+    if (newConceptIds.length > 0 && concepts.length > 0) {
+      // Small delay to ensure the new node is fully created and edges are updated
+      const timeoutId = setTimeout(() => {
+        // Auto-apply with makeSticky=true to preserve sticky state
+        handleApplyLayout(activeLayout, true).catch((error) => {
+          console.error('Failed to auto-apply layout:', error)
+        })
+      }, 300)
+      
+      // Update ref for next comparison
+      prevConceptIdsRef.current = currentConceptIds
+      
+      return () => clearTimeout(timeoutId)
+    }
+    
+    // Update ref even if no new nodes (in case nodes were deleted)
+    prevConceptIdsRef.current = currentConceptIds
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conceptIdsString, activeLayout, handleApplyLayout])
   
   // Memoize concept nodes to avoid recreating the filter on every render
   const conceptNodes = useMemo(() => nodes.filter(n => n.type === 'concept'), [nodes])
@@ -703,82 +773,162 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   // Handle connection end - create concept if dropped on empty space
   const onConnectEnd = useCallback(
     async (event: MouseEvent | TouchEvent) => {
+      // Reset connection made flag for next connection
+      const wasConnectionMade = connectionMadeRef.current
+      connectionMadeRef.current = false
+      
       if (!currentMapId || !connectionStart) {
         setConnectionStart(null)
         return
       }
 
-      // Check if connection ended on a node
+      // If a connection was made to an existing node, don't create a new node
+      if (wasConnectionMade) {
+        setConnectionStart(null)
+        return
+      }
+
+      // Check if connection ended on a node (anywhere on the node, not just the handle)
       const target = event.target as HTMLElement
-      const targetNode = target.closest('.react-flow__node')
-
-      if (!targetNode) {
-        // Connection ended on empty space - create new concept and relationship
-        const pointer = 'clientX' in event ? event : event.touches?.[0]
-        if (!pointer) {
-          setConnectionStart(null)
-          return
-        }
-
-        const mousePosition = screenToFlowPosition({
-          x: pointer.clientX,
-          y: pointer.clientY,
-        })
-
-        // Estimate node dimensions to center it on the mouse position
-        // Node has min-w-[120px], px-4 (16px padding), py-3 (12px padding)
-        // For "New Concept" text, estimate ~130px width and ~50px height
-        const estimatedNodeWidth = 130
-        const estimatedNodeHeight = 50
+      const targetNodeElement = target.closest('.react-flow__node')
+      
+      // If we hit a node, create a relationship between the source and target nodes
+      if (targetNodeElement) {
+        // Get the node ID from the id attribute (React Flow format: react-flow__node-{nodeId})
+        let targetId: string | null = null
         
-        // Adjust position so node center is at mouse position
-        const position = {
-          x: mousePosition.x - estimatedNodeWidth / 2,
-          y: mousePosition.y - estimatedNodeHeight / 2,
+        // Try to extract from id attribute
+        const nodeIdAttr = targetNodeElement.id
+        if (nodeIdAttr && nodeIdAttr.startsWith('react-flow__node-')) {
+          targetId = nodeIdAttr.replace('react-flow__node-', '')
         }
-
-        try {
-          // Generate IDs for both concept and relationship
-          const newConceptId = id()
-          const newRelationshipId = id()
-
-          // Create both concept and relationship in a single transaction
-          await db.transact([
-            // Create the new concept
-            tx.concepts[newConceptId]
-              .update({
-                label: 'New Concept',
-                positionX: position.x,
-                positionY: position.y,
-                notes: '',
-                metadata: JSON.stringify({}),
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-              })
-              .link({ map: currentMapId }),
-            // Create the relationship linking source to new concept
-            tx.relationships[newRelationshipId]
-              .update({
-                primaryLabel: 'related to',
-                reverseLabel: 'related from',
-                notes: '',
-                metadata: JSON.stringify({}),
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-              })
-              .link({
-                map: currentMapId,
-                fromConcept: connectionStart.sourceId,
-                toConcept: newConceptId,
-              }),
-          ])
-          
-          // Track the relationship to start in edit mode (not the node)
-          // The relationship will be edited first, then Tab/Enter will move to the node
-          newlyCreatedRelationshipIdsRef.current.set(newConceptId, newRelationshipId)
-        } catch (error) {
-          console.error('Failed to create concept and relationship from connection:', error)
+        
+        // Fallback: try data-id attribute
+        if (!targetId) {
+          targetId = targetNodeElement.getAttribute('data-id')
         }
+        
+        // Fallback: use getNodes() and find node at position
+        if (!targetId) {
+          const pointer = 'clientX' in event ? event : event.touches?.[0]
+          if (pointer) {
+            const mousePosition = screenToFlowPosition({
+              x: pointer.clientX,
+              y: pointer.clientY,
+            })
+            
+            // Find the node that contains this position
+            // Use nodes from state instead of getNodes() to avoid duplicate declaration
+            const nodeAtPosition = nodes.find((node) => {
+              // Rough check: see if mouse is within node bounds
+              // Nodes are typically ~130px wide and ~50px tall
+              const nodeWidth = 130
+              const nodeHeight = 50
+              return (
+                mousePosition.x >= node.position.x &&
+                mousePosition.x <= node.position.x + nodeWidth &&
+                mousePosition.y >= node.position.y &&
+                mousePosition.y <= node.position.y + nodeHeight
+              )
+            })
+            
+            if (nodeAtPosition) {
+              targetId = nodeAtPosition.id
+            }
+          }
+        }
+        
+        if (targetId && targetId !== connectionStart.sourceId && targetId !== 'text-view-node') {
+          // Create relationship between source and target nodes
+          try {
+            await createRelationship({
+              mapId: currentMapId,
+              fromConceptId: connectionStart.sourceId,
+              toConceptId: targetId,
+              primaryLabel: 'related to',
+              reverseLabel: 'related from',
+            })
+          } catch (error) {
+            console.error('Failed to create relationship from connection:', error)
+          }
+        }
+        
+        setConnectionStart(null)
+        return
+      }
+      
+      // Check if we hit a handle (this should have been handled by onConnect, but just in case)
+      const targetHandle = target.closest('.react-flow__handle')
+      if (targetHandle) {
+        setConnectionStart(null)
+        return
+      }
+
+      // Connection ended on empty space - create new concept and relationship
+      const pointer = 'clientX' in event ? event : event.touches?.[0]
+      if (!pointer) {
+        setConnectionStart(null)
+        return
+      }
+
+      const mousePosition = screenToFlowPosition({
+        x: pointer.clientX,
+        y: pointer.clientY,
+      })
+
+      // Estimate node dimensions to center it on the mouse position
+      // Node has min-w-[120px], px-4 (16px padding), py-3 (12px padding)
+      // For "New Concept" text, estimate ~130px width and ~50px height
+      const estimatedNodeWidth = 130
+      const estimatedNodeHeight = 50
+      
+      // Adjust position so node center is at mouse position
+      const position = {
+        x: mousePosition.x - estimatedNodeWidth / 2,
+        y: mousePosition.y - estimatedNodeHeight / 2,
+      }
+
+      try {
+        // Generate IDs for both concept and relationship
+        const newConceptId = id()
+        const newRelationshipId = id()
+
+        // Create both concept and relationship in a single transaction
+        await db.transact([
+          // Create the new concept
+          tx.concepts[newConceptId]
+            .update({
+              label: 'New Concept',
+              positionX: position.x,
+              positionY: position.y,
+              notes: '',
+              metadata: JSON.stringify({}),
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            })
+            .link({ map: currentMapId }),
+          // Create the relationship linking source to new concept
+          tx.relationships[newRelationshipId]
+            .update({
+              primaryLabel: 'related to',
+              reverseLabel: 'related from',
+              notes: '',
+              metadata: JSON.stringify({}),
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            })
+            .link({
+              map: currentMapId,
+              fromConcept: connectionStart.sourceId,
+              toConcept: newConceptId,
+            }),
+        ])
+        
+        // Track the relationship to start in edit mode (not the node)
+        // The relationship will be edited first, then Tab/Enter will move to the node
+        newlyCreatedRelationshipIdsRef.current.set(newConceptId, newRelationshipId)
+      } catch (error) {
+        console.error('Failed to create concept and relationship from connection:', error)
       }
 
       setConnectionStart(null)
@@ -787,6 +937,8 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       currentMapId,
       connectionStart,
       screenToFlowPosition,
+      createRelationship,
+      nodes,
     ]
   )
 
@@ -900,12 +1052,17 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   )
 
   // Handle connection creation - create new relationship between existing nodes
+  // Track if a connection was successfully made to an existing node
+  const connectionMadeRef = useRef(false)
+  
   const onConnectHandler = useCallback(
     (connection: Connection) => {
       if (!currentMapId || !hasWriteAccess || !connection.source || !connection.target) {
         return
       }
 
+      // Mark that a connection was made to an existing node
+      connectionMadeRef.current = true
       setConnectionStart(null)
 
       void (async () => {
@@ -1008,18 +1165,18 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
           {/* Custom layout buttons */}
           <div className="h-px bg-gray-300" />
           <button
-            onClick={() => handleApplyLayout('force-directed')}
+            onClick={(e) => handleApplyLayout('force-directed', e.shiftKey)}
             disabled={conceptNodes.length === 0}
-            className="react-flow__controls-button"
-            title="Force-directed layout (spreads nodes evenly)"
+            className={`react-flow__controls-button ${activeLayout === 'force-directed' ? '!bg-primary !text-primary-foreground' : ''}`}
+            title="Force-directed layout (spreads nodes evenly). Shift+Click to make sticky (auto-apply on new nodes)."
           >
             <Network className="h-4 w-4" />
           </button>
           <button
-            onClick={() => handleApplyLayout('hierarchical')}
+            onClick={(e) => handleApplyLayout('hierarchical', e.shiftKey)}
             disabled={conceptNodes.length === 0}
-            className="react-flow__controls-button"
-            title="Hierarchical layout (top-to-bottom tree)"
+            className={`react-flow__controls-button ${activeLayout === 'hierarchical' ? '!bg-primary !text-primary-foreground' : ''}`}
+            title="Hierarchical layout (top-to-bottom tree). Shift+Click to make sticky (auto-apply on new nodes)."
           >
             <Layers className="h-4 w-4" />
           </button>

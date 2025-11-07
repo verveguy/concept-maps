@@ -431,10 +431,11 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          backgroundColor: isDarkMode ? 'hsl(217.2 32.6% 17.5%)' : 'hsl(214.3 31.8% 91.4%)',
-          width: '4px',
-          height: '4px',
-          opacity: 0.3,
+          backgroundColor: 'transparent',
+          width: '20px',
+          height: '20px',
+          borderRadius: '50%',
+          border: 'none',
         }}
       />
       
@@ -546,10 +547,11 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          backgroundColor: isDarkMode ? 'hsl(217.2 32.6% 17.5%)' : 'hsl(214.3 31.8% 91.4%)',
-          width: '4px',
-          height: '4px',
-          opacity: 0.3,
+          backgroundColor: 'transparent',
+          width: '20px',
+          height: '20px',
+          borderRadius: '50%',
+          border: 'none',
         }}
       />
     </div>

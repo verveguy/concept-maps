@@ -32,13 +32,16 @@ export function useMaps() {
 
   const maps: Map[] = useMemo(
     () =>
-      mapsData?.maps?.map((m: any) => ({
-        id: m.id,
-        name: m.name,
-        createdBy: m.creator?.id || userId || '',
-        createdAt: new Date(m.createdAt),
-        updatedAt: new Date(m.updatedAt),
-      })) || [],
+      mapsData?.maps
+        ?.filter((m: any) => !m.deletedAt) // Filter out soft-deleted maps
+        .map((m: any) => ({
+          id: m.id,
+          name: m.name,
+          createdBy: m.creator?.id || userId || '',
+          createdAt: new Date(m.createdAt),
+          updatedAt: new Date(m.updatedAt),
+          deletedAt: m.deletedAt ? new Date(m.deletedAt) : null,
+        })) || [],
     [mapsData?.maps, userId]
   )
 

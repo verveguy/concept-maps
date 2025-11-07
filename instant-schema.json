@@ -21,6 +21,11 @@
           "valueType": "number",
           "required": true,
           "isIndexed": true
+        },
+        "deletedAt": {
+          "valueType": "number",
+          "required": false,
+          "isIndexed": true
         }
       },
       "links": {}
