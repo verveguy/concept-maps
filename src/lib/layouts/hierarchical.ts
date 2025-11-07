@@ -7,6 +7,38 @@ import dagre from 'dagre'
 import type { Node, Edge } from 'reactflow'
 
 /**
+ * Estimate the width of an edge label for layout calculations.
+ * 
+ * @param label - Edge label text
+ * @param fontSize - Font size in pixels (default: 12px for text-xs)
+ * @param padding - Horizontal padding in pixels (default: 16px for px-2 on both sides)
+ * @returns Estimated width in pixels
+ */
+function estimateEdgeLabelWidth(label: string, fontSize: number = 12, padding: number = 16): number {
+  if (!label) return 0
+  
+  // Try to use canvas for accurate measurement
+  if (typeof document !== 'undefined') {
+    try {
+      const canvas = document.createElement('canvas')
+      const context = canvas.getContext('2d')
+      if (context) {
+        // Match the actual font used: text-xs font-medium
+        context.font = `500 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`
+        const measuredWidth = context.measureText(label).width
+        return measuredWidth + padding
+      }
+    } catch {
+      // Fall through to estimation if canvas fails
+    }
+  }
+  
+  // Fallback estimation: for font-medium, average character width is closer to 0.75 * fontSize
+  const avgCharWidth = fontSize * 0.75
+  return (label.length * avgCharWidth) + padding
+}
+
+/**
  * Configuration options for hierarchical layout.
  */
 export interface HierarchicalLayoutOptions {
@@ -92,13 +124,26 @@ export function applyHierarchicalLayout(
     nodesep = 50, // Horizontal spacing between nodes
   } = options
 
+  // Calculate maximum label width across all edges to adjust spacing
+  let maxLabelWidth = 0
+  edges.forEach((edge) => {
+    const edgeLabel = (edge.data as any)?.relationship?.primaryLabel || ''
+    const labelWidth = estimateEdgeLabelWidth(edgeLabel)
+    maxLabelWidth = Math.max(maxLabelWidth, labelWidth)
+  })
+  
+  // Adjust ranksep and nodesep based on maximum label width
+  // Add extra space proportional to label width (60% of max label width)
+  const adjustedRanksep = ranksep + (maxLabelWidth * 0.6)
+  const adjustedNodesep = nodesep + (maxLabelWidth * 0.3)
+  
   // Create a new dagre graph
   const dagreGraph = new dagre.graphlib.Graph()
   dagreGraph.setDefaultEdgeLabel(() => ({}))
   dagreGraph.setGraph({
     rankdir: direction,
-    nodesep,
-    ranksep,
+    nodesep: adjustedNodesep,
+    ranksep: adjustedRanksep,
   })
 
   // Add nodes to dagre graph
@@ -109,9 +154,14 @@ export function applyHierarchicalLayout(
     })
   })
 
-  // Add edges to dagre graph
+  // Add edges to dagre graph with label information
   edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target)
+    // Get edge label from edge data
+    const edgeLabel = (edge.data as any)?.relationship?.primaryLabel || ''
+    
+    dagreGraph.setEdge(edge.source, edge.target, {
+      label: edgeLabel, // Store label for reference
+    })
   })
 
   // Run dagre layout algorithm

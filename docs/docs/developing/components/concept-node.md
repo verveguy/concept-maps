@@ -41,11 +41,24 @@ import { ConceptNode } from '@/components/concept/ConceptNode'
 ## Features
 
 - **Inline Editing**: Double-click to edit the label
+- **Triple Entry Mode**: When editing a label, entering text in the format "Noun verb phrase Noun" automatically creates a relationship and new concept
 - **Multiple Handles**: Supports multiple edges between the same nodes
 - **Notes**: Expandable notes section with Markdown rendering
 - **Metadata**: Custom key-value pairs
 - **Presence**: Shows avatars of users viewing/editing the concept
 - **Styling**: Customizable colors via metadata
+
+## Triple Entry Mode
+
+When a user edits a concept label and enters text matching the triple pattern (e.g., "Diagrams explain Architecture"), the component:
+
+1. Parses the input using `parseTripleText()` from `@/lib/textRepresentation`
+2. Updates the current concept label to the first noun
+3. Creates a new relationship with the verb phrase
+4. Creates a new concept with the second noun
+5. Sets `shouldStartEditing: true` on the new concept node to automatically enter edit mode
+
+This enables rapid keyboard-based diagram creation without mouse interaction.
 
 ## Related Components
 

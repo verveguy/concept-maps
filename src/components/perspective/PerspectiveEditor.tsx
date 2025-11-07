@@ -10,6 +10,7 @@ import { usePerspectives } from '@/hooks/usePerspectives'
 import { useMapStore } from '@/stores/mapStore'
 import { useAllRelationships } from '@/hooks/useRelationships'
 import { db } from '@/lib/instant'
+import { stripLineBreaks } from '@/lib/textRepresentation'
 
 /**
  * Perspective Editor component.
@@ -360,7 +361,7 @@ export function PerspectiveEditor() {
                         className="rounded"
                       />
                       <span className="text-xs flex-1">
-                        {fromConcept?.label || '?'} {relationship.primaryLabel}{' '}
+                        {fromConcept?.label || '?'} {stripLineBreaks(relationship.primaryLabel)}{' '}
                         {toConcept?.label || '?'}
                       </span>
                     </label>

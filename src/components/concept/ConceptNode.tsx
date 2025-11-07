@@ -12,7 +12,9 @@ import { usePresence } from '@/hooks/usePresence'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { usePerspectives } from '@/hooks/usePerspectives'
 import { useAllRelationships } from '@/hooks/useRelationships'
+import { useConcepts } from '@/hooks/useConcepts'
 import { db, tx, id } from '@/lib/instant'
+import { parseTripleText, stripLineBreaks } from '@/lib/textRepresentation'
 import { EditingHighlight } from '@/components/presence/EditingHighlight'
 import { PresenceAvatar } from '@/components/presence/PresenceAvatar'
 
@@ -43,6 +45,7 @@ function getNonStyleMetadata(metadata: Record<string, unknown>): Record<string, 
  * 
  * **Features:**
  * - Inline label editing (double-click to edit)
+ * - Triple entry mode: Enter text in format "Noun verb phrase Noun" to automatically create a relationship and second concept
  * - Drag-and-drop positioning
  * - Connection handles (top/bottom for multiple edges)
  * - Markdown notes preview (expandable)
@@ -89,7 +92,7 @@ function getNonStyleMetadata(metadata: Record<string, unknown>): Record<string, 
  * ```
  */
 export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<ConceptNodeData>) => {
-  const { getEdges, setEdges, getNode, fitView } = useReactFlow()
+  const { getEdges, setEdges, getNodes, setNodes, getNode, fitView } = useReactFlow()
   const currentMapId = useMapStore((state) => state.currentMapId)
   const setSelectedConceptId = useUIStore((state) => state.setSelectedConceptId)
   const setConceptEditorOpen = useUIStore((state) => state.setConceptEditorOpen)
@@ -104,6 +107,7 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   const isInPerspective = data.isInPerspective ?? true
   const perspectives = usePerspectives()
   const allRelationships = useAllRelationships()
+  const concepts = useConcepts()
   const [isEditing, setIsEditing] = useState(false)
   const [editLabel, setEditLabel] = useState(data.label)
   const [isMetadataExpanded, setIsMetadataExpanded] = useState(false)
@@ -273,18 +277,146 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
       return
     }
     
-    if (editLabel.trim() && editLabel.trim() !== data.label) {
+    const trimmedLabel = editLabel.trim()
+    if (!trimmedLabel) {
+      setEditLabel(data.label) // Revert if empty
+      setIsEditing(false)
+      return Promise.resolve()
+    }
+
+    // Check if the entered text matches the triple pattern "Noun verb phrase Noun"
+    const parsed = parseTripleText(trimmedLabel)
+    
+    if (parsed) {
+      // Triple pattern detected: update current concept, create relationship and new concept
       try {
-        await updateConcept(data.concept.id, {
-          label: editLabel.trim(),
-        })
+        // Get current node position for positioning the new concept
+        const currentNode = getNode(nodeId)
+        if (!currentNode || !currentNode.position || !currentMapId) {
+          // Fallback to simple update if we can't get position
+          await updateConcept(data.concept.id, {
+            label: trimmedLabel,
+          })
+          setIsEditing(false)
+          return Promise.resolve()
+        }
+
+        // Estimate node width (same as in ConceptMapCanvas)
+        const estimatedNodeWidth = 130
+        
+        // Calculate position for new concept (1.5 node widths to the right)
+        const newPosition = {
+          x: currentNode.position.x + estimatedNodeWidth * 1.5,
+          y: currentNode.position.y, // Keep same Y position
+        }
+
+        // Check if the "to" concept already exists
+        const existingToConcept = concepts.find((c) => c.label === parsed.to)
+        const toConceptId = existingToConcept ? existingToConcept.id : id()
+        const relationshipId = id()
+        
+        // Build transaction array
+        const transactions: Parameters<typeof db.transact>[0] = []
+        
+        // Update current concept label to the first noun if changed
+        if (parsed.from !== data.label) {
+          transactions.push(
+            tx.concepts[data.concept.id].update({
+              label: parsed.from,
+              updatedAt: Date.now(),
+            })
+          )
+        }
+
+        // Create the "to" concept if it doesn't exist
+        if (!existingToConcept) {
+          transactions.push(
+            tx.concepts[toConceptId]
+              .update({
+                label: parsed.to,
+                positionX: newPosition.x,
+                positionY: newPosition.y,
+                notes: '',
+                metadata: JSON.stringify({}),
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              })
+              .link({ map: currentMapId })
+          )
+        }
+
+        // Create relationship between current concept and the "to" concept
+        transactions.push(
+          tx.relationships[relationshipId]
+            .update({
+              primaryLabel: stripLineBreaks(parsed.verb),
+              reverseLabel: stripLineBreaks(parsed.verb),
+              notes: '',
+              metadata: JSON.stringify({}),
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            })
+            .link({
+              map: currentMapId,
+              fromConcept: data.concept.id,
+              toConcept: toConceptId,
+            })
+        )
+
+        // Execute all operations in a single transaction
+        await db.transact(transactions)
+
+        // If we created a new concept, set shouldStartEditing flag to trigger edit mode
+        if (!existingToConcept) {
+          // Wait a bit for the node to appear in React Flow
+          setTimeout(() => {
+            const nodes = getNodes()
+            const newNode = nodes.find((node) => node.id === toConceptId)
+            if (newNode) {
+              const updatedNodes = nodes.map((node) => {
+                if (node.id === toConceptId) {
+                  return {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      shouldStartEditing: true,
+                    },
+                  }
+                }
+                return node
+              })
+              setNodes(updatedNodes)
+            }
+          }, 50) // Small delay to ensure React Flow has updated its internal state
+        }
       } catch (error) {
-        console.error('Failed to update concept label:', error)
-        setEditLabel(data.label) // Revert on error
+        console.error('Failed to process triple:', error)
+        // Fallback to simple label update on error
+        try {
+          await updateConcept(data.concept.id, {
+            label: trimmedLabel,
+          })
+        } catch (updateError) {
+          console.error('Failed to update concept label:', updateError)
+          setEditLabel(data.label) // Revert on error
+        }
       }
     } else {
-      setEditLabel(data.label) // Revert if empty or unchanged
+      // Not a triple pattern, just update the concept label
+      if (trimmedLabel !== data.label) {
+        try {
+          await updateConcept(data.concept.id, {
+            label: trimmedLabel,
+          })
+        } catch (error) {
+          console.error('Failed to update concept label:', error)
+          setEditLabel(data.label) // Revert on error
+        }
+      } else {
+        setEditLabel(data.label) // Revert if unchanged
+      }
     }
+    
     setIsEditing(false)
     return Promise.resolve() // Return promise for await in handleKeyDown
   }

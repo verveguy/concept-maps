@@ -8,6 +8,7 @@ import { useRelationships } from '@/hooks/useRelationships'
 import { useUIStore } from '@/stores/uiStore'
 import { MarkdownEditor } from '@/components/notes/MarkdownEditor'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
+import { stripLineBreaks } from '@/lib/textRepresentation'
 
 /**
  * Style attribute keys that should be treated as built-in attributes, not metadata
@@ -653,8 +654,9 @@ function RelationshipEditorContent({
   // Update form when relationship changes
   useEffect(() => {
     if (!isEditingRef.current) {
-      setPrimaryLabel(relationship.primaryLabel)
-      setReverseLabel(relationship.reverseLabel)
+      // Strip line breaks when loading labels for text panel editing
+      setPrimaryLabel(stripLineBreaks(relationship.primaryLabel))
+      setReverseLabel(stripLineBreaks(relationship.reverseLabel))
       setNotes(relationship.notes || '')
       // Only include non-style metadata in the editable metadata fields
       const nonStyleMetadata = getNonStyleMetadata(relationship.metadata || {}, EDGE_STYLE_ATTRIBUTES)
@@ -671,30 +673,36 @@ function RelationshipEditorContent({
   }, [relationship])
 
   const handleSavePrimaryLabel = async () => {
-    if (!hasWriteAccess || !primaryLabel.trim() || primaryLabel.trim() === relationship.primaryLabel) return
+    if (!hasWriteAccess || !primaryLabel.trim()) return
+    // Strip line breaks before saving - line breaks are only for diagram display
+    const cleanedLabel = stripLineBreaks(primaryLabel)
+    if (cleanedLabel === stripLineBreaks(relationship.primaryLabel)) return
     setIsSaving(true)
     isEditingRef.current = false
     try {
-      await onUpdate(relationship.id, { primaryLabel: primaryLabel.trim() })
+      await onUpdate(relationship.id, { primaryLabel: cleanedLabel })
     } catch (error) {
       console.error('Failed to update relationship label:', error)
       alert('Failed to update relationship label. Please try again.')
-      setPrimaryLabel(relationship.primaryLabel)
+      setPrimaryLabel(stripLineBreaks(relationship.primaryLabel))
     } finally {
       setIsSaving(false)
     }
   }
 
   const handleSaveReverseLabel = async () => {
-    if (!hasWriteAccess || !reverseLabel.trim() || reverseLabel.trim() === relationship.reverseLabel) return
+    if (!hasWriteAccess || !reverseLabel.trim()) return
+    // Strip line breaks before saving - line breaks are only for diagram display
+    const cleanedLabel = stripLineBreaks(reverseLabel)
+    if (cleanedLabel === stripLineBreaks(relationship.reverseLabel)) return
     setIsSaving(true)
     isEditingRef.current = false
     try {
-      await onUpdate(relationship.id, { reverseLabel: reverseLabel.trim() })
+      await onUpdate(relationship.id, { reverseLabel: cleanedLabel })
     } catch (error) {
       console.error('Failed to update reverse label:', error)
       alert('Failed to update reverse label. Please try again.')
-      setReverseLabel(relationship.reverseLabel)
+      setReverseLabel(stripLineBreaks(relationship.reverseLabel))
     } finally {
       setIsSaving(false)
     }

@@ -23,6 +23,30 @@ Concepts are the fundamental building blocks of concept maps. They represent ide
 - **Double-click** on a concept node to edit its label inline
 - Or select the concept and use the concept editor panel
 
+### Triple Entry Mode (Fast Keyboard Creation)
+
+When editing a concept label, you can use **triple entry mode** to quickly create relationships and new concepts:
+
+1. **Double-click** on a concept node to edit its label
+2. Type a triple in the format: `"Noun verb phrase Noun"` (e.g., `"Diagrams explain Architecture"`)
+3. Press **Enter** or click outside the input
+
+The system will automatically:
+- Update the current concept label to the first noun ("Diagrams")
+- Create a new relationship with the verb phrase ("explain")
+- Create a new concept with the second noun ("Architecture")
+- **Automatically enter edit mode** on the new concept so you can continue typing more triples
+
+**Example workflow:**
+1. Double-click a concept and type: `"Diagrams explain Architecture"`
+2. Press Enter → Creates relationship and new concept
+3. The new "Architecture" concept is automatically in edit mode
+4. Type: `"Architecture describes Structure"`
+5. Press Enter → Creates another relationship and concept
+6. Continue chaining triples for rapid diagram creation!
+
+This makes it much faster to create complex diagrams using just the keyboard, without needing to use the mouse to drag connections.
+
 ## Concept Properties
 
 Each concept can have:

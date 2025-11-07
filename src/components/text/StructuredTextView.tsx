@@ -15,6 +15,7 @@ import {
   conceptsToTriples,
   findOrphanConcepts,
   parseTripleText,
+  stripLineBreaks,
 } from '@/lib/textRepresentation'
 import { EditableTriple } from './EditableTriple'
 import { db, tx, id } from '@/lib/instant'
@@ -159,8 +160,8 @@ export function StructuredTextView() {
         mapId: currentMapId,
         fromConceptId: fromConcept.id,
         toConceptId: toConcept.id,
-        primaryLabel: parsed.verb,
-        reverseLabel: parsed.verb,
+        primaryLabel: stripLineBreaks(parsed.verb),
+        reverseLabel: stripLineBreaks(parsed.verb),
         notes: '',
         metadata: {},
       })

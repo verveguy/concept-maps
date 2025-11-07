@@ -14,6 +14,38 @@ import {
 import type { Node, Edge } from 'reactflow'
 
 /**
+ * Estimate the width of an edge label for layout calculations.
+ * 
+ * @param label - Edge label text
+ * @param fontSize - Font size in pixels (default: 12px for text-xs)
+ * @param padding - Horizontal padding in pixels (default: 16px for px-2 on both sides)
+ * @returns Estimated width in pixels
+ */
+function estimateEdgeLabelWidth(label: string, fontSize: number = 12, padding: number = 16): number {
+  if (!label) return 0
+  
+  // Try to use canvas for accurate measurement
+  if (typeof document !== 'undefined') {
+    try {
+      const canvas = document.createElement('canvas')
+      const context = canvas.getContext('2d')
+      if (context) {
+        // Match the actual font used: text-xs font-medium
+        context.font = `500 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`
+        const measuredWidth = context.measureText(label).width
+        return measuredWidth + padding
+      }
+    } catch {
+      // Fall through to estimation if canvas fails
+    }
+  }
+  
+  // Fallback estimation: for font-medium, average character width is closer to 0.75 * fontSize
+  const avgCharWidth = fontSize * 0.75
+  return (label.length * avgCharWidth) + padding
+}
+
+/**
  * Configuration options for force-directed layout.
  */
 export interface ForceDirectedLayoutOptions {
@@ -108,21 +140,32 @@ export function applyForceDirectedLayout(
   const nodeMap = new Map(simulationNodes.map((n, i) => [n.id, i]))
 
   // Create links for d3-force (using indices)
+  // Calculate per-edge distances based on label width
   const simulationLinks = edges
     .map((edge) => {
       const sourceIndex = nodeMap.get(edge.source)
       const targetIndex = nodeMap.get(edge.target)
       if (sourceIndex === undefined || targetIndex === undefined) return null
+      
+      // Get edge label from edge data
+      const edgeLabel = (edge.data as any)?.relationship?.primaryLabel || ''
+      const labelWidth = estimateEdgeLabelWidth(edgeLabel)
+      
+      // Calculate distance: base distance + extra space for label
+      // Add 50% of label width to ensure labels don't overlap nodes
+      const edgeDistance = distance + (labelWidth * 0.5)
+      
       return {
         source: sourceIndex,
         target: targetIndex,
+        distance: edgeDistance,
       }
     })
-    .filter((link): link is { source: number; target: number } => link !== null)
+    .filter((link): link is { source: number; target: number; distance: number } => link !== null)
 
   // Create force simulation
   const simulation = forceSimulation(simulationNodes as any)
-    .force('link', forceLink(simulationLinks).distance(distance).strength(0.5))
+    .force('link', forceLink(simulationLinks).distance((d: any) => d.distance || distance).strength(0.5))
     .force('charge', forceManyBody().strength(strength))
     .force('center', forceCenter(width / 2, height / 2))
     .force('collision', forceCollide().radius(80))

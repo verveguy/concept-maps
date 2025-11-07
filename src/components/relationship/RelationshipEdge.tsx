@@ -1,4 +1,79 @@
 /**
+ * Calculate the horizontal bounding box width of an SVG path.
+ * This gives us the horizontal space available for text wrapping.
+ * 
+ * @param pathD - SVG path data string (e.g., "M 10,10 L 20,20")
+ * @returns Horizontal width (maxX - minX) in pixels, or 0 if calculation fails
+ */
+function getPathHorizontalWidth(pathD: string): number {
+  if (typeof document === 'undefined' || !pathD) return 0
+  
+  try {
+    const svgNS = 'http://www.w3.org/2000/svg'
+    
+    // Create a temporary SVG element and add it to the DOM temporarily
+    // getBBox() requires the element to be in the DOM for accurate measurements
+    const svg = document.createElementNS(svgNS, 'svg')
+    svg.style.position = 'absolute'
+    svg.style.visibility = 'hidden'
+    svg.style.width = '0'
+    svg.style.height = '0'
+    document.body.appendChild(svg)
+    
+    const pathEl = document.createElementNS(svgNS, 'path')
+    pathEl.setAttribute('d', pathD)
+    svg.appendChild(pathEl)
+    
+    // Use getBBox() to get the bounding box
+    const bbox = pathEl.getBBox()
+    const horizontalWidth = bbox.width
+    
+    // Clean up
+    document.body.removeChild(svg)
+    
+    return isFinite(horizontalWidth) && horizontalWidth > 0 ? horizontalWidth : 0
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Measure text width accurately using canvas or fallback estimation.
+ * Accounts for font size, font weight (medium), and padding.
+ * 
+ * @param text - Text to measure
+ * @param fontSize - Font size in pixels (default: 12px for text-xs)
+ * @param padding - Horizontal padding in pixels (default: 16px for px-2 on both sides)
+ * @returns Estimated width in pixels including padding
+ */
+function estimateTextWidth(text: string, fontSize: number = 12, padding: number = 16): number {
+  if (!text) return 0
+  
+  // Try to use canvas for accurate measurement
+  if (typeof document !== 'undefined') {
+    try {
+      const canvas = document.createElement('canvas')
+      const context = canvas.getContext('2d')
+      if (context) {
+        // Match the actual font used: text-xs font-medium
+        // text-xs = 0.75rem = 12px (assuming 16px base)
+        // font-medium = font-weight: 500
+        context.font = `500 ${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`
+        const measuredWidth = context.measureText(text).width
+        return measuredWidth + padding
+      }
+    } catch {
+      // Fall through to estimation if canvas fails
+    }
+  }
+  
+  // Fallback estimation: for font-medium, average character width is closer to 0.75 * fontSize
+  // This is more accurate than 0.6 for medium-weight fonts
+  const avgCharWidth = fontSize * 0.75
+  return (text.length * avgCharWidth) + padding
+}
+
+/**
  * Custom React Flow edge component for Relationship edges.
  * 
  * Renders a relationship as an edge connecting two concept nodes with inline editing
@@ -1281,7 +1356,7 @@ export const RelationshipEdge = memo(
     
     const [isEditing, setIsEditing] = useState(false)
     const [editLabel, setEditLabel] = useState(label)
-    const inputRef = useRef<HTMLInputElement>(null)
+    const inputRef = useRef<HTMLTextAreaElement>(null)
     const hasTriggeredEditRef = useRef(false)
 
     // Update edit label when relationship changes
@@ -1305,7 +1380,7 @@ export const RelationshipEdge = memo(
       }
     }, [data?.shouldStartEditing, isEditing, label])
 
-    // Focus input when editing starts
+    // Focus textarea when editing starts
     useEffect(() => {
       if (isEditing && inputRef.current) {
         inputRef.current.focus()
@@ -1315,7 +1390,7 @@ export const RelationshipEdge = memo(
 
     // Calculate edge path - keep original path ending at center
     // Arrowhead will be rendered separately at boundary intersection
-    const { path: edgePath, labelX, labelY, labelOffsetX, labelOffsetY, arrowhead, trimLength } = useMemo(() => {
+    const { path: edgePath, labelX, labelY, labelOffsetX, labelOffsetY, arrowhead, trimLength, horizontalWidth } = useMemo(() => {
       // Get target node to calculate boundary intersection
       const targetNode = target ? getNode(target) : null
       
@@ -1495,6 +1570,9 @@ export const RelationshipEdge = memo(
         }
       }
       
+      // Calculate horizontal width for word wrapping (we don't need pathLength anymore)
+      const horizontalWidth = getPathHorizontalWidth(basePath)
+      
       return {
         path: basePath, // Keep original path ending at center
         labelX: baseLabelX,
@@ -1503,8 +1581,47 @@ export const RelationshipEdge = memo(
         labelOffsetY,
         arrowhead: arrowheadPos,
         trimLength,
+        horizontalWidth,
       }
     }, [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, sourceHandleId, targetHandleId, data?.hasMultipleEdges, data?.edgeIndex, edgeStyle.type, source, target, getNode])
+
+    // Determine if word wrapping should be enabled based on text width vs horizontal edge width
+    // Only wrap on clearly horizontal edges - vertical and diagonal edges have plenty of space
+    // For horizontal edges, wrap when text exceeds 30% of the horizontal bounding box width
+    const shouldWordWrap = useMemo(() => {
+      if (!label) return false
+      
+      // If horizontalWidth is not available, fall back to using the distance between nodes
+      const effectiveHorizontalWidth = horizontalWidth || Math.abs(targetX - sourceX)
+      const effectiveVerticalHeight = Math.abs(targetY - sourceY)
+      
+      // Only wrap on clearly horizontal edges (horizontal width significantly greater than vertical height)
+      // Use a ratio of 2:1 to ensure we only wrap when the edge is clearly horizontal
+      // This prevents wrapping on vertical and diagonal edges that have plenty of space
+      const isHorizontalEdge = effectiveHorizontalWidth > effectiveVerticalHeight * 2
+      
+      // Don't wrap vertical or diagonal edges - they have plenty of space
+      if (!isHorizontalEdge) return false
+      
+      // For horizontal edges, check if text width exceeds 30% of horizontal width
+      if (!effectiveHorizontalWidth) return false
+      
+      // Find the longest line (accounting for manual line breaks)
+      const lines = label.split('\n')
+      const longestLine = lines.reduce((longest, line) => 
+        line.length > longest.length ? line : longest, '')
+      
+      if (!longestLine) return false
+      
+      // Estimate text width (text-xs is 12px, px-2 adds 8px padding on each side = 16px total)
+      const fontSize = 12
+      const padding = 16 // px-2 = 0.5rem = 8px on each side
+      const estimatedTextWidth = estimateTextWidth(longestLine, fontSize, padding)
+      
+      // Enable word wrap if text width exceeds 30% of the horizontal width of the edge
+      const maxWidth = effectiveHorizontalWidth * 0.3
+      return estimatedTextWidth > maxWidth
+    }, [label, horizontalWidth, sourceX, targetX, sourceY, targetY])
 
     const handleDoubleClick = (e: React.MouseEvent) => {
       e.stopPropagation()
@@ -1515,10 +1632,17 @@ export const RelationshipEdge = memo(
     const handleSave = async () => {
       if (!relationship) return
       
-      if (editLabel.trim() && editLabel.trim() !== label) {
+      // Trim each line and remove empty lines, but preserve line breaks
+      const cleanedLabel = editLabel
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .join('\n')
+      
+      if (cleanedLabel && cleanedLabel !== label) {
         try {
           await updateRelationship(relationship.id, {
-            primaryLabel: editLabel.trim(),
+            primaryLabel: cleanedLabel,
           })
         } catch (error) {
           console.error('Failed to update relationship label:', error)
@@ -1535,8 +1659,9 @@ export const RelationshipEdge = memo(
       setIsEditing(false)
     }
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && isEditing) {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && !e.shiftKey && isEditing) {
+        // Enter (without Shift) saves and exits edit mode
         e.preventDefault()
         handleSave()
         // After saving, navigate to target node edit mode
@@ -1551,6 +1676,7 @@ export const RelationshipEdge = memo(
         // Navigate to target node edit mode
         navigateToTargetNode()
       }
+      // Shift+Enter allows line breaks (default textarea behavior)
     }
 
     // Navigate to target node and trigger edit mode
@@ -1626,25 +1752,29 @@ export const RelationshipEdge = memo(
             onDoubleClick={handleDoubleClick}
           >
             {isEditing ? (
-              <input
+              <textarea
                 ref={inputRef}
-                type="text"
                 value={editLabel}
                 onChange={(e) => setEditLabel(e.target.value)}
                 onBlur={handleSave}
                 onKeyDown={handleKeyDown}
-                className="px-2 py-1 text-xs font-medium rounded shadow-lg outline-none min-w-[80px] text-foreground backdrop-blur-sm bg-[hsl(var(--edge-label-bg))] border-0 text-center"
+                className="px-2 py-1 text-xs font-medium rounded shadow-lg outline-none min-w-[80px] text-foreground backdrop-blur-sm bg-[hsl(var(--edge-label-bg))] border-0 text-center resize-none whitespace-pre-wrap"
                 onClick={(e) => e.stopPropagation()}
+                rows={Math.max(1, editLabel.split('\n').length)}
+                style={{ minHeight: '1.5rem', maxHeight: '6rem', overflowY: 'auto' }}
               />
             ) : (
               <div
-                className={`px-2 py-1 text-xs font-medium rounded cursor-pointer hover:bg-accent text-foreground border-0 text-center ${
+                className={`px-2 py-1 text-xs font-medium rounded cursor-pointer hover:bg-accent text-foreground border-0 text-center whitespace-pre-line ${
+                  shouldWordWrap ? '' : ''
+                } ${
                   isEditingPerspective && !isInPerspective ? 'opacity-50' : 'opacity-100'
                 } ${
                   selected 
                     ? 'bg-[hsl(var(--edge-label-bg-selected))]' 
                     : 'bg-[hsl(var(--edge-label-bg))]'
                 }`}
+                style={shouldWordWrap ? { maxWidth: `${(horizontalWidth || Math.abs(targetX - sourceX)) * 0.3}px`, wordWrap: 'break-word', overflowWrap: 'break-word' } : undefined}
               >
                 {label}
               </div>

@@ -13,6 +13,29 @@ export interface TextTriple {
 }
 
 /**
+ * Strip line breaks from a relationship label for use in text contexts.
+ * 
+ * Replaces newlines with spaces and trims the result. This is used when
+ * displaying relationship labels in text panels or other contexts where
+ * line breaks should not be shown.
+ * 
+ * @param label - Relationship label that may contain line breaks
+ * @returns Label with line breaks replaced by spaces and trimmed
+ * 
+ * @example
+ * ```tsx
+ * import { stripLineBreaks } from '@/lib/textRepresentation'
+ * 
+ * const label = "is used\nfor"
+ * const text = stripLineBreaks(label)
+ * // Returns: "is used for"
+ * ```
+ */
+export function stripLineBreaks(label: string): string {
+  return label.replace(/\n/g, ' ').trim()
+}
+
+/**
  * Convert InstantDB concepts and relationships to structured text triples.
  * 
  * Transforms the graph structure into a text-based representation where each
@@ -84,7 +107,7 @@ export function conceptsToTriples(
         fromConceptId: relationship.fromConceptId,
         fromConceptLabel: fromConcept.label,
         relationshipId: relationship.id,
-        relationshipLabel: relationship.primaryLabel,
+        relationshipLabel: stripLineBreaks(relationship.primaryLabel),
         toConceptId: relationship.toConceptId,
         toConceptLabel: toConcept.label,
       }
