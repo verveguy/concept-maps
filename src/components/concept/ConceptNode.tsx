@@ -60,7 +60,9 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
   const [editLabel, setEditLabel] = useState(data.label)
   const [isMetadataExpanded, setIsMetadataExpanded] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const measureRef = useRef<HTMLSpanElement>(null)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hasTriggeredEditRef = useRef(false)
   
   // Get users editing this node
   const editingUsers = otherUsersPresence
@@ -105,18 +107,44 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
     }
   }, [metadataKey, selected, isDarkMode])
 
-  // Update edit label when data changes
+  // Update edit label when data changes (but not while editing)
   useEffect(() => {
-    setEditLabel(data.label)
-  }, [data.label])
-
-  // Focus input when editing starts
-  useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus()
-      inputRef.current.select()
+    if (!isEditing) {
+      setEditLabel(data.label)
     }
-  }, [isEditing])
+  }, [data.label, isEditing])
+
+  // Reset the trigger ref when shouldStartEditing becomes false
+  useEffect(() => {
+    if (!data.shouldStartEditing) {
+      hasTriggeredEditRef.current = false
+    }
+  }, [data.shouldStartEditing])
+
+  // Trigger edit mode if shouldStartEditing flag is set (only once per flag cycle)
+  useEffect(() => {
+    if (data.shouldStartEditing && !isEditing && hasWriteAccess && !hasTriggeredEditRef.current) {
+      hasTriggeredEditRef.current = true
+      setIsEditing(true)
+      setEditLabel(data.label)
+    }
+  }, [data.shouldStartEditing, isEditing, hasWriteAccess, data.label])
+
+  // Focus input and set initial width when editing starts
+  useEffect(() => {
+    if (isEditing && inputRef.current && measureRef.current) {
+      // Set the measure span text to current label
+      measureRef.current.textContent = editLabel || data.label
+      // Use requestAnimationFrame to ensure DOM has updated before measuring
+      requestAnimationFrame(() => {
+        if (measureRef.current && inputRef.current) {
+          inputRef.current.style.width = `${Math.max(measureRef.current.offsetWidth, 20)}px`
+          inputRef.current.focus()
+          inputRef.current.select()
+        }
+      })
+    }
+  }, [isEditing]) // Only run when isEditing changes, not on every editLabel change
 
   // Cleanup timer on unmount
   useEffect(() => {
@@ -302,23 +330,56 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
         }}
       />
       
-      {isEditing ? (
-        <input
-          ref={inputRef}
-          type="text"
-          value={editLabel}
-          onChange={(e) => setEditLabel(e.target.value)}
-          onBlur={handleSave}
-          onKeyDown={handleKeyDown}
-          className="w-full font-semibold text-sm bg-transparent border border-primary rounded px-1 py-0.5 outline-none"
-          style={{ color: nodeStyle.textColor }}
-          onClick={(e) => e.stopPropagation()}
-        />
-      ) : (
-        <div className="font-semibold text-sm" style={{ color: nodeStyle.textColor }}>
-          {data.label}
-        </div>
-      )}
+      <div className="text-center">
+        {isEditing ? (
+          <>
+            {/* Hidden span to measure text width - positioned off-screen but in normal flow */}
+            <span
+              ref={measureRef}
+              className="font-semibold text-sm absolute whitespace-pre pointer-events-none"
+              style={{ 
+                color: nodeStyle.textColor,
+                visibility: 'hidden',
+                position: 'absolute',
+                top: '-9999px',
+                left: '-9999px'
+              }}
+            >
+              {editLabel || data.label}
+            </span>
+            <input
+              ref={inputRef}
+              type="text"
+              value={editLabel}
+              onChange={(e) => {
+                setEditLabel(e.target.value)
+                // Update input width based on measured text width
+                if (measureRef.current && inputRef.current) {
+                  measureRef.current.textContent = e.target.value || data.label
+                  // Use requestAnimationFrame to ensure DOM has updated
+                  requestAnimationFrame(() => {
+                    if (measureRef.current && inputRef.current) {
+                      inputRef.current.style.width = `${Math.max(measureRef.current.offsetWidth, 20)}px`
+                    }
+                  })
+                }
+              }}
+              onBlur={handleSave}
+              onKeyDown={handleKeyDown}
+              className="inline-block font-semibold text-sm bg-transparent border-0 outline-none text-center"
+              style={{ 
+                color: nodeStyle.textColor,
+                minWidth: '1px'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </>
+        ) : (
+          <div className="font-semibold text-sm inline-block" style={{ color: nodeStyle.textColor }}>
+            {data.label}
+          </div>
+        )}
+      </div>
       
       {data.concept.notes && (
         <div 

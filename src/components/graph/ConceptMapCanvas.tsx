@@ -15,7 +15,6 @@ import ReactFlow, {
   type OnConnectStart,
   type NodeChange,
   type EdgeChange,
-  ConnectionLineType,
   useNodesState,
   useEdgesState,
   ReactFlowProvider,
@@ -40,6 +39,7 @@ import { usePresenceEditing } from '@/hooks/usePresenceEditing'
 import { usePresenceCursorSetter } from '@/hooks/usePresenceCursorSetter'
 import { PeerCursors } from '@/components/presence/PeerCursors'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
+import { CustomConnectionLine } from './CustomConnectionLine'
 
 /**
  * Props for ConceptMapCanvas component.
@@ -72,6 +72,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   // This prevents React Flow from detecting them as new objects on each render
   const nodeTypesRef = useRef(nodeTypes)
   const edgeTypesRef = useRef(edgeTypes)
+  
+  // Track newly created concept IDs that should start in edit mode
+  const newlyCreatedConceptIdsRef = useRef<Set<string>>(new Set())
   
   const currentMapId = useMapStore((state) => state.currentMapId)
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
@@ -213,6 +216,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     [relationships, perspectiveRelationshipIds, isEditingPerspective]
   )
 
+
   // Add text view node if visible
   const allNodes = useMemo(() => {
     const nodes = [...newNodes]
@@ -240,6 +244,73 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   // React Flow state management - initialize with data
   const [nodes, setNodes, onNodesChangeBase] = useNodesState(allNodes)
   const [edges, setEdges, onEdgesChangeBase] = useEdgesState(newEdges)
+
+  // Update newly created nodes to start in edit mode
+  // Watch for when the concept appears in the concepts array and update the corresponding node
+  useEffect(() => {
+    const idsToUpdate = Array.from(newlyCreatedConceptIdsRef.current)
+    if (idsToUpdate.length === 0) return
+    
+    // Use the same concepts array that's used to create nodes
+    const conceptsForNodes = isEditingPerspective ? allConcepts : filteredConcepts
+    
+    // Check if any of the tracked concepts have appeared (don't check label, just ID)
+    const conceptsToTrigger = conceptsForNodes.filter((c) => 
+      idsToUpdate.includes(c.id)
+    )
+    
+    if (conceptsToTrigger.length > 0) {
+      // Wait for next frame to ensure nodes are rendered
+      requestAnimationFrame(() => {
+        const updatedNodes = nodes.map((node) => {
+          const conceptId = conceptsToTrigger.find((c) => c.id === node.id)?.id
+          if (conceptId && !node.data.shouldStartEditing) {
+            // Remove from tracking set immediately to prevent re-triggering
+            newlyCreatedConceptIdsRef.current.delete(conceptId)
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                shouldStartEditing: true,
+              },
+            }
+          }
+          return node
+        })
+        
+        // Only update if we actually changed something
+        const hasChanges = updatedNodes.some((node, index) => node !== nodes[index])
+        if (hasChanges) {
+          setNodes(updatedNodes)
+        }
+      })
+    }
+  }, [filteredConcepts, allConcepts, isEditingPerspective, nodes, setNodes])
+
+  // Clear shouldStartEditing flag after it's been used (to prevent re-triggering)
+  useEffect(() => {
+    const nodesWithFlag = nodes.filter((node) => node.data.shouldStartEditing)
+    if (nodesWithFlag.length > 0) {
+      // Clear the flag after a short delay to allow edit mode to trigger
+      const timeoutId = setTimeout(() => {
+        const updatedNodes = nodes.map((node) => {
+          if (node.data.shouldStartEditing) {
+            return {
+              ...node,
+              data: {
+                ...node.data,
+                shouldStartEditing: false,
+              },
+            }
+          }
+          return node
+        })
+        setNodes(updatedNodes)
+      }, 100) // Small delay to ensure edit mode has triggered
+      
+      return () => clearTimeout(timeoutId)
+    }
+  }, [nodes, setNodes])
 
   // Wrap onNodesChange to intercept deletions and delete from database
   const onNodesChange = useCallback(
@@ -615,10 +686,22 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
           return
         }
 
-        const position = screenToFlowPosition({
+        const mousePosition = screenToFlowPosition({
           x: pointer.clientX,
           y: pointer.clientY,
         })
+
+        // Estimate node dimensions to center it on the mouse position
+        // Node has min-w-[120px], px-4 (16px padding), py-3 (12px padding)
+        // For "New Concept" text, estimate ~130px width and ~50px height
+        const estimatedNodeWidth = 130
+        const estimatedNodeHeight = 50
+        
+        // Adjust position so node center is at mouse position
+        const position = {
+          x: mousePosition.x - estimatedNodeWidth / 2,
+          y: mousePosition.y - estimatedNodeHeight / 2,
+        }
 
         try {
           // Generate IDs for both concept and relationship
@@ -655,6 +738,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
                 toConcept: newConceptId,
               }),
           ])
+          
+          // Mark this concept to start in edit mode
+          newlyCreatedConceptIdsRef.current.add(newConceptId)
         } catch (error) {
           console.error('Failed to create concept and relationship from connection:', error)
         }
@@ -866,8 +952,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         nodesConnectable={hasWriteAccess}
         fitView
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-        connectionLineStyle={{ stroke: '#6366f1', strokeWidth: 2 }}
-        connectionLineType={ConnectionLineType.SmoothStep}
+        connectionLineComponent={CustomConnectionLine}
       >
         <Background />
         <Controls className="!bg-white !border !border-gray-300 !rounded-md !shadow-md">

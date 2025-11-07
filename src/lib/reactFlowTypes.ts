@@ -19,6 +19,8 @@ export interface ConceptNodeData {
   isInPerspective?: boolean
   /** Whether we're currently editing a perspective */
   isEditingPerspective?: boolean
+  /** Flag to trigger edit mode when node is first created */
+  shouldStartEditing?: boolean
 }
 
 /**
