@@ -44,7 +44,7 @@ function getNonStyleMetadata(metadata: Record<string, unknown>): Record<string, 
  * @returns The concept node JSX
  */
 export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<ConceptNodeData>) => {
-  const { getEdges, setEdges, getNode } = useReactFlow()
+  const { getEdges, setEdges, getNode, fitView } = useReactFlow()
   const currentMapId = useMapStore((state) => state.currentMapId)
   const setSelectedConceptId = useUIStore((state) => state.setSelectedConceptId)
   const setConceptEditorOpen = useUIStore((state) => state.setConceptEditorOpen)
@@ -313,7 +313,7 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
             }),
         ])
         
-        // Wait a bit for the edge to appear, then set shouldStartEditing flag
+        // Wait a bit for the node and edge to appear, then set shouldStartEditing flag and fit view
         setTimeout(() => {
           const edges = getEdges()
           const newEdge = edges.find((edge) => edge.id === newRelationshipId)
@@ -332,7 +332,22 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
             })
             setEdges(updatedEdges)
           }
-        }, 100)
+          
+          // Fit view to include the new node
+          const newNode = getNode(newConceptId)
+          if (newNode) {
+            // Use fitView to ensure the new node is visible
+            // Small delay to ensure React Flow has updated its internal state
+            setTimeout(() => {
+              fitView({ 
+                padding: 0.2, 
+                includeHiddenNodes: false,
+                nodes: [newNode],
+                duration: 100, // Smooth animation
+              })
+            }, 50)
+          }
+        }, 10)
       } catch (error) {
         console.error('Failed to create concept and relationship from Tab:', error)
       }

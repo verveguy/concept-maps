@@ -67,7 +67,7 @@ export interface ConceptMapCanvasRef {
  * @returns The concept map canvas JSX
  */
 const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasProps>(
-  ({ onCreateConcept }, ref) => {
+  (_props, ref) => {
   // Use refs to ensure nodeTypes and edgeTypes have stable references
   // This prevents React Flow from detecting them as new objects on each render
   const nodeTypesRef = useRef(nodeTypes)
@@ -79,6 +79,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   
   // Track active layout for sticky behavior - auto-apply when nodes are added
   const [activeLayout, setActiveLayout] = useState<LayoutType | null>(null)
+  
+  // Track if we've checked for initial concept creation (to avoid creating multiple)
+  const hasCheckedInitialConceptRef = useRef<Set<string>>(new Set())
   
   const currentMapId = useMapStore((state) => state.currentMapId)
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
@@ -539,6 +542,87 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
 
   // Get React Flow instance for accessing latest nodes/edges
   const { getNodes, getEdges } = useReactFlow()
+  
+  // Create initial concept if map is empty (new map)
+  useEffect(() => {
+    if (!currentMapId || !hasWriteAccess) return
+    
+    // Check if we've already handled this map
+    if (hasCheckedInitialConceptRef.current.has(currentMapId)) return
+    
+    // Check if map has no concepts
+    if (concepts.length === 0) {
+      hasCheckedInitialConceptRef.current.add(currentMapId)
+      
+      // Create initial concept at center of viewport (0, 0 in flow coordinates)
+      const initialPosition = {
+        x: 0,
+        y: 0,
+      }
+      
+      // Estimate node dimensions to center it
+      const estimatedNodeWidth = 130
+      const estimatedNodeHeight = 50
+      
+      // Adjust position so node center is at origin
+      const position = {
+        x: initialPosition.x - estimatedNodeWidth / 2,
+        y: initialPosition.y - estimatedNodeHeight / 2,
+      }
+      
+      const createInitialConcept = async () => {
+        try {
+          // Generate ID for the new concept
+          const newConceptId = id()
+
+          // Create the new concept
+          await db.transact([
+            tx.concepts[newConceptId]
+              .update({
+                label: 'New Concept',
+                positionX: position.x,
+                positionY: position.y,
+                notes: '',
+                metadata: JSON.stringify({}),
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              })
+              .link({ map: currentMapId }),
+          ])
+          
+          // Track the concept to start in edit mode
+          // Wait a bit for the node to appear, then set shouldStartEditing flag
+          setTimeout(() => {
+            const allNodes = getNodes()
+            const newNode = allNodes.find((node) => node.id === newConceptId)
+            if (newNode) {
+              const updatedNodes = allNodes.map((node) => {
+                if (node.id === newConceptId) {
+                  return {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      shouldStartEditing: true,
+                    },
+                  }
+                }
+                return node
+              })
+              setNodes(updatedNodes)
+            }
+          }, 200)
+        } catch (error) {
+          console.error('Failed to create initial concept:', error)
+        }
+      }
+      
+      // Small delay to ensure React Flow is ready
+      setTimeout(createInitialConcept, 300)
+    } else {
+      // Map has concepts, mark as checked
+      hasCheckedInitialConceptRef.current.add(currentMapId)
+    }
+  }, [currentMapId, concepts.length, hasWriteAccess, getNodes, setNodes])
   
   // Layout handler function for buttons
   const handleApplyLayout = useCallback(
@@ -1095,33 +1179,111 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     setRelationshipEditorOpen,
   ])
 
-  // Handle double-click on pane - create concept
-  // Note: React Flow doesn't support onPaneDoubleClick directly, so we'll handle it via a wrapper div
-  const handleDoubleClick = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (!onCreateConcept || !hasWriteAccess) return
-
-      // Check if clicking on the background (not on a node or edge)
-      const target = event.target as HTMLElement
-      if (
-        target.closest('.react-flow__node') ||
-        target.closest('.react-flow__edge')
-      ) {
+  // Use a ref to attach double-click handler to the React Flow pane
+  const reactFlowWrapperRef = useRef<HTMLDivElement>(null)
+  const handlerRef = useRef<((event: Event) => Promise<void>) | null>(null)
+  
+  useEffect(() => {
+    // Wait a bit for React Flow to render the pane
+    const timeoutId = setTimeout(() => {
+      const reactFlowPane = reactFlowWrapperRef.current?.querySelector('.react-flow__pane')
+      if (!reactFlowPane) {
+        console.warn('React Flow pane not found for double-click handler')
         return
       }
+    
+      const handlePaneDoubleClick = async (event: Event) => {
+        const mouseEvent = event as MouseEvent
+        if (!currentMapId || !hasWriteAccess) return
 
-      // Get the position in flow coordinates
-      const position = screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      })
-      onCreateConcept(position)
-    },
-    [onCreateConcept, screenToFlowPosition, hasWriteAccess]
-  )
+        // Check if clicking on the background (not on a node or edge)
+        const target = mouseEvent.target as HTMLElement
+        if (
+          target.closest('.react-flow__node') ||
+          target.closest('.react-flow__edge') ||
+          target.closest('.react-flow__controls') ||
+          target.closest('.react-flow__minimap')
+        ) {
+          return
+        }
+
+        // Get the position in flow coordinates
+        const mousePosition = screenToFlowPosition({
+          x: mouseEvent.clientX,
+          y: mouseEvent.clientY,
+        })
+
+        // Estimate node dimensions to center it on the mouse position
+        const estimatedNodeWidth = 130
+        const estimatedNodeHeight = 50
+        
+        // Adjust position so node center is at mouse position
+        const position = {
+          x: mousePosition.x - estimatedNodeWidth / 2,
+          y: mousePosition.y - estimatedNodeHeight / 2,
+        }
+
+        try {
+          // Generate ID for the new concept
+          const newConceptId = id()
+
+          // Create the new concept
+          await db.transact([
+            tx.concepts[newConceptId]
+              .update({
+                label: 'New Concept',
+                positionX: position.x,
+                positionY: position.y,
+                notes: '',
+                metadata: JSON.stringify({}),
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+              })
+              .link({ map: currentMapId }),
+          ])
+          
+          // Track the concept to start in edit mode
+          // Wait a bit for the node to appear, then set shouldStartEditing flag
+          setTimeout(() => {
+            const allNodes = getNodes()
+            const newNode = allNodes.find((node) => node.id === newConceptId)
+            if (newNode) {
+              const updatedNodes = allNodes.map((node) => {
+                if (node.id === newConceptId) {
+                  return {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      shouldStartEditing: true,
+                    },
+                  }
+                }
+                return node
+              })
+              setNodes(updatedNodes)
+            }
+          }, 100)
+        } catch (error) {
+          console.error('Failed to create concept from double-click:', error)
+        }
+      }
+      
+      handlerRef.current = handlePaneDoubleClick
+      reactFlowPane.addEventListener('dblclick', handlePaneDoubleClick)
+    }, 100)
+    
+    return () => {
+      clearTimeout(timeoutId)
+      const reactFlowPane = reactFlowWrapperRef.current?.querySelector('.react-flow__pane')
+      if (reactFlowPane && handlerRef.current) {
+        reactFlowPane.removeEventListener('dblclick', handlerRef.current)
+        handlerRef.current = null
+      }
+    }
+  }, [currentMapId, screenToFlowPosition, hasWriteAccess, getNodes, setNodes])
 
   return (
-    <div className="w-full h-full relative" onDoubleClick={handleDoubleClick}>
+    <div className="w-full h-full relative" ref={reactFlowWrapperRef}>
       {/* Render presence cursors for other users - isolated component with its own hook */}
       <PeerCursors />
       
