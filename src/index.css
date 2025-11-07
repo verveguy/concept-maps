@@ -22,6 +22,8 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+    --edge-label-bg: 0 0% 100%;
+    --edge-label-bg-selected: 222.2 47.4% 95%;
   }
 
   .dark {
@@ -44,6 +46,8 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+    --edge-label-bg: 222.2 84% 4.9%;
+    --edge-label-bg-selected: 210 40% 15%;
   }
 }
 
@@ -54,5 +58,26 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
+  }
+  
+  /* Remove borders from React Flow edge labels - target all possible wrappers */
+  .react-flow__edge-label,
+  .react-flow__edge-label > *,
+  .react-flow__edge-label > * > *,
+  .react-flow__edge-label input,
+  .react-flow__edge-label div,
+  [class*="react-flow__edge-label"],
+  .react-flow__edge-label-renderer,
+  .react-flow__edge-label-renderer > *,
+  .react-flow__edge-label-renderer > * > *,
+  /* Target our specific classes */
+  .nodrag.nopan,
+  .nodrag.nopan > * {
+    border: 0 !important;
+    border-width: 0 !important;
+    border-style: none !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
   }
 }

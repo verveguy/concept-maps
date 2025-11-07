@@ -72,15 +72,38 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
 
   // Extract node style from metadata
   const metadataKey = data.concept?.metadata ? JSON.stringify(data.concept.metadata) : ''
+  // Track dark mode state for theme-aware defaults
+  const [isDarkMode, setIsDarkMode] = useState(() => 
+    document.documentElement.classList.contains('dark')
+  )
+  
+  useEffect(() => {
+    // Watch for theme changes
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(document.documentElement.classList.contains('dark'))
+    })
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    })
+    return () => observer.disconnect()
+  }, [])
+  
   const nodeStyle = useMemo(() => {
     const metadata = data.concept?.metadata || {}
+    // Theme-aware default colors
+    const defaultFillColor = isDarkMode ? 'hsl(222.2 84% 4.9%)' : 'hsl(0 0% 100%)'
+    const defaultBorderColor = isDarkMode ? 'hsl(217.2 32.6% 17.5%)' : 'hsl(214.3 31.8% 91.4%)'
+    const defaultTextColor = isDarkMode ? 'hsl(210 40% 98%)' : 'hsl(222.2 84% 4.9%)'
+    const defaultPrimaryColor = isDarkMode ? 'hsl(210 40% 98%)' : 'hsl(222.2 47.4% 11.2%)'
+    
     return {
-      fillColor: (metadata.fillColor as string) || '#ffffff',
-      borderColor: (metadata.borderColor as string) || (selected ? '#6366f1' : '#d1d5db'),
+      fillColor: (metadata.fillColor as string) || defaultFillColor,
+      borderColor: (metadata.borderColor as string) || (selected ? defaultPrimaryColor : defaultBorderColor),
       borderStyle: (metadata.borderStyle as 'solid' | 'dashed' | 'dotted') || 'solid',
-      textColor: (metadata.textColor as string) || '#111827',
+      textColor: (metadata.textColor as string) || defaultTextColor,
     }
-  }, [metadataKey, selected])
+  }, [metadataKey, selected, isDarkMode])
 
   // Update edit label when data changes
   useEffect(() => {
@@ -216,8 +239,8 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
         backgroundColor: nodeStyle.fillColor,
         borderWidth: '2px',
         borderStyle: nodeStyle.borderStyle,
-        borderColor: selected ? '#6366f1' : nodeStyle.borderColor,
-        boxShadow: selected ? '0 0 0 2px rgba(99, 102, 241, 0.2)' : undefined,
+        borderColor: nodeStyle.borderColor,
+        boxShadow: selected ? (isDarkMode ? '0 0 0 2px rgba(210, 250, 255, 0.2)' : '0 0 0 2px rgba(99, 102, 241, 0.2)') : undefined,
         opacity: nodeOpacity,
         filter: nodeFilter,
       }}
@@ -272,8 +295,11 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
+          backgroundColor: isDarkMode ? 'hsl(217.2 32.6% 17.5%)' : 'hsl(214.3 31.8% 91.4%)',
+          width: '4px',
+          height: '4px',
+          opacity: 0.3,
         }}
-        className="bg-gray-300! w-1! h-1! opacity-30"
       />
       
       {isEditing ? (
@@ -351,8 +377,11 @@ export const ConceptNode = memo(({ data, selected }: NodeProps<ConceptNodeData>)
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
+          backgroundColor: isDarkMode ? 'hsl(217.2 32.6% 17.5%)' : 'hsl(214.3 31.8% 91.4%)',
+          width: '4px',
+          height: '4px',
+          opacity: 0.3,
         }}
-        className="bg-gray-300! w-1! h-1! opacity-30"
       />
     </div>
   )

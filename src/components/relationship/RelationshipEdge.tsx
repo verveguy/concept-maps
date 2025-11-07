@@ -12,6 +12,7 @@ import {
   getStraightPath,
   type EdgeProps,
   Position,
+  useReactFlow,
 } from 'reactflow'
 import type { RelationshipEdgeData } from '@/lib/reactFlowTypes'
 import { useRelationshipActions } from '@/hooks/useRelationshipActions'
@@ -56,6 +57,1150 @@ function getHandleIndex(handleId: string | null | undefined): number {
   if (!handleId) return 2 // Default to middle handle
   const match = handleId.match(/(?:top|bottom)-(\d+)/)
   return match ? parseInt(match[1], 10) : 2
+}
+
+/**
+ * Derive step/smoothstep orientations based on relative positions.
+ * Ensures the final segment approaches the target from the correct side
+ * even when node handles are defined on top/bottom.
+ */
+function deriveStepPositions(
+  sourceX: number,
+  sourceY: number,
+  targetX: number,
+  targetY: number
+): { sourcePosition: Position; targetPosition: Position } {
+  const dx = targetX - sourceX
+  const dy = targetY - sourceY
+  const horizontal = Math.abs(dx) >= Math.abs(dy)
+  
+  let sPos: Position
+  let tPos: Position
+  
+  if (horizontal) {
+    // Approach horizontally
+    sPos = dx > 0 ? Position.Right : Position.Left
+    tPos = dx > 0 ? Position.Left : Position.Right
+  } else {
+    // Approach vertically
+    sPos = dy > 0 ? Position.Bottom : Position.Top
+    tPos = dy > 0 ? Position.Top : Position.Bottom
+  }
+  
+  return { sourcePosition: sPos, targetPosition: tPos }
+}
+
+/**
+ * Calculate a point on a cubic bezier curve at parameter t.
+ * 
+ * @param t - Parameter value (0 to 1)
+ * @param x0 - Start X
+ * @param y0 - Start Y
+ * @param x1 - First control point X
+ * @param y1 - First control point Y
+ * @param x2 - Second control point X
+ * @param y2 - Second control point Y
+ * @param x3 - End X
+ * @param y3 - End Y
+ * @returns Point coordinates
+ */
+function bezierPoint(
+  t: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number
+): { x: number; y: number } {
+  const mt = 1 - t
+  const mt2 = mt * mt
+  const mt3 = mt2 * mt
+  const t2 = t * t
+  const t3 = t2 * t
+  
+  return {
+    x: mt3 * x0 + 3 * mt2 * t * x1 + 3 * mt * t2 * x2 + t3 * x3,
+    y: mt3 * y0 + 3 * mt2 * t * y1 + 3 * mt * t2 * y2 + t3 * y3,
+  }
+}
+
+/**
+ * Calculate the tangent vector (derivative) of a cubic bezier curve at parameter t.
+ * 
+ * @param t - Parameter value (0 to 1)
+ * @param x0 - Start X
+ * @param y0 - Start Y
+ * @param x1 - First control point X
+ * @param y1 - First control point Y
+ * @param x2 - Second control point X
+ * @param y2 - Second control point Y
+ * @param x3 - End X
+ * @param y3 - End Y
+ * @returns Tangent vector
+ */
+function bezierTangent(
+  t: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number
+): { x: number; y: number } {
+  const mt = 1 - t
+  const mt2 = mt * mt
+  const t2 = t * t
+  
+  return {
+    x: 3 * mt2 * (x1 - x0) + 6 * mt * t * (x2 - x1) + 3 * t2 * (x3 - x2),
+    y: 3 * mt2 * (y1 - y0) + 6 * mt * t * (y2 - y1) + 3 * t2 * (y3 - y2),
+  }
+}
+
+/**
+ * Find where a bezier curve intersects a node's boundary.
+ * Uses binary search to find the intersection point along the curve.
+ * 
+ * @param nodeCenterX - X coordinate of node center
+ * @param nodeCenterY - Y coordinate of node center
+ * @param nodeWidth - Width of the node
+ * @param nodeHeight - Height of the node
+ * @param x0 - Bezier start X
+ * @param y0 - Bezier start Y
+ * @param x1 - Bezier first control point X
+ * @param y1 - Bezier first control point Y
+ * @param x2 - Bezier second control point X
+ * @param y2 - Bezier second control point Y
+ * @param x3 - Bezier end X (center)
+ * @param y3 - Bezier end Y (center)
+ * @returns Intersection point and tangent angle, or null if not found
+ */
+function findBezierBoundaryIntersection(
+  nodeCenterX: number,
+  nodeCenterY: number,
+  nodeWidth: number,
+  nodeHeight: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  x3: number,
+  y3: number
+): { x: number; y: number; angle: number; exactPointX?: number; exactPointY?: number } | null {
+  // ... existing code ...
+  // NOTE: This function remains as a fallback. See the SVG path based approach below for the primary implementation.
+  // Account for node border (2px on each side) - React Flow dimensions include border
+  // But we want the visual boundary, which is the outer edge of the border
+  // So we use the full dimensions as-is
+  const halfWidth = nodeWidth / 2
+  const halfHeight = nodeHeight / 2
+  const topY = nodeCenterY - halfHeight
+  const bottomY = nodeCenterY + halfHeight
+  const leftX = nodeCenterX - halfWidth
+  const rightX = nodeCenterX + halfWidth
+  
+  // Check if a point is inside the node boundary
+  const isInside = (x: number, y: number): boolean => {
+    return x >= leftX && x <= rightX && y >= topY && y <= bottomY
+  }
+  
+  // Find exact intersections with each boundary by solving bezier equations
+  // For left/right: solve x(t) = leftX or x(t) = rightX
+  // For top/bottom: solve y(t) = topY or y(t) = bottomY
+  const allIntersections: Array<{ x: number; y: number; t: number; edge: 'top' | 'bottom' | 'left' | 'right' }> = []
+  
+  // Helper function to find t where bezier x(t) = targetX using binary search
+  const findTForX = (targetX: number, tMin: number, tMax: number): number | null => {
+    const epsilon = 0.0001
+    let low = tMin
+    let high = tMax
+    
+    // First, verify that there's a crossing in this range
+    const pLow = bezierPoint(low, x0, y0, x1, y1, x2, y2, x3, y3)
+    const pHigh = bezierPoint(high, x0, y0, x1, y1, x2, y2, x3, y3)
+    
+    // Check if targetX is between the x values
+    if ((pLow.x < targetX && pHigh.x < targetX) || (pLow.x > targetX && pHigh.x > targetX)) {
+      return null // No crossing in this range
+    }
+    
+    // Binary search for exact t
+    for (let iter = 0; iter < 50; iter++) {
+      const mid = (low + high) / 2
+      const pMid = bezierPoint(mid, x0, y0, x1, y1, x2, y2, x3, y3)
+      const error = pMid.x - targetX
+      
+      if (Math.abs(error) < epsilon) {
+        return mid
+      }
+      
+      if ((pLow.x < targetX && pMid.x < targetX) || (pLow.x > targetX && pMid.x > targetX)) {
+        low = mid
+      } else {
+        high = mid
+      }
+      
+      if (high - low < epsilon) break
+    }
+    
+    return (low + high) / 2
+  }
+  
+  // Helper function to find t where bezier y(t) = targetY using binary search
+  const findTForY = (targetY: number, tMin: number, tMax: number): number | null => {
+    const epsilon = 0.0001
+    let low = tMin
+    let high = tMax
+    
+    // First, verify that there's a crossing in this range
+    const pLow = bezierPoint(low, x0, y0, x1, y1, x2, y2, x3, y3)
+    const pHigh = bezierPoint(high, x0, y0, x1, y1, x2, y2, x3, y3)
+    
+    // Check if targetY is between the y values
+    if ((pLow.y < targetY && pHigh.y < targetY) || (pLow.y > targetY && pHigh.y > targetY)) {
+      return null // No crossing in this range
+    }
+    
+    // Binary search for exact t
+    for (let iter = 0; iter < 50; iter++) {
+      const mid = (low + high) / 2
+      const pMid = bezierPoint(mid, x0, y0, x1, y1, x2, y2, x3, y3)
+      const error = pMid.y - targetY
+      
+      if (Math.abs(error) < epsilon) {
+        return mid
+      }
+      
+      if ((pLow.y < targetY && pMid.y < targetY) || (pLow.y > targetY && pMid.y > targetY)) {
+        low = mid
+      } else {
+        high = mid
+      }
+      
+      if (high - low < epsilon) break
+    }
+    
+    return (low + high) / 2
+  }
+  
+  // Sample curve to find ranges where it might cross boundaries
+  // Use adaptive sampling: more samples for longer curves
+  const curveLength = Math.sqrt((x3 - x0) ** 2 + (y3 - y0) ** 2)
+  const sampleCount = Math.max(500, Math.min(2000, Math.floor(curveLength / 2))) // Adaptive: 500-2000 samples based on curve length
+  let lastOutsideT = 0
+  let lastOutsidePoint = bezierPoint(0, x0, y0, x1, y1, x2, y2, x3, y3)
+  let prevPoint = lastOutsidePoint
+  let prevT = 0
+  let prevWasInside = isInside(prevPoint.x, prevPoint.y)
+  
+  for (let i = 0; i <= sampleCount; i++) {
+    const t = i / sampleCount
+    const point = bezierPoint(t, x0, y0, x1, y1, x2, y2, x3, y3)
+    const isNowInside = isInside(point.x, point.y)
+    
+    // Detect boundary crossing: transition from outside to inside
+    if (!prevWasInside && isNowInside) {
+      // Found transition - now find exact intersection in this range
+      const tOutside = prevT
+      const tInside = t
+      
+      // Check each boundary
+      // Left boundary: x(t) = leftX
+      const tLeft = findTForX(leftX, tOutside, tInside)
+      if (tLeft !== null) {
+        const pLeft = bezierPoint(tLeft, x0, y0, x1, y1, x2, y2, x3, y3)
+        // Verify: point must be on the left boundary segment AND outside before entering
+        if (pLeft.y >= topY && pLeft.y <= bottomY && 
+            Math.abs(pLeft.x - leftX) < 1.0 && // Actually on the boundary
+            !isInside(prevPoint.x, prevPoint.y)) {
+          allIntersections.push({ edge: 'left', t: tLeft, x: leftX, y: pLeft.y })
+        }
+      }
+      
+      // Right boundary: x(t) = rightX
+      const tRight = findTForX(rightX, tOutside, tInside)
+      if (tRight !== null) {
+        const pRight = bezierPoint(tRight, x0, y0, x1, y1, x2, y2, x3, y3)
+        // Verify: point must be on the right boundary segment AND outside before entering
+        if (pRight.y >= topY && pRight.y <= bottomY && 
+            Math.abs(pRight.x - rightX) < 1.0 && // Actually on the boundary
+            !isInside(prevPoint.x, prevPoint.y)) {
+          allIntersections.push({ edge: 'right', t: tRight, x: rightX, y: pRight.y })
+        }
+      }
+      
+      // Top boundary: y(t) = topY
+      const tTop = findTForY(topY, tOutside, tInside)
+      if (tTop !== null) {
+        const pTop = bezierPoint(tTop, x0, y0, x1, y1, x2, y2, x3, y3)
+        // Verify: point must be on the top boundary segment AND outside before entering
+        if (pTop.x >= leftX && pTop.x <= rightX && 
+            Math.abs(pTop.y - topY) < 1.0 && // Actually on the boundary
+            !isInside(prevPoint.x, prevPoint.y)) {
+          allIntersections.push({ edge: 'top', t: tTop, x: pTop.x, y: topY })
+        }
+      }
+      
+      // Bottom boundary: y(t) = bottomY
+      const tBottom = findTForY(bottomY, tOutside, tInside)
+      if (tBottom !== null) {
+        const pBottom = bezierPoint(tBottom, x0, y0, x1, y1, x2, y2, x3, y3)
+        // Verify: point must be on the bottom boundary segment AND outside before entering
+        if (pBottom.x >= leftX && pBottom.x <= rightX && 
+            Math.abs(pBottom.y - bottomY) < 1.0 && // Actually on the boundary
+            !isInside(prevPoint.x, prevPoint.y)) {
+          allIntersections.push({ edge: 'bottom', t: tBottom, x: pBottom.x, y: bottomY })
+        }
+      }
+    }
+    
+    // Update tracking
+    if (!isNowInside) {
+      lastOutsideT = t
+      lastOutsidePoint = point
+    }
+    prevPoint = point
+    prevT = t
+    prevWasInside = isNowInside
+  }
+  
+  // Validate intersections and pick the first valid one (lowest t)
+  if (allIntersections.length === 0) {
+    // Fallback: curve never enters node
+    const tangent = bezierTangent(0, x0, y0, x1, y1, x2, y2, x3, y3)
+    const angle = Math.atan2(tangent.y, tangent.x) * (180 / Math.PI)
+    return { 
+      x: lastOutsidePoint.x, 
+      y: lastOutsidePoint.y, 
+      angle,
+      exactPointX: lastOutsidePoint.x,
+      exactPointY: lastOutsidePoint.y
+    }
+  }
+  
+  // Validate intersections: check that curve actually crosses boundary at calculated t
+  // More strict validation: curve must be ON the boundary, not just close
+  const validIntersections = allIntersections.filter(int => {
+    const curvePoint = bezierPoint(int.t, x0, y0, x1, y1, x2, y2, x3, y3)
+    const tolerance = 0.5 // Stricter tolerance
+    
+    let isValid = false
+    if (int.edge === 'top') {
+      // Top edge: curve Y should be at topY (or very close)
+      isValid = Math.abs(curvePoint.y - topY) < tolerance && curvePoint.x >= leftX && curvePoint.x <= rightX
+    } else if (int.edge === 'bottom') {
+      // Bottom edge: curve Y should be at bottomY (or very close)
+      isValid = Math.abs(curvePoint.y - bottomY) < tolerance && curvePoint.x >= leftX && curvePoint.x <= rightX
+    } else if (int.edge === 'left') {
+      // Left edge: curve X should be at leftX (or very close)
+      isValid = Math.abs(curvePoint.x - leftX) < tolerance && curvePoint.y >= topY && curvePoint.y <= bottomY
+    } else { // right
+      // Right edge: curve X should be at rightX (or very close)
+      isValid = Math.abs(curvePoint.x - rightX) < tolerance && curvePoint.y >= topY && curvePoint.y <= bottomY
+    }
+    
+    return isValid
+  })
+  
+  if (validIntersections.length === 0) {
+    // Fallback: no valid intersections
+    const tangent = bezierTangent(0, x0, y0, x1, y1, x2, y2, x3, y3)
+    const angle = Math.atan2(tangent.y, tangent.x) * (180 / Math.PI)
+    return { 
+      x: lastOutsidePoint.x, 
+      y: lastOutsidePoint.y, 
+      angle,
+      exactPointX: lastOutsidePoint.x,
+      exactPointY: lastOutsidePoint.y
+    }
+  }
+  
+  // Pick the intersection closest to source (lowest t) - that's the actual entry edge
+  const closest = validIntersections.reduce((prev, curr) => (curr.t < prev.t ? curr : prev))
+  const entryEdge = closest.edge
+  // Use the actual boundary coordinates, not the interpolated values
+  // For vertical edges (top/bottom), we need to find where y(t) = topY or bottomY
+  // For horizontal edges (left/right), we need to find where x(t) = leftX or rightX
+  const targetY = closest.edge === 'top' ? topY : closest.edge === 'bottom' ? bottomY : undefined
+  const targetX = closest.edge === 'left' ? leftX : closest.edge === 'right' ? rightX : undefined
+  
+  // Find t values that bracket the intersection
+  // Start from a point that's definitely outside the node
+  // For long curves, closest.t might already be slightly inside, so we need to go back further
+  let tLow = Math.max(0, closest.t - 0.05) // Increased range for long curves
+  let tHigh = Math.min(1, closest.t + 0.01)
+  
+  // Ensure tLow is actually outside the node
+  let pLow = bezierPoint(tLow, x0, y0, x1, y1, x2, y2, x3, y3)
+  while (isInside(pLow.x, pLow.y) && tLow > 0) {
+    tLow = Math.max(0, tLow - 0.01)
+    pLow = bezierPoint(tLow, x0, y0, x1, y1, x2, y2, x3, y3)
+  }
+  
+  // Refine bracket to ensure tLow is outside and tHigh is inside
+  for (let refine = 0; refine < 10; refine++) {
+    const pLow = bezierPoint(tLow, x0, y0, x1, y1, x2, y2, x3, y3)
+    const pHigh = bezierPoint(tHigh, x0, y0, x1, y1, x2, y2, x3, y3)
+    if (!isInside(pLow.x, pLow.y) && isInside(pHigh.x, pHigh.y)) {
+      break
+    }
+    if (isInside(pLow.x, pLow.y)) {
+      tLow = Math.max(0, tLow - 0.01)
+    }
+    if (!isInside(pHigh.x, pHigh.y)) {
+      tHigh = Math.min(1, tHigh + 0.01)
+    }
+  }
+  
+  // Refine t value using Newton's method with tighter tolerance
+  // Start from tLow (outside) and refine towards the boundary
+  // This ensures we find the actual entry point, not a point already inside
+  let refinedT = (tLow + tHigh) / 2 // Start from middle of bracket
+  const epsilon = 0.00001 // Tighter tolerance for extreme cases
+  
+  if (targetY !== undefined) {
+    // Horizontal edge: find exact t where bezier y(t) = targetY
+    for (let iter = 0; iter < 100; iter++) {
+      const p = bezierPoint(refinedT, x0, y0, x1, y1, x2, y2, x3, y3)
+      const error = p.y - targetY
+      
+      if (Math.abs(error) < epsilon) break
+      
+      const tangent = bezierTangent(refinedT, x0, y0, x1, y1, x2, y2, x3, y3)
+      if (Math.abs(tangent.y) > 0.0001) {
+        const deltaT = -error / tangent.y
+        const newT = Math.max(tLow, Math.min(tHigh, refinedT + deltaT))
+        // Prevent oscillation by checking if we're making progress
+        if (Math.abs(newT - refinedT) < 0.000001) break
+        refinedT = newT
+      } else {
+        // Binary search fallback
+        refinedT = (tLow + tHigh) / 2
+        const p2 = bezierPoint(refinedT, x0, y0, x1, y1, x2, y2, x3, y3)
+        if ((targetY === topY && p2.y < targetY) || (targetY === bottomY && p2.y > targetY)) {
+          tLow = refinedT
+        } else {
+          tHigh = refinedT
+        }
+      }
+      if (tHigh - tLow < epsilon) break
+    }
+  } else if (targetX !== undefined) {
+    // Vertical edge: find exact t where bezier x(t) = targetX
+    for (let iter = 0; iter < 100; iter++) {
+      const p = bezierPoint(refinedT, x0, y0, x1, y1, x2, y2, x3, y3)
+      const error = p.x - targetX
+      
+      if (Math.abs(error) < epsilon) break
+      
+      const tangent = bezierTangent(refinedT, x0, y0, x1, y1, x2, y2, x3, y3)
+      if (Math.abs(tangent.x) > 0.0001) {
+        const deltaT = -error / tangent.x
+        const newT = Math.max(tLow, Math.min(tHigh, refinedT + deltaT))
+        // Prevent oscillation by checking if we're making progress
+        if (Math.abs(newT - refinedT) < 0.000001) break
+        refinedT = newT
+      } else {
+        // Binary search fallback
+        refinedT = (tLow + tHigh) / 2
+        const p2 = bezierPoint(refinedT, x0, y0, x1, y1, x2, y2, x3, y3)
+        if ((targetX === leftX && p2.x < targetX) || (targetX === rightX && p2.x > targetX)) {
+          tLow = refinedT
+        } else {
+          tHigh = refinedT
+        }
+      }
+      if (tHigh - tLow < epsilon) break
+    }
+  }
+  
+  // Get exact point on curve and project onto boundary
+  const curvePoint = bezierPoint(refinedT, x0, y0, x1, y1, x2, y2, x3, y3)
+  const tangent = bezierTangent(refinedT, x0, y0, x1, y1, x2, y2, x3, y3)
+  const angle = Math.atan2(tangent.y, tangent.x) * (180 / Math.PI)
+  
+  // Verify refinement accuracy - curvePoint should be very close to boundary
+  // For extreme cases, we need tighter tolerance
+  let correctedPoint = { x: curvePoint.x, y: curvePoint.y }
+  if (targetX !== undefined) {
+    const xError = Math.abs(curvePoint.x - targetX)
+    if (xError > 0.001) {
+      // Refinement didn't converge well, use targetX directly
+      // Recalculate Y by finding where the curve crosses the boundary
+      // Use binary search to find Y where x(t) = targetX
+      let tForX = refinedT
+      for (let iter = 0; iter < 20; iter++) {
+        const p = bezierPoint(tForX, x0, y0, x1, y1, x2, y2, x3, y3)
+        const error = p.x - targetX
+        if (Math.abs(error) < 0.0001) break
+        const tan = bezierTangent(tForX, x0, y0, x1, y1, x2, y2, x3, y3)
+        if (Math.abs(tan.x) > 0.0001) {
+          const deltaT = -error / tan.x
+          tForX = Math.max(tLow, Math.min(tHigh, tForX + deltaT))
+        } else {
+          break
+        }
+      }
+      const finalPoint = bezierPoint(tForX, x0, y0, x1, y1, x2, y2, x3, y3)
+      correctedPoint = { x: targetX, y: finalPoint.y }
+    }
+  } else if (targetY !== undefined) {
+    const yError = Math.abs(curvePoint.y - targetY)
+    if (yError > 0.001) {
+      // Refinement didn't converge well, use targetY directly
+      // Recalculate X by finding where the curve crosses the boundary
+      let tForY = refinedT
+      for (let iter = 0; iter < 20; iter++) {
+        const p = bezierPoint(tForY, x0, y0, x1, y1, x2, y2, x3, y3)
+        const error = p.y - targetY
+        if (Math.abs(error) < 0.0001) break
+        const tan = bezierTangent(tForY, x0, y0, x1, y1, x2, y2, x3, y3)
+        if (Math.abs(tan.y) > 0.0001) {
+          const deltaT = -error / tan.y
+          tForY = Math.max(tLow, Math.min(tHigh, tForY + deltaT))
+        } else {
+          break
+        }
+      }
+      const finalPoint = bezierPoint(tForY, x0, y0, x1, y1, x2, y2, x3, y3)
+      correctedPoint = { x: finalPoint.x, y: targetY }
+    }
+  }
+  
+  // Project onto exact boundary coordinate
+  // Ensure exactPoint is precisely on the boundary line
+  let exactPoint: { x: number; y: number }
+  if (targetY !== undefined) {
+    // Horizontal edge (top/bottom): X comes from curve, Y is the boundary coordinate
+    // After refining t where y(t) = targetY, get the X coordinate from the curve
+    // Clamp X to ensure it's within the node boundaries
+    const clampedX = Math.max(leftX, Math.min(rightX, correctedPoint.x))
+    exactPoint = { x: clampedX, y: targetY }
+  } else if (targetX !== undefined) {
+    // Vertical edge (left/right): Y comes from curve, X is the boundary coordinate
+    // After refining t where x(t) = targetX, get the Y coordinate from the curve
+    // Clamp Y to ensure it's within the node boundaries
+    const clampedY = Math.max(topY, Math.min(bottomY, correctedPoint.y))
+    exactPoint = { x: targetX, y: clampedY }
+  } else {
+    exactPoint = correctedPoint
+  }
+  
+  // Final validation: ensure exactPoint is actually on the boundary
+  // If it's not, something went wrong - use the closest boundary point
+  if (targetX !== undefined) {
+    // For vertical edges, Y must be between topY and bottomY
+    if (exactPoint.y < topY) {
+      exactPoint.y = topY
+    } else if (exactPoint.y > bottomY) {
+      exactPoint.y = bottomY
+    }
+  } else if (targetY !== undefined) {
+    // For horizontal edges, X must be between leftX and rightX
+    if (exactPoint.x < leftX) {
+      exactPoint.x = leftX
+    } else if (exactPoint.x > rightX) {
+      exactPoint.x = rightX
+    }
+  }
+  
+  // Apply adaptive offset along tangent to position arrowhead on the boundary
+  // Offset direction and amount depend on entry edge to account for node styling (shadows, borders)
+  const tangentLength = Math.sqrt(tangent.x * tangent.x + tangent.y * tangent.y)
+  let finalX = exactPoint.x
+  let finalY = exactPoint.y
+  
+  if (tangentLength > 0.001) {
+    // Determine offset based on entry edge
+    // Positive offset moves along tangent (towards node center)
+    // Negative offset moves opposite to tangent (away from node center)
+    let offset: number
+    
+    switch (entryEdge) {
+      case 'top':
+        // Entering from top: move inward slightly to account for shadow/border
+        offset = 2
+        break
+      case 'bottom':
+        // Entering from bottom: move outward to avoid being too deep (shadow makes it appear deeper)
+        offset = -1.5
+        break
+      case 'left':
+        // Entering from left: move inward more to reach boundary
+        offset = 4
+        break
+      case 'right':
+        // Entering from right: move inward more to reach boundary
+        offset = 4
+        break
+      default:
+        offset = 2
+    }
+    
+    finalX += (tangent.x / tangentLength) * offset
+    finalY += (tangent.y / tangentLength) * offset
+  }
+  
+  return { 
+    x: finalX, 
+    y: finalY, 
+    angle,
+    exactPointX: exactPoint.x,
+    exactPointY: exactPoint.y
+  }
+}
+
+/**
+ * Find the boundary intersection using the actual SVG path geometry.
+ * This avoids numeric issues by querying the browser's path sampling API.
+ *
+ * Algorithm:
+ * - Build a temporary SVGPathElement with the same "d" used to render the edge
+ * - Walk backwards from the end of the path (inside the node) until we find a point outside
+ * - Binary search between outside/inside lengths to find the entry crossing
+ * - Snap to the nearest rectangle side and compute a tangent for arrow rotation
+ *
+ * Returns the final arrow position (with adaptive offset), and the exact intersection (for red dot).
+ */
+function findPathBoundaryIntersectionUsingSVG(
+  nodeCenterX: number,
+  nodeCenterY: number,
+  nodeWidth: number,
+  nodeHeight: number,
+  pathD: string
+): { x: number; y: number; angle: number; exactPointX?: number; exactPointY?: number; trimLength?: number } | null {
+  // Guard for SSR or missing DOM
+  if (typeof document === 'undefined') return null
+  if (!pathD || !Number.isFinite(nodeCenterX) || !Number.isFinite(nodeCenterY)) return null
+  
+  const halfW = nodeWidth / 2
+  const halfH = nodeHeight / 2
+  const leftX = nodeCenterX - halfW
+  const rightX = nodeCenterX + halfW
+  const topY = nodeCenterY - halfH
+  const bottomY = nodeCenterY + halfH
+  
+  const isInside = (x: number, y: number): boolean =>
+    x >= leftX && x <= rightX && y >= topY && y <= bottomY
+  
+  // Build a temporary SVG path to query geometry
+  const svgNS = 'http://www.w3.org/2000/svg'
+  const pathEl = document.createElementNS(svgNS, 'path')
+  pathEl.setAttribute('d', pathD)
+  
+  let totalLength = 0
+  try {
+    totalLength = pathEl.getTotalLength()
+  } catch {
+    // If the path is invalid, bail out
+    return null
+  }
+  if (!isFinite(totalLength) || totalLength <= 0) return null
+  
+  // Helper to get point at length
+  const pointAt = (s: number) => pathEl.getPointAtLength(Math.max(0, Math.min(totalLength, s)))
+  const insideAt = (s: number) => {
+    const p = pointAt(s)
+    return isInside(p.x, p.y)
+  }
+  
+  // End of path is target center: should be inside
+  let sHigh = totalLength
+  if (!insideAt(sHigh)) {
+    // If not inside (shouldn't happen), walk forward to find an inside segment
+    // Fallback to bezier approach by returning null
+    return null
+  }
+  
+  // Walk backwards to find an outside point
+  let sLow = sHigh
+  let step = Math.max(2, totalLength / 128) // adaptive step
+  let safety = 0
+  while (sLow > 0 && insideAt(sLow) && safety < 256) {
+    sLow -= step
+    step *= 1.1 // expand step gradually
+    safety++
+  }
+  sLow = Math.max(0, sLow)
+  
+  // If we never left the node, we can't find an entry crossing
+  if (insideAt(sLow)) {
+    // As a fallback, snap to the nearest side from the end
+    const end = pointAt(sHigh)
+    const dxs = [Math.abs(end.x - leftX), Math.abs(end.x - rightX)]
+    const dys = [Math.abs(end.y - topY), Math.abs(end.y - bottomY)]
+    const minX = Math.min(...dxs)
+    const minY = Math.min(...dys)
+    let snapX = end.x
+    let snapY = end.y
+    let entryEdge: 'top' | 'bottom' | 'left' | 'right' = 'left'
+    
+    if (minX < minY) {
+      // Closer to a vertical side
+      if (dxs[0] < dxs[1]) {
+        snapX = leftX
+        entryEdge = 'left'
+      } else {
+        snapX = rightX
+        entryEdge = 'right'
+      }
+      snapY = Math.max(topY, Math.min(bottomY, end.y))
+    } else {
+      // Closer to a horizontal side
+      if (dys[0] < dys[1]) {
+        snapY = topY
+        entryEdge = 'top'
+      } else {
+        snapY = bottomY
+        entryEdge = 'bottom'
+      }
+      snapX = Math.max(leftX, Math.min(rightX, end.x))
+    }
+    
+    // Estimate tangent near the end
+    const prev = pointAt(Math.max(0, sHigh - 1))
+    const dx = end.x - prev.x
+    const dy = end.y - prev.y
+    const angle = Math.atan2(dy, dx) * (180 / Math.PI)
+    
+    // Apply adaptive offset along tangent
+    const len = Math.hypot(dx, dy)
+    let fx = snapX
+    let fy = snapY
+    if (len > 0.0001) {
+      let offset = 2
+      switch (entryEdge) {
+        case 'top':
+          offset = 2
+          break
+        case 'bottom':
+          offset = -1.5
+          break
+        case 'left':
+        case 'right':
+          offset = 4
+          break
+      }
+      fx += (dx / len) * offset
+      fy += (dy / len) * offset
+    }
+    
+    return { x: fx, y: fy, angle, exactPointX: snapX, exactPointY: snapY, trimLength: sHigh }
+  }
+  
+  // Binary search between sLow (outside) and sHigh (inside) to find the boundary
+  let iterations = 0
+  while (iterations < 40 && Math.abs(sHigh - sLow) > 0.25) {
+    const mid = (sLow + sHigh) / 2
+    if (insideAt(mid)) {
+      sHigh = mid
+    } else {
+      sLow = mid
+    }
+    iterations++
+  }
+  
+  // Use the inside endpoint as our intersection sample
+  const p = pointAt(sHigh)
+  
+  // Determine the closest side and snap to it
+  const dxLeft = Math.abs(p.x - leftX)
+  const dxRight = Math.abs(p.x - rightX)
+  const dyTop = Math.abs(p.y - topY)
+  const dyBottom = Math.abs(p.y - bottomY)
+  
+  let exactX = p.x
+  let exactY = p.y
+  let entryEdge: 'top' | 'bottom' | 'left' | 'right' = 'left'
+  
+  const minX = Math.min(dxLeft, dxRight)
+  const minY = Math.min(dyTop, dyBottom)
+  
+  if (minX < minY) {
+    if (dxLeft < dxRight) {
+      exactX = leftX
+      entryEdge = 'left'
+    } else {
+      exactX = rightX
+      entryEdge = 'right'
+    }
+    exactY = Math.max(topY, Math.min(bottomY, p.y))
+  } else {
+    if (dyTop < dyBottom) {
+      exactY = topY
+      entryEdge = 'top'
+    } else {
+      exactY = bottomY
+      entryEdge = 'bottom'
+    }
+    exactX = Math.max(leftX, Math.min(rightX, p.x))
+  }
+  
+  // Estimate tangent at the intersection
+  const prev = pointAt(Math.max(0, sHigh - 1))
+  let dx = p.x - prev.x
+  let dy = p.y - prev.y
+  let angle = Math.atan2(dy, dx) * (180 / Math.PI)
+  
+  // Apply adaptive offset along tangent to position arrowhead on the boundary
+  const segLen = Math.hypot(dx, dy)
+  let finalX = exactX
+  let finalY = exactY
+  if (segLen > 0.0001) {
+    let offset = 2
+    switch (entryEdge) {
+      case 'top':
+        offset = 2
+        break
+      case 'bottom':
+        offset = -1.5
+        break
+      case 'left':
+      case 'right':
+        offset = 4
+        break
+    }
+    finalX += (dx / segLen) * offset
+    finalY += (dy / segLen) * offset
+  }
+  
+  return {
+    x: finalX,
+    y: finalY,
+    angle,
+    exactPointX: exactX,
+    exactPointY: exactY,
+    trimLength: sHigh,
+  }
+}
+
+/**
+ * Calculate the intersection point of a straight line with a node's boundary.
+ * Used for non-bezier edge types.
+ * 
+ * @param nodeCenterX - X coordinate of node center (handle position)
+ * @param nodeCenterY - Y coordinate of node center (handle position)
+ * @param nodeWidth - Width of the node
+ * @param nodeHeight - Height of the node
+ * @param edgeStartX - X coordinate of edge start point
+ * @param edgeStartY - Y coordinate of edge start point
+ * @returns Object with x, y coordinates and angle of intersection point
+ */
+function getNodeBoundaryIntersection(
+  nodeCenterX: number,
+  nodeCenterY: number,
+  nodeWidth: number,
+  nodeHeight: number,
+  edgeStartX: number,
+  edgeStartY: number
+): { x: number; y: number; angle: number } {
+  // Calculate direction vector from edge start to node center
+  const dx = nodeCenterX - edgeStartX
+  const dy = nodeCenterY - edgeStartY
+  
+  // Handle edge case where start and center are the same
+  if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) {
+    return { x: nodeCenterX, y: nodeCenterY, angle: 0 }
+  }
+  
+  // Calculate angle from direction vector
+  const angle = Math.atan2(dy, dx) * (180 / Math.PI)
+  
+  // Calculate half dimensions
+  const halfWidth = nodeWidth / 2
+  const halfHeight = nodeHeight / 2
+  
+  // Determine entry edge based on source position relative to target
+  const aspectRatio = nodeWidth / nodeHeight
+  const normalizedDx = dx / halfWidth
+  const normalizedDy = dy / halfHeight
+  
+  let entryEdge: 'top' | 'bottom' | 'left' | 'right'
+  if (Math.abs(normalizedDx) > Math.abs(normalizedDy) * aspectRatio) {
+    // Horizontal entry
+    entryEdge = dx > 0 ? 'right' : 'left'
+  } else {
+    // Vertical entry
+    entryEdge = dy > 0 ? 'bottom' : 'top'
+  }
+  
+  // Visual offset to account for node border (2px) and padding
+  // Top entries appear too far back, so we move them down (increase Y)
+  // Bottom entries appear too deep, so we move them up (decrease Y)
+  // Left entries appear too far back, so we move them right (increase X)
+  // Right entries appear too deep, so we move them left (decrease X)
+  const VISUAL_OFFSET_Y = 1.5 // Adjust to match visual boundary
+  const VISUAL_OFFSET_X = 1.5 // Adjust to match visual boundary
+  
+  // Calculate intersection with node boundary
+  // We need to find which edge of the rectangle the line intersects
+  // Calculate intersections with all four edges and pick the closest one
+  
+  const intersections: Array<{ x: number; y: number; t: number }> = []
+  
+  // Top edge: y = nodeCenterY - halfHeight
+  if (Math.abs(dy) > 0.001) {
+    const topY = nodeCenterY - halfHeight
+    const topT = (topY - edgeStartY) / dy
+    if (topT > 0 && topT <= 1) {
+      const topX = edgeStartX + dx * topT
+      if (topX >= nodeCenterX - halfWidth && topX <= nodeCenterX + halfWidth) {
+        intersections.push({ x: topX, y: topY, t: topT })
+      }
+    }
+  }
+  
+  // Bottom edge: y = nodeCenterY + halfHeight
+  if (Math.abs(dy) > 0.001) {
+    const bottomY = nodeCenterY + halfHeight
+    const bottomT = (bottomY - edgeStartY) / dy
+    if (bottomT > 0 && bottomT <= 1) {
+      const bottomX = edgeStartX + dx * bottomT
+      if (bottomX >= nodeCenterX - halfWidth && bottomX <= nodeCenterX + halfWidth) {
+        intersections.push({ x: bottomX, y: bottomY, t: bottomT })
+      }
+    }
+  }
+  
+  // Left edge: x = nodeCenterX - halfWidth
+  if (Math.abs(dx) > 0.001) {
+    const leftX = nodeCenterX - halfWidth
+    const leftT = (leftX - edgeStartX) / dx
+    if (leftT > 0 && leftT <= 1) {
+      const leftY = edgeStartY + dy * leftT
+      if (leftY >= nodeCenterY - halfHeight && leftY <= nodeCenterY + halfHeight) {
+        intersections.push({ x: leftX, y: leftY, t: leftT })
+      }
+    }
+  }
+  
+  // Right edge: x = nodeCenterX + halfWidth
+  if (Math.abs(dx) > 0.001) {
+    const rightX = nodeCenterX + halfWidth
+    const rightT = (rightX - edgeStartX) / dx
+    if (rightT > 0 && rightT <= 1) {
+      const rightY = edgeStartY + dy * rightT
+      if (rightY >= nodeCenterY - halfHeight && rightY <= nodeCenterY + halfHeight) {
+        intersections.push({ x: rightX, y: rightY, t: rightT })
+      }
+    }
+  }
+  
+  // If we have intersections, pick the one closest to the edge start (smallest t)
+  // This ensures we get the first intersection point along the line
+  if (intersections.length > 0) {
+    const closest = intersections.reduce((prev, curr) => (curr.t < prev.t ? curr : prev))
+    
+    // Apply visual offset: top entries need to move down, bottom entries need to move up
+    // Left entries need to move right, right entries need to move left
+    let finalY = closest.y
+    let finalX = closest.x
+    
+    if (Math.abs(closest.y - (nodeCenterY - halfHeight)) < 0.001) {
+      // Top edge: move down (increase Y) to match visual boundary
+      finalY += VISUAL_OFFSET_Y
+    } else if (Math.abs(closest.y - (nodeCenterY + halfHeight)) < 0.001) {
+      // Bottom edge: move up (decrease Y) to match visual boundary
+      finalY -= VISUAL_OFFSET_Y
+    } else if (Math.abs(closest.x - (nodeCenterX - halfWidth)) < 0.001) {
+      // Left edge: move left (decrease X) to move arrowhead outward from boundary
+      finalX -= VISUAL_OFFSET_X
+    } else if (Math.abs(closest.x - (nodeCenterX + halfWidth)) < 0.001) {
+      // Right edge: move right (increase X) to move arrowhead outward from boundary
+      finalX += VISUAL_OFFSET_X
+    }
+    
+    return { 
+      x: finalX, 
+      y: finalY, 
+      angle
+    }
+  }
+  
+  // Fallback: if no valid intersection found, return center
+  // This can happen if the edge starts inside the node
+  return { 
+    x: nodeCenterX, 
+    y: nodeCenterY, 
+    angle: 0
+  }
+}
+
+/**
+ * Modify an SVG path string to end at a different point.
+ * For bezier curves, also adjusts the second control point to maintain proper curve shape.
+ * 
+ * @param path - Original SVG path string
+ * @param originalEndX - Original X coordinate of the endpoint (center)
+ * @param originalEndY - Original Y coordinate of the endpoint (center)
+ * @param newEndX - New X coordinate for the endpoint (boundary)
+ * @param newEndY - New Y coordinate for the endpoint (boundary)
+ * @returns Modified path string ending at the new coordinates
+ */
+function modifyPathEndpoint(
+  path: string,
+  originalEndX: number,
+  originalEndY: number,
+  newEndX: number,
+  newEndY: number
+): string {
+  // Calculate the offset vector from center to boundary
+  const offsetX = newEndX - originalEndX
+  const offsetY = newEndY - originalEndY
+  
+  // Check if this is a bezier curve path (contains "C" command)
+  const isBezier = /C\s/i.test(path)
+  
+  if (isBezier) {
+    // For bezier curves: "M x,y C cx1,cy1 cx2,cy2 x,y"
+    // We need to adjust both the second control point (cx2,cy2) and the endpoint
+    // The second control point should be adjusted by the same offset to maintain curve shape
+    
+    // Find all coordinate pairs in the path
+    // Match pattern: number,number (with optional whitespace)
+    const coordinatePattern = /([+-]?\d+\.?\d*)\s*,\s*([+-]?\d+\.?\d*)/g
+    const matches = [...path.matchAll(coordinatePattern)]
+    
+    if (matches.length >= 4) {
+      // Bezier curve has: M start, C control1, control2, end
+      // matches[0] = start point (M)
+      // matches[1] = first control point (cx1, cy1)
+      // matches[2] = second control point (cx2, cy2) - need to adjust this
+      // matches[3] = endpoint - need to replace this
+      
+      const control2Match = matches[2]
+      const endMatch = matches[3]
+      
+      // Calculate adjusted second control point
+      const originalControl2X = parseFloat(control2Match[1])
+      const originalControl2Y = parseFloat(control2Match[2])
+      const adjustedControl2X = originalControl2X + offsetX
+      const adjustedControl2Y = originalControl2Y + offsetY
+      
+      // Build the modified path
+      // Replace second control point
+      const beforeControl2 = path.substring(0, control2Match.index!)
+      const afterControl2 = path.substring(control2Match.index! + control2Match[0].length)
+      const pathWithAdjustedControl2 = beforeControl2 + `${adjustedControl2X},${adjustedControl2Y}` + afterControl2
+      
+      // Now replace the endpoint in the modified path
+      // Find the endpoint again (its index may have shifted slightly)
+      const endPattern = /([+-]?\d+\.?\d*)\s*,\s*([+-]?\d+\.?\d*)\s*$/g
+      const endMatches = [...pathWithAdjustedControl2.matchAll(endPattern)]
+      
+      if (endMatches.length > 0) {
+        const finalEndMatch = endMatches[endMatches.length - 1]
+        const beforeEnd = pathWithAdjustedControl2.substring(0, finalEndMatch.index!)
+        const afterEnd = pathWithAdjustedControl2.substring(finalEndMatch.index! + finalEndMatch[0].length)
+        return beforeEnd + `${newEndX},${newEndY}` + afterEnd
+      }
+    }
+  }
+  
+  // For non-bezier paths (straight lines, smoothstep), just replace the endpoint
+  // Find the last coordinate pair in the path
+  const coordinatePattern = /([+-]?\d+\.?\d*)\s*,\s*([+-]?\d+\.?\d*)\s*$/g
+  const matches = [...path.matchAll(coordinatePattern)]
+  
+  if (matches.length > 0) {
+    // Replace the last match (final coordinates) with new endpoint
+    const lastMatch = matches[matches.length - 1]
+    const before = path.substring(0, lastMatch.index!)
+    const after = path.substring(lastMatch.index! + lastMatch[0].length)
+    return before + `${newEndX},${newEndY}` + after
+  }
+  
+  // Fallback: if no match found, try to find last two space-separated numbers
+  const spaceSeparatedPattern = /([+-]?\d+\.?\d*)\s+([+-]?\d+\.?\d*)\s*$/g
+  const spaceMatches = [...path.matchAll(spaceSeparatedPattern)]
+  
+  if (spaceMatches.length > 0) {
+    const lastMatch = spaceMatches[spaceMatches.length - 1]
+    const before = path.substring(0, lastMatch.index!)
+    const after = path.substring(lastMatch.index! + lastMatch[0].length)
+    return before + `${newEndX},${newEndY}` + after
+  }
+  
+  // Final fallback: append the new endpoint
+  return path + ` ${newEndX},${newEndY}`
+}
+
+/**
+ * Calculate bezier control points using React Flow's logic.
+ * Returns control points that match what React Flow's getBezierPath would use.
+ * 
+ * @param sourceX - Source X coordinate
+ * @param sourceY - Source Y coordinate
+ * @param targetX - Target X coordinate
+ * @param targetY - Target Y coordinate
+ * @param sourcePosition - Source handle position
+ * @param targetPosition - Target handle position
+ * @returns Object with control points { x1, y1, x2, y2 }
+ */
+function calculateBezierControlPoints(
+  sourceX: number,
+  sourceY: number,
+  targetX: number,
+  targetY: number,
+  sourcePosition: Position,
+  targetPosition: Position
+): { x1: number; y1: number; x2: number; y2: number } {
+  const offset = getControlPointOffset(sourcePosition, sourceX, sourceY, targetX, targetY)
+  
+  let controlX1: number
+  let controlY1: number
+  let controlX2: number
+  let controlY2: number
+  
+  // Calculate control points based on handle positions
+  switch (sourcePosition) {
+    case Position.Right:
+      controlX1 = sourceX + offset
+      controlY1 = sourceY
+      break
+    case Position.Left:
+      controlX1 = sourceX - offset
+      controlY1 = sourceY
+      break
+    case Position.Top:
+      controlX1 = sourceX
+      controlY1 = sourceY - offset
+      break
+    case Position.Bottom:
+    default:
+      controlX1 = sourceX
+      controlY1 = sourceY + offset
+      break
+  }
+  
+  switch (targetPosition) {
+    case Position.Right:
+      controlX2 = targetX + offset
+      controlY2 = targetY
+      break
+    case Position.Left:
+      controlX2 = targetX - offset
+      controlY2 = targetY
+      break
+    case Position.Top:
+      controlX2 = targetX
+      controlY2 = targetY - offset
+      break
+    case Position.Bottom:
+    default:
+      controlX2 = targetX
+      controlY2 = targetY + offset
+      break
+  }
+  
+  return { x1: controlX1, y1: controlY1, x2: controlX2, y2: controlY2 }
 }
 
 /**
@@ -198,30 +1343,54 @@ export const RelationshipEdge = memo(
     targetPosition,
     sourceHandleId,
     targetHandleId,
+    source,
+    target,
     data,
     selected,
     markerEnd,
   }: EdgeProps<RelationshipEdgeData>) => {
     const { updateRelationship } = useRelationshipActions()
+    const { getNode } = useReactFlow()
     const relationship = data?.relationship
     const label = relationship?.primaryLabel || ''
     const isEditingPerspective = data?.isEditingPerspective ?? false
     const isInPerspective = data?.isInPerspective ?? true
+    
+    // Track dark mode state for theme-aware defaults
+    const [isDarkMode, setIsDarkMode] = useState(() => 
+      document.documentElement.classList.contains('dark')
+    )
+    
+    useEffect(() => {
+      // Watch for theme changes
+      const observer = new MutationObserver(() => {
+        setIsDarkMode(document.documentElement.classList.contains('dark'))
+      })
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class'],
+      })
+      return () => observer.disconnect()
+    }, [])
     
     // Extract edge style from metadata
     // Use JSON.stringify to ensure we detect changes to nested metadata
     const metadataKey = relationship?.metadata ? JSON.stringify(relationship.metadata) : ''
     const edgeStyle = useMemo(() => {
       const metadata = relationship?.metadata || {}
-      const baseColor = (metadata.edgeColor as string) || '#94a3b8'
+      // Theme-aware default edge color (muted foreground color)
+      const defaultEdgeColor = isDarkMode ? 'hsl(215 20.2% 65.1%)' : 'hsl(215.4 16.3% 46.9%)'
+      const baseColor = (metadata.edgeColor as string) || defaultEdgeColor
       
       // Apply greyed-out styling when editing perspective and relationship is not included
       const isGreyedOut = isEditingPerspective && !isInPerspective
-      let color = selected ? '#6366f1' : baseColor
+      // Theme-aware selected color (primary color)
+      const selectedColor = isDarkMode ? 'hsl(210 40% 98%)' : 'hsl(222.2 47.4% 11.2%)'
+      let color = selected ? selectedColor : baseColor
       
       if (isGreyedOut) {
-        // Apply greyed-out effect
-        color = '#d1d5db' // Light grey color
+        // Theme-aware greyed-out color (muted border color)
+        color = isDarkMode ? 'hsl(217.2 32.6% 17.5%)' : 'hsl(214.3 31.8% 91.4%)'
       }
       
       return {
@@ -230,7 +1399,7 @@ export const RelationshipEdge = memo(
         style: (metadata.edgeStyle as 'solid' | 'dashed') || 'solid',
         opacity: isGreyedOut ? 0.3 : 1,
       }
-    }, [metadataKey, selected, isEditingPerspective, isInPerspective])
+    }, [metadataKey, selected, isEditingPerspective, isInPerspective, isDarkMode])
     
     const [isEditing, setIsEditing] = useState(false)
     const [editLabel, setEditLabel] = useState(label)
@@ -249,15 +1418,23 @@ export const RelationshipEdge = memo(
       }
     }, [isEditing])
 
-    // Calculate edge path based on edge type
-    // For bezier edges with multiple edges between same nodes, use custom path with offset control points
-    const { path: edgePath, labelX, labelY, labelOffsetX, labelOffsetY } = useMemo(() => {
+    // Calculate edge path - keep original path ending at center
+    // Arrowhead will be rendered separately at boundary intersection
+    const { path: edgePath, labelX, labelY, labelOffsetX, labelOffsetY, arrowhead, trimLength } = useMemo(() => {
+      // Get target node to calculate boundary intersection
+      const targetNode = target ? getNode(target) : null
+      
+      // Use node dimensions if available, otherwise use estimated dimensions
+      const nodeWidth = targetNode?.width ?? 150
+      const nodeHeight = targetNode?.height ?? 80
+      
+      // Calculate path using CENTER coordinates - path ends at center handle
       const params = {
         sourceX,
         sourceY,
         sourcePosition,
-        targetX,
-        targetY,
+        targetX, // Center coordinates
+        targetY, // Center coordinates
         targetPosition,
       }
       
@@ -270,22 +1447,42 @@ export const RelationshipEdge = memo(
       
       switch (edgeStyle.type) {
         case 'smoothstep':
-          ;[basePath, baseLabelX, baseLabelY] = getSmoothStepPath(params)
+          {
+            // Override positions so the final segment approaches from the correct side
+            const { sourcePosition: sPos, targetPosition: tPos } = deriveStepPositions(
+              sourceX,
+              sourceY,
+              targetX,
+              targetY
+            )
+            ;[basePath, baseLabelX, baseLabelY] = getSmoothStepPath({
+              ...params,
+              sourcePosition: sPos,
+              targetPosition: tPos,
+            })
+          }
           break
         case 'step':
-          // Step is smoothstep with borderRadius 0
-          ;[basePath, baseLabelX, baseLabelY] = getSmoothStepPath({
-            ...params,
-            borderRadius: 0,
-          } as any)
+          {
+            const { sourcePosition: sPos, targetPosition: tPos } = deriveStepPositions(
+              sourceX,
+              sourceY,
+              targetX,
+              targetY
+            )
+            ;[basePath, baseLabelX, baseLabelY] = getSmoothStepPath({
+              ...params,
+              sourcePosition: sPos,
+              targetPosition: tPos,
+              borderRadius: 0,
+            } as any)
+          }
           break
         case 'straight':
           ;[basePath, baseLabelX, baseLabelY] = getStraightPath(params)
           break
         case 'bezier':
         default:
-          // Use custom bezier path with offset control points for multiple edges
-          // This ensures edges bend in opposite directions based on handle positions
           if (hasMultipleEdges && edgeStyle.type === 'bezier') {
             ;[basePath, baseLabelX, baseLabelY] = getBezierPathWithOffset(
               sourceX,
@@ -298,19 +1495,101 @@ export const RelationshipEdge = memo(
               targetHandleId
             )
           } else {
-            // Use standard bezier path for single edges
             ;[basePath, baseLabelX, baseLabelY] = getBezierPath(params)
           }
           break
       }
       
+      // Calculate arrowhead position at boundary intersection
+      let arrowheadPos: { x: number; y: number; angle: number } | null = null
+      let trimLength: number | undefined = undefined
+      
+      if (targetNode && targetNode.width && targetNode.height) {
+        // Use edgeStyle.type to determine if this is a bezier curve
+        const isBezierType = edgeStyle.type === 'bezier'
+        
+        if (isBezierType) {
+          // Primary: use the browser's SVG path geometry for robust intersection
+          arrowheadPos = findPathBoundaryIntersectionUsingSVG(
+            targetX,
+            targetY,
+            targetNode.width,
+            targetNode.height,
+            basePath
+          ) || null
+          if (arrowheadPos) {
+            trimLength = (arrowheadPos as any).trimLength as number | undefined
+          }
+
+          // Fallback: if geometry API fails (should be rare), fall back to bezier math or line
+          if (!arrowheadPos) {
+            // Attempt bezier math using parsed control points
+            const pathMatch = basePath.match(/M\s*([\d.-]+)\s*,\s*([\d.-]+)\s+C\s*([\d.-]+)\s*,\s*([\d.-]+)\s+([\d.-]+)\s*,\s*([\d.-]+)\s+([\d.-]+)\s*,\s*([\d.-]+)/)
+            if (pathMatch) {
+              const x0 = parseFloat(pathMatch[1])
+              const y0 = parseFloat(pathMatch[2])
+              const x1 = parseFloat(pathMatch[3])
+              const y1 = parseFloat(pathMatch[4])
+              const x2 = parseFloat(pathMatch[5])
+              const y2 = parseFloat(pathMatch[6])
+              const x3 = parseFloat(pathMatch[7])
+              const y3 = parseFloat(pathMatch[8])
+              arrowheadPos = findBezierBoundaryIntersection(
+                targetX,
+                targetY,
+                targetNode.width,
+                targetNode.height,
+                x0, y0, x1, y1, x2, y2, x3, y3
+              )
+            }
+            if (!arrowheadPos) {
+              arrowheadPos = getNodeBoundaryIntersection(
+                targetX,
+                targetY,
+                targetNode.width,
+                targetNode.height,
+                sourceX,
+                sourceY
+              )
+            }
+          }
+          
+          // Do not modify the path geometry; we'll trim the stroke using dasharray instead
+        } else {
+          // For straight, smoothstep, and step: use robust path-geometry computation first
+          const geom = findPathBoundaryIntersectionUsingSVG(
+            targetX,
+            targetY,
+            targetNode.width,
+            targetNode.height,
+            basePath
+          )
+          
+          if (geom) {
+            arrowheadPos = { x: geom.x, y: geom.y, angle: geom.angle }
+            if (typeof (geom as any).trimLength === 'number') {
+              trimLength = (geom as any).trimLength as number
+            }
+          } else {
+            // Fallback to simple radial intersection if geometry API fails
+            arrowheadPos = getNodeBoundaryIntersection(
+              targetX,
+              targetY,
+              targetNode.width,
+              targetNode.height,
+              sourceX,
+              sourceY
+            )
+          }
+        }
+      }
+      
       let labelOffsetX = 0
       let labelOffsetY = 0
 
-      // Apply small label offset if needed (for non-bezier edge types with multiple edges)
       if (hasMultipleEdges && edgeStyle.type !== 'bezier') {
         const maxHandles = 5
-        const offsetAmount = 25 // pixels of offset per edge index
+        const offsetAmount = 25
         const offset = (edgeIndex - (maxHandles - 1) / 2) * offsetAmount
         
         const dx = targetX - sourceX
@@ -326,13 +1605,15 @@ export const RelationshipEdge = memo(
       }
       
       return {
-        path: basePath,
+        path: basePath, // Keep original path ending at center
         labelX: baseLabelX,
         labelY: baseLabelY,
         labelOffsetX,
         labelOffsetY,
+        arrowhead: arrowheadPos,
+        trimLength,
       }
-    }, [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, sourceHandleId, targetHandleId, data?.hasMultipleEdges, data?.edgeIndex, edgeStyle.type])
+    }, [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, sourceHandleId, targetHandleId, data?.hasMultipleEdges, data?.edgeIndex, edgeStyle.type, source, target, getNode])
 
     const handleDoubleClick = (e: React.MouseEvent) => {
       e.stopPropagation()
@@ -377,22 +1658,49 @@ export const RelationshipEdge = memo(
       <>
         <BaseEdge
           path={edgePath}
-          markerEnd={markerEnd}
+          markerEnd={undefined}
           style={{
             stroke: edgeStyle.color,
             strokeWidth: selected ? 3 : 2,
-            strokeDasharray: edgeStyle.style === 'dashed' ? '5,5' : undefined,
+            // If we have a trimLength (for bezier), draw only up to that length
+            strokeDasharray:
+              (typeof trimLength === 'number' && trimLength > 0)
+                ? `${trimLength}px 100000px`
+                : (edgeStyle.style === 'dashed' ? '5,5' : undefined),
+            strokeDashoffset: 0,
             opacity: edgeStyle.opacity,
           }}
         />
+        {/* Custom arrowhead at boundary intersection */}
+        {arrowhead && (
+          <EdgeLabelRenderer>
+            <svg
+              style={{
+                position: 'absolute',
+                overflow: 'visible',
+                pointerEvents: 'none',
+                left: 0,
+                top: 0,
+              }}
+            >
+              <g
+                transform={`translate(${arrowhead.x},${arrowhead.y}) rotate(${arrowhead.angle}) translate(-12, -6)`}
+              >
+                <path
+                  d="M 0 0 L 12 6 L 0 12 Z"
+                  fill={edgeStyle.color}
+                  opacity={edgeStyle.opacity}
+                />
+              </g>
+            </svg>
+          </EdgeLabelRenderer>
+        )}
         <EdgeLabelRenderer>
           <div
             style={{
-              position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX + labelOffsetX}px,${labelY + labelOffsetY}px)`,
-              pointerEvents: 'all',
             }}
-            className="nodrag nopan"
+            className="nodrag nopan absolute pointer-events-auto border-0"
             onDoubleClick={handleDoubleClick}
           >
             {isEditing ? (
@@ -403,17 +1711,18 @@ export const RelationshipEdge = memo(
                 onChange={(e) => setEditLabel(e.target.value)}
                 onBlur={handleSave}
                 onKeyDown={handleKeyDown}
-                className="px-2 py-1 text-xs font-medium bg-white border border-primary rounded shadow-lg outline-none min-w-[80px]"
+                className="px-2 py-1 text-xs font-medium rounded shadow-lg outline-none min-w-[80px] text-foreground backdrop-blur-sm bg-[hsl(var(--edge-label-bg))] border-0"
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
               <div
-                className={`px-2 py-1 text-xs font-medium bg-white rounded cursor-pointer hover:bg-gray-50 ${
-                  selected ? 'bg-primary/5' : ''
+                className={`px-2 py-1 text-xs font-medium rounded cursor-pointer hover:bg-accent text-foreground border-0 ${
+                  isEditingPerspective && !isInPerspective ? 'opacity-50' : 'opacity-100'
+                } ${
+                  selected 
+                    ? 'bg-[hsl(var(--edge-label-bg-selected))]' 
+                    : 'bg-[hsl(var(--edge-label-bg))]'
                 }`}
-                style={{
-                  opacity: isEditingPerspective && !isInPerspective ? 0.5 : 1,
-                }}
               >
                 {label}
               </div>
@@ -426,3 +1735,4 @@ export const RelationshipEdge = memo(
 )
 
 RelationshipEdge.displayName = 'RelationshipEdge'
+
