@@ -49,12 +49,13 @@ export function useMapActions() {
   /**
    * Delete a map (soft delete).
    * Sets deletedAt timestamp instead of actually deleting the record.
+   * Uses merge() for optional fields to avoid schema conflicts.
    * 
    * @param mapId - ID of the map to delete
    */
   const deleteMap = async (mapId: string) => {
     await db.transact([
-      tx.maps[mapId].update({
+      tx.maps[mapId].merge({
         deletedAt: Date.now(),
         updatedAt: Date.now(),
       }),
