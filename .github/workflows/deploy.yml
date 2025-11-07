@@ -46,7 +46,11 @@ jobs:
       - name: Build app
         run: pnpm build
         env:
-          VITE_INSTANTDB_APP_ID: ${{ secrets.VITE_INSTANTDB_APP_ID }}
+          # Use repository variable for App ID since it's safe to expose
+          # Set in: Settings > Secrets and variables > Actions > Variables
+          # Name: VITE_INSTANTDB_APP_ID
+          VITE_INSTANTDB_APP_ID: ${{ vars.VITE_INSTANTDB_APP_ID }}
+          # API key is a secret - set in: Settings > Secrets and variables > Actions > Secrets
           VITE_INSTANTDB_API_KEY: ${{ secrets.VITE_INSTANTDB_API_KEY }}
 
       - name: Build docs
