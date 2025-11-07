@@ -11,7 +11,7 @@ import { Eye, EyeOff } from 'lucide-react'
 /**
  * Props for MarkdownEditor component.
  */
-interface MarkdownEditorProps {
+export interface MarkdownEditorProps {
   /** Current markdown text value */
   value: string
   /** Callback when value changes */
@@ -30,12 +30,6 @@ interface MarkdownEditorProps {
  * Markdown editor component with preview mode.
  * Supports editing markdown text and previewing rendered markdown.
  * 
- * @param value - Current markdown text value
- * @param onChange - Callback when value changes
- * @param onBlur - Optional callback when editor loses focus
- * @param placeholder - Placeholder text (default: 'Add notes...')
- * @param disabled - Whether editing is disabled (default: false)
- * @param className - Additional CSS classes (default: '')
  * @returns The markdown editor JSX
  */
 export function MarkdownEditor({

@@ -49,5 +49,5 @@ import { ConceptNode } from '@/components/concept/ConceptNode'
 
 ## Related Components
 
-- [ConceptEditor](/docs/components/concept-editor): Full-featured editor panel
-- [ConceptMapCanvas](/docs/components/concept-map-canvas): Container component
+- [ConceptEditor](/docs/developing/components/concept-editor): Full-featured editor panel
+- [ConceptMapCanvas](/docs/developing/components/concept-map-canvas): Container component

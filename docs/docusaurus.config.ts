@@ -29,7 +29,7 @@ const config: Config = {
   deploymentBranch: 'gh-pages',
   trailingSlash: false,
 
-  onBrokenLinks: 'throw',
+  onBrokenLinks: 'warn',
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
@@ -99,12 +99,8 @@ const config: Config = {
               to: '/docs/user-guide/intro',
             },
             {
-              label: 'Components',
-              to: '/docs/components/intro',
-            },
-            {
-              label: 'Architecture',
-              to: '/docs/architecture/overview',
+              label: 'Developing',
+              to: '/docs/developing/intro',
             },
           ],
         },

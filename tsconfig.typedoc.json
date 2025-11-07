@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "skipLibCheck": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [
+    "src/vite-env.d.ts",
+    "src/components/**/*",
+    "src/hooks/**/*",
+    "src/lib/**/*",
+    "src/stores/**/*"
+  ]
+}
+

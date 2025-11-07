@@ -33,7 +33,7 @@ const OPERATION_TIME_WINDOW_MS = 1000 // 1 second
 /**
  * State interface for undo history.
  */
-interface UndoState {
+export interface UndoState {
   /** Deletion history array */
   deletionHistory: DeletionEntry[]
   /** Current operation ID for grouping deletions */

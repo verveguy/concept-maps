@@ -1,0 +1,50 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/components/**/*.tsx",
+    "src/hooks/**/*.ts",
+    "src/lib/**/*.ts",
+    "src/stores/**/*.ts"
+  ],
+  "out": "docs/docs/developing/api",
+  "plugin": ["typedoc-plugin-markdown"],
+  "readme": "none",
+  "gitRevision": "main",
+  "tsconfig": "tsconfig.typedoc.json",
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/node_modules/**",
+    "**/dist/**"
+  ],
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeInternal": true,
+  "includeVersion": true,
+  "skipErrorChecking": true,
+  "sort": ["source-order"],
+  "kindSortOrder": [
+    "Project",
+    "Module",
+    "Namespace",
+    "Enum",
+    "Class",
+    "Interface",
+    "TypeAlias",
+    "Constructor",
+    "Property",
+    "Method",
+    "Accessor",
+    "Function",
+    "Variable"
+  ],
+  "name": "Concept Mapping Tool API Reference",
+  "entryFileName": "api-overview.md",
+  "useCodeBlocks": true,
+  "flattenOutputFiles": true,
+  "fileExtension": ".md"
+}
+
+

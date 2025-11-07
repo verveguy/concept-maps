@@ -28,7 +28,7 @@ Each component documentation includes:
 
 Start by exploring the core components:
 
-- [ConceptNode](/docs/components/concept-node): The visual representation of concepts
-- [ConceptEditor](/docs/components/concept-editor): Editor for concept properties
-- [RelationshipEdge](/docs/components/relationship-edge): Visual representation of relationships
-- [ConceptMapCanvas](/docs/components/concept-map-canvas): Main canvas component
+- [ConceptNode](/docs/developing/components/concept-node): The visual representation of concepts
+- [ConceptEditor](/docs/developing/components/concept-editor): Editor for concept properties
+- [RelationshipEdge](/docs/developing/components/relationship-edge): Visual representation of relationships
+- [ConceptMapCanvas](/docs/developing/components/concept-map-canvas): Main canvas component

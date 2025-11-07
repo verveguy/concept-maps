@@ -12,7 +12,7 @@ import { format } from 'date-fns'
 /**
  * Props for ShareDialog component.
  */
-interface ShareDialogProps {
+export interface ShareDialogProps {
   /** Map ID to share, or null */
   mapId: string | null
   /** Callback when dialog should close */
@@ -22,8 +22,6 @@ interface ShareDialogProps {
 /**
  * Dialog component for managing map sharing and permissions.
  * 
- * @param mapId - Map ID to share, or null
- * @param onClose - Callback when dialog should close
  * @returns The share dialog JSX
  */
 export function ShareDialog({ mapId, onClose }: ShareDialogProps) {

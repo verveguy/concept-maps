@@ -13,7 +13,7 @@ import { parseTripleText, formatTriple, type TextTriple } from '@/lib/textRepres
 /**
  * Props for EditableTriple component.
  */
-interface EditableTripleProps {
+export interface EditableTripleProps {
   /** The triple data to edit */
   triple: TextTriple
   /** Callback when triple is updated */
@@ -24,8 +24,6 @@ interface EditableTripleProps {
  * EditableTriple component - Individual triple editor in text view.
  * Uses a single text field with Noun <verb phrase> Noun format.
  * 
- * @param triple - The triple data to edit
- * @param onUpdate - Callback when triple is updated
  * @returns The editable triple component JSX
  */
 export function EditableTriple({ triple, onUpdate }: EditableTripleProps) {

@@ -19,5 +19,5 @@ The Concept Mapping Tool is a collaborative, real-time concept mapping applicati
 ## What's Next?
 
 - Get started with the [Getting Started Guide](/docs/user-guide/getting-started)
-- Explore the [Component Documentation](/docs/components/intro)
-- Learn about the [Architecture](/docs/architecture/overview)
+- Explore the [Component Documentation](/docs/developing/components/intro)
+- Learn about the [Architecture](/docs/developing/architecture/overview)

@@ -1,13 +1,18 @@
-# InstantDB Setup Complete
+# InstantDB Setup
+
+This document describes the InstantDB setup and configuration for the Concept Mapping Tool.
 
 ## App Configuration
+
 - **App ID**: Set via `VITE_INSTANTDB_APP_ID` environment variable
 - **App Title**: Concept Mapping Tool
 
 **Note**: Admin tokens and API keys should never be committed to the repository. Store them securely in environment variables or a secrets management system.
 
 ## Environment Variables
+
 Create a `.env` file in the root directory with:
+
 ```
 VITE_INSTANTDB_APP_ID=your-app-id-here
 ```
@@ -19,6 +24,7 @@ VITE_INSTANTDB_APP_ID=your-app-id-here
 The schema has been created in `instant-schema.json` with the following entities:
 
 ### Entities:
+
 1. **maps** - Concept maps
    - name, createdBy, createdAt, updatedAt
 
@@ -35,6 +41,7 @@ The schema has been created in `instant-schema.json` with the following entities
    - mapId, userId, permission, createdAt
 
 ### Links:
+
 - concepts ↔ maps (many-to-one)
 - relationships ↔ maps (many-to-one)
 - relationships ↔ concepts (from/to, many-to-one)
@@ -57,3 +64,23 @@ To push the schema to InstantDB, you have two options:
    - Or contact InstantDB support if MCP tools continue to have issues
 
 The schema format in `instant-schema.json` follows InstantDB's schema definition format and should work once pushed.
+
+## Schema Files
+
+The project uses the following schema files:
+
+- `instant-schema.json` - Schema definition file
+- `src/instant.schema.ts` - TypeScript schema definitions
+- `src/instant.perms.ts` - Permission rules
+
+## Best Practices
+
+When working with InstantDB in this project, refer to the InstantDB Development Rules (see `.cursorrules` in the project root) for critical patterns and best practices, including:
+
+- Query syntax rules (especially null value checks)
+- Link vs foreign key patterns
+- Permission rules and CEL expressions
+- Mutation patterns and transactions
+
+For the complete set of InstantDB development rules, see the [project repository](https://github.com/verveguy/concept-maps/blob/main/.cursorrules).
+

@@ -1,0 +1,318 @@
+---
+description: When working with InstantDB queries, transactions, permissions, schema etc.
+alwaysApply: false
+---
+# InstantDB Development Rules
+
+## Critical Query Syntax Rules
+
+### Null Value Checks - CRITICAL
+- **NEVER** use `$ne: null` or `!= null` syntax - InstantDB does NOT support these operators
+- **ALWAYS** use `$isNull` operator for null checks:
+  ```typescript
+  // ✅ CORRECT - Check for null values
+  where: { deletedAt: { $isNull: true } }
+  
+  // ✅ CORRECT - Check for non-null values  
+  where: { deletedAt: { $isNull: false } }
+  
+  // ❌ WRONG - Will cause validation errors
+  where: { deletedAt: { $ne: null } }
+  where: { deletedAt: { $isNotNull: true } }
+  ```
+- This is a common source of errors: `Validation failed for coerced-query` with `$not` operator errors
+
+### Query Operators
+- Use `$isNull: true` to check if field is null
+- Use `$isNull: false` to check if field is NOT null
+- Use `$in` for array membership checks: `id: { $in: [id1, id2] }`
+- Use `$like` for pattern matching: `label: { $like: '%pattern%' }`
+- Use `$ilike` for case-insensitive pattern matching
+- Use comparison operators: `$gt`, `$gte`, `$lt`, `$lte`, `$eq`, `$ne` (but NOT for null checks)
+
+## Query Patterns
+
+### When to Use `db.useQuery()` vs `db.queryOnce()`
+- **Use `db.useQuery()`** for reactive data that needs to update in real-time (UI components, lists, etc.)
+- **Use `db.queryOnce()`** for one-time operations (empty trash, validation checks, initial data loads)
+- **Example**: Empty trash operation should use `queryOnce()` to avoid unnecessary reactive subscriptions
+
+### Query Structure
+- Always include links needed for data transformation in the query
+- If you access `entity.link?.id` in transformation, include that link in query:
+  ```typescript
+  // ✅ CORRECT
+  db.useQuery({
+    relationships: {
+      map: { creator: {} },      // Include if accessing r.map.creator.id
+      fromConcept: {},           // Include if accessing r.fromConcept.id
+      toConcept: {},             // Include if accessing r.toConcept.id
+    }
+  })
+  
+  // ❌ WRONG - Missing links will result in empty IDs
+  db.useQuery({
+    relationships: {}  // Missing map, fromConcept, toConcept links
+  })
+  ```
+- **Prefer querying through parent entities** when possible:
+  ```typescript
+  // ✅ CORRECT - Query through parent (ensures permission checks work)
+  db.useQuery({
+    maps: {
+      $: { where: { id: mapId } },
+      concepts: {
+        map: { creator: {} }
+      }
+    }
+  })
+  
+  // ❌ WRONG - Direct filtering may break permission checks
+  db.useQuery({
+    concepts: {
+      $: { where: { mapId: mapId } }  // Don't use mapId attribute!
+    }
+  })
+  ```
+
+### Permission Links in Queries
+- If permissions traverse links (e.g., `data.ref("map.creator.id")`), include those links:
+  ```typescript
+  // ✅ CORRECT - Includes links needed for permission checks
+  concepts: {
+    map: {
+      creator: {},
+      readPermissions: {},
+      writePermissions: {},
+    }
+  }
+  ```
+
+### Query Optimization with Field Specifiers
+- **CRITICAL**: Use `fields` parameter to narrow queries and reduce redundant updates
+- Only select fields you actually need - this reduces data transfer and prevents unnecessary re-renders
+- Especially important for reactive queries (`useQuery`) that update frequently
+- **Example from presence queries**: Only subscribe to cursor fields when rendering cursors:
+  ```typescript
+  // ✅ CORRECT - Only subscribe to cursor-related fields
+  db.rooms.usePresence(room, {
+    keys: ['cursor', 'userId', 'userName', 'color', 'avatarUrl']
+    // Prevents re-renders when editingNodeId or editingEdgeId change
+  })
+  
+  // ✅ CORRECT - Use fields in queries to reduce updates
+  db.useQuery({
+    concepts: {
+      $: {
+        fields: ['id', 'label', 'positionX', 'positionY'], // Only needed fields
+        where: { deletedAt: { $isNull: true } }
+      },
+      map: {
+        $: { fields: ['id'] }, // Only need map ID, not all map fields
+      }
+    }
+  })
+  
+  // ❌ WRONG - Fetches all fields, causes re-renders on any field change
+  db.useQuery({
+    concepts: {
+      $: { where: { deletedAt: { $isNull: true } } }
+      // Fetches ALL fields including notes, metadata, etc.
+    }
+  })
+  ```
+- **Benefits**: 
+  - Reduces network traffic and processing overhead
+  - Prevents React re-renders when unrelated fields change
+  - InstantDB filters updates at the source (more efficient than React filtering)
+  - Clear intent: code shows exactly which fields each query needs
+- **When to use**: 
+  - Always consider for reactive queries (`useQuery`) that update frequently
+  - Essential for presence/subscription queries (use `keys` for presence)
+  - Useful when entities have many fields but you only need a few
+  - Less critical for one-time queries (`queryOnce`) but still beneficial
+- **Reference**: [InstantDB Select Fields Documentation](https://www.instantdb.com/docs/instaql#select-fields)
+
+### Presence Query Optimization
+- **CRITICAL**: Use `keys` selection in presence queries to prevent unnecessary re-renders
+- **Write-only mode**: Use `peers: []` and `user: false` for setters that don't need to read presence
+- **Example patterns**:
+  ```typescript
+  // ✅ CORRECT - Only subscribe to cursor fields (for cursor rendering)
+  db.rooms.usePresence(room, {
+    keys: ['cursor', 'userId', 'userName', 'color', 'avatarUrl']
+    // Prevents re-renders when editingNodeId or editingEdgeId change
+  })
+  
+  // ✅ CORRECT - Write-only hook (for setters)
+  db.rooms.usePresence(room, {
+    peers: [],
+    user: false,
+    // Only provides publishPresence, never triggers re-renders
+  })
+  
+  // ✅ CORRECT - Exclude cursor from selection (for editing state)
+  db.rooms.usePresence(room, {
+    keys: ['userId', 'userName', 'editingNodeId', 'editingEdgeId', 'color', 'avatarUrl']
+    // Prevents re-renders when cursors move
+  })
+  
+  // ❌ WRONG - Subscribes to all fields, causes re-renders on any change
+  db.rooms.usePresence(room, {
+    // No keys selection - subscribes to everything
+  })
+  ```
+- **Benefits**: 
+  - Components only subscribe to presence data they actually need
+  - Cursor movements don't trigger graph re-renders
+  - Write-only hooks prevent unnecessary subscriptions
+  - InstantDB filters updates at the source (more efficient than React filtering)
+- **Reference**: See `REACT_FLOW_OPTIMIZATION_ANALYSIS.md` for detailed presence optimization patterns
+
+## Schema Design Rules
+
+### Use Links, Never Foreign Keys
+- **NEVER** store foreign key IDs as attributes (e.g., `createdBy: i.string()`, `mapId: i.string()`)
+- **ALWAYS** use links instead:
+  ```typescript
+  // ✅ CORRECT
+  mapsCreator: {
+    forward: { on: 'maps', has: 'one', label: 'creator' },
+    reverse: { on: '$users', has: 'many', label: 'createdMaps' },
+  }
+  
+  // ❌ WRONG
+  maps: i.entity({
+    creatorId: i.string(),  // Don't do this!
+  })
+  ```
+
+### Link Cardinality
+- `has: 'one'` on forward = single entity points to one related entity (e.g., concept → map)
+- `has: 'many'` on reverse = one entity can have many related entities (e.g., map → concepts)
+- For one-to-many: forward `has: 'one'`, reverse `has: 'many'`
+- For many-to-many: forward `has: 'many'`, reverse `has: 'many'`
+
+## Mutation Patterns
+
+### Creating Entities with Links
+- Use `.link()` method, NOT attributes:
+  ```typescript
+  // ✅ CORRECT
+  await db.transact([
+    tx.concepts[conceptId]
+      .update({ label: 'My Concept', ... })
+      .link({ map: mapId })
+  ])
+  
+  // ❌ WRONG
+  tx.concepts[conceptId].update({ mapId: mapId })
+  ```
+
+### Updating Links
+- Use `.link()` to add/change links: `tx.entity[id].link({ relation: targetId })`
+- Use `.unlink()` to remove links: `tx.entity[id].unlink({ relation: targetId })`
+- Links are idempotent - calling `.link()` multiple times is safe
+
+### Atomic Transactions
+- Combine related operations in a single `db.transact()` call:
+  ```typescript
+  // ✅ CORRECT - Atomic operation
+  await db.transact([
+    tx.shareInvitations[invitationId].update({ status: 'accepted' }),
+    tx.shares[shareId].update({ status: 'active' }).link({ user: userId, map: mapId }),
+    tx.maps[mapId].link({ writePermissions: userId }),
+  ])
+  ```
+
+### Soft Deletes
+- Use `deletedAt` timestamp for soft deletes:
+  ```typescript
+  // Soft delete
+  tx.entity[id].update({ deletedAt: Date.now() })
+  
+  // Restore (undelete)
+  tx.entity[id].merge({ deletedAt: null })
+  
+  // Permanent delete
+  tx.entity[id].delete()
+  ```
+
+## Permission Rules (CEL - Common Expression Language)
+
+### Link Traversal with `data.ref()`
+- `data.ref()` always returns an array-like structure, even for single-valued links
+- **ALWAYS** use `in` operator, never `==`:
+  ```typescript
+  // ✅ CORRECT
+  'auth.id != null && auth.id in data.ref("creator.id")'
+  'auth.id != null && auth.id in data.ref("map.creator.id")'
+  
+  // ❌ WRONG
+  'auth.id == data.ref("creator.id")'
+  ```
+
+### Permission Bind Rules
+- Use `bind` to create reusable permission expressions:
+  ```typescript
+  bind: [
+    'isOwner',
+    'auth.id != null && auth.id in data.ref("creator.id")',
+    'hasReadPermission',
+    'auth.id != null && auth.id in data.ref("readPermissions.id")',
+    'isOwnerOrReader',
+    'isOwner || hasReadPermission || hasWritePermission',
+  ]
+  allow: {
+    view: 'isOwnerOrReader',
+  }
+  ```
+
+### $users View Permission
+- Always include `$users: { allow: { view: 'auth.id != null' } }` to enable viewing linked user entities
+- Required when queries traverse to user entities (e.g., `creator: {}`)
+
+## Common Pitfalls to Avoid
+
+1. **Null Check Syntax**: Using `$ne: null` instead of `$isNull: false` - causes validation errors
+2. **Missing Links**: Not including links in queries that are accessed in transformations
+3. **Using `==` instead of `in`**: Always use `in` for `data.ref()` comparisons in permissions
+4. **Foreign Keys as Attributes**: Never store `mapId`, `userId` as attributes - use links
+5. **Incomplete Transactions**: Group related operations (updates + link changes) in single transaction
+6. **Wrong Query Method**: Using `useQuery()` for one-time operations instead of `queryOnce()`
+7. **Missing Permission Links**: If permissions check `map.creator.id`, query must include `map: { creator: {} }`
+8. **Not Using Field Specifiers**: Fetching all fields when only a few are needed - causes unnecessary re-renders
+9. **Missing Field Specifiers in Presence**: Not using `keys` selection in presence queries - causes re-renders on unrelated changes
+10. **Querying Through Wrong Parent**: Using `concepts: { $: { where: { mapId: X } } }` instead of `maps: { concepts: {} }` - breaks permission checks
+
+## Code Review Checklist
+
+When reviewing InstantDB code, check:
+- [ ] Null checks use `$isNull: true/false`, not `$ne: null`
+- [ ] All links accessed in transformations are included in queries
+- [ ] Permission rules use `in` operator with `data.ref()`, not `==`
+- [ ] No foreign key IDs stored as attributes - only links
+- [ ] Related mutations grouped in single `db.transact()` call
+- [ ] `useQuery()` used for reactive data, `queryOnce()` for one-time operations
+- [ ] Permission links included in queries when permissions traverse links
+- [ ] `$users` has view permission if queries include user links
+- [ ] Field specifiers (`fields`) used in queries to reduce unnecessary updates
+- [ ] Presence queries use `keys` selection to narrow subscriptions
+- [ ] Queries prefer parent entity traversal (`maps: { concepts: {} }`) over direct filtering
+
+## Debugging Tips
+
+- **Empty link IDs**: Check console for `fromConceptId: ""` or `toConceptId: ""` - indicates missing links in query
+- **Permission denied errors**: Often mean missing links needed for permission traversal - add `map: { creator: {} }` etc.
+- **Schema mismatch**: Verify schema matches query structure (correct `has: 'one'` vs `has: 'many'`)
+- **Inspect raw data**: Add debug logging: `console.log('Raw data:', data?.maps?.[0]?.relationships)` to see what InstantDB returns
+- **User links not loading**: Check that `$users` has view permission if queries include `creator: {}` or `user: {}`
+- **Unexpected re-renders**: Check if field specifiers (`fields`) are being used - missing fields can cause re-renders on unrelated changes
+- **Presence re-renders**: Verify `keys` selection is used in presence queries to narrow subscriptions
+- **Transaction failures**: Check if related operations are grouped in single `db.transact()` call
+
+## References
+- [InstantDB Query Documentation](https://www.instantdb.com/docs/instaql)
+- [InstantDB Schema Documentation](https://www.instantdb.com/docs/modeling-data)
+- [InstantDB Permissions Documentation](https://www.instantdb.com/docs/permissions)
+

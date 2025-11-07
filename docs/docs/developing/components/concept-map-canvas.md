@@ -25,5 +25,5 @@ The `ConceptMapCanvas` component is the main container for the graph view of con
 
 ## Related Components
 
-- [ConceptNode](/docs/components/concept-node): Node component
-- [RelationshipEdge](/docs/components/relationship-edge): Edge component
+- [ConceptNode](/docs/developing/components/concept-node): Node component
+- [RelationshipEdge](/docs/developing/components/relationship-edge): Edge component

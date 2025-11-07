@@ -1,12 +1,14 @@
 import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
+import { apiSidebarItems } from './sidebars.api';
 
 /**
  * Sidebar configuration for the Concept Mapping Tool documentation.
  * 
- * Organized into three main sections:
+ * Organized into two main sections:
  * - User Guide: End-user documentation
- * - Components: React component API documentation
- * - Architecture: System design and technical architecture
+ * - Developing: Developer documentation, guides, components, and architecture
+ * 
+ * Note: API Reference sidebar items are auto-generated from TypeDoc output.
  */
 const sidebars: SidebarsConfig = {
   docsSidebar: [
@@ -26,52 +28,94 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
-      label: 'Components',
+      label: 'Developing',
       items: [
-        'components/intro',
+        'developing/intro',
         {
           type: 'category',
-          label: 'Core Components',
+          label: 'Components',
           items: [
-            'components/concept-node',
-            'components/concept-editor',
-            'components/relationship-edge',
-            'components/relationship-editor',
-            'components/concept-map-canvas',
-            'components/unified-editor',
+            'developing/components/intro',
+            {
+              type: 'category',
+              label: 'Core Components',
+              items: [
+                'developing/components/concept-node',
+                'developing/components/concept-editor',
+                'developing/components/relationship-edge',
+                'developing/components/relationship-editor',
+                'developing/components/concept-map-canvas',
+                'developing/components/unified-editor',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Layout Components',
+              items: [
+                'developing/components/app-layout',
+                'developing/components/sidebar',
+                'developing/components/search-box',
+              ],
+            },
+            {
+              type: 'category',
+              label: 'Presence Components',
+              items: [
+                'developing/components/presence-avatar',
+                'developing/components/presence-cursor',
+                'developing/components/editing-highlight',
+              ],
+            },
           ],
         },
         {
           type: 'category',
-          label: 'Layout Components',
+          label: 'Architecture',
           items: [
-            'components/app-layout',
-            'components/sidebar',
-            'components/search-box',
+            'developing/architecture/overview',
+            'developing/architecture/data-model',
+            'developing/architecture/state-management',
+            'developing/architecture/instantdb-integration',
+            'developing/architecture/realtime-sync',
+            'developing/architecture/layout-algorithms',
+            'developing/architecture/performance',
           ],
         },
         {
           type: 'category',
-          label: 'Presence Components',
+          label: 'API Reference',
+          collapsed: true,
+          items: apiSidebarItems,
+        },
+        {
+          type: 'category',
+          label: 'Setup & Configuration',
           items: [
-            'components/presence-avatar',
-            'components/presence-cursor',
-            'components/editing-highlight',
+            'developing/setup/building',
+            'developing/setup/docusaurus',
+            'developing/setup/instantdb',
           ],
         },
-      ],
-    },
-    {
-      type: 'category',
-      label: 'Architecture',
-      items: [
-        'architecture/overview',
-        'architecture/data-model',
-        'architecture/state-management',
-        'architecture/instantdb-integration',
-        'architecture/realtime-sync',
-        'architecture/layout-algorithms',
-        'architecture/performance',
+        'developing/contributing',
+        {
+          type: 'category',
+          label: 'Development Guides',
+          items: [
+            'developing/guides/react-flow-optimization',
+            'developing/guides/sharing-system-review',
+          ],
+        },
+        {
+          type: 'category',
+          label: 'Planning Documents',
+          items: [
+            'developing/planning/implementation-plan',
+            'developing/planning/command-pattern',
+            'developing/planning/perspective-edit',
+            'developing/planning/concept-map-comparison',
+            'developing/planning/questions',
+          ],
+        },
       ],
     },
   ],

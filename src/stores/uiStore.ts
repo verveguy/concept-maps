@@ -13,7 +13,7 @@ export type ViewMode = 'graph' | 'text' | 'both'
 /**
  * State interface for UI-related state.
  */
-interface UIState {
+export interface UIState {
   /** Current view mode: 'graph' | 'text' | 'both' */
   viewMode: ViewMode
   /** Set the view mode */

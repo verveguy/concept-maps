@@ -8,7 +8,7 @@ import { create } from 'zustand'
 /**
  * State interface for map-related UI and data state.
  */
-interface MapState {
+export interface MapState {
   /** Current active map ID */
   currentMapId: string | null
   /** Current active perspective ID */

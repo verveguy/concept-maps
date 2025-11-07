@@ -9,7 +9,7 @@ import type { LayoutType } from '@/lib/layouts'
 /**
  * Props for LayoutControls component.
  */
-interface LayoutControlsProps {
+export interface LayoutControlsProps {
   /** Callback when a layout is selected */
   onApplyLayout: (layoutType: LayoutType) => void
   /** Whether controls are disabled */
@@ -19,8 +19,6 @@ interface LayoutControlsProps {
 /**
  * LayoutControls component - UI for selecting and applying layout algorithms.
  * 
- * @param onApplyLayout - Callback when a layout is selected
- * @param disabled - Whether controls are disabled (default: false)
  * @returns The layout controls JSX
  */
 export function LayoutControls({ onApplyLayout, disabled = false }: LayoutControlsProps) {

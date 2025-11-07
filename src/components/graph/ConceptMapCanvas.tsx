@@ -44,7 +44,7 @@ import { CustomConnectionLine } from './CustomConnectionLine'
 /**
  * Props for ConceptMapCanvas component.
  */
-interface ConceptMapCanvasProps {
+export interface ConceptMapCanvasProps {
   /** Callback when user requests to create a new concept at a position */
   onCreateConcept?: (position: { x: number; y: number }) => void
 }

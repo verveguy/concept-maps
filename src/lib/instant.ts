@@ -2,7 +2,7 @@
  * InstantDB client initialization and configuration.
  * Sets up the database connection and exports transaction utilities.
  * 
- * App ID: 58e6b84c-91aa-49d6-8159-ab1ecafb93f5
+ * App ID should be set via VITE_INSTANTDB_APP_ID environment variable.
  */
 
 import { init, tx, id } from '@instantdb/react'
@@ -12,13 +12,13 @@ import schema from '../instant.schema'
 
 /**
  * InstantDB application ID.
- * Can be overridden via VITE_INSTANTDB_APP_ID environment variable.
+ * Must be set via VITE_INSTANTDB_APP_ID environment variable.
  */
-const APP_ID = import.meta.env.VITE_INSTANTDB_APP_ID || '58e6b84c-91aa-49d6-8159-ab1ecafb93f5'
+const APP_ID = import.meta.env.VITE_INSTANTDB_APP_ID
 
 if (!APP_ID) {
-  console.warn(
-    'InstantDB credentials not found. Please set VITE_INSTANTDB_APP_ID in your .env file'
+  throw new Error(
+    'InstantDB App ID not found. Please set VITE_INSTANTDB_APP_ID in your .env file'
   )
 }
 
