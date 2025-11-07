@@ -13,6 +13,7 @@ import {
   type EdgeProps,
   Position,
   useReactFlow,
+  useNodes,
 } from 'reactflow'
 import type { RelationshipEdgeData } from '@/lib/reactFlowTypes'
 import { useRelationshipActions } from '@/hooks/useRelationshipActions'
@@ -1350,7 +1351,8 @@ export const RelationshipEdge = memo(
     markerEnd,
   }: EdgeProps<RelationshipEdgeData>) => {
     const { updateRelationship } = useRelationshipActions()
-    const { getNode } = useReactFlow()
+    const { getNode, setNodes } = useReactFlow()
+    const nodes = useNodes()
     const relationship = data?.relationship
     const label = relationship?.primaryLabel || ''
     const isEditingPerspective = data?.isEditingPerspective ?? false
@@ -1404,11 +1406,28 @@ export const RelationshipEdge = memo(
     const [isEditing, setIsEditing] = useState(false)
     const [editLabel, setEditLabel] = useState(label)
     const inputRef = useRef<HTMLInputElement>(null)
+    const hasTriggeredEditRef = useRef(false)
 
     // Update edit label when relationship changes
     useEffect(() => {
       setEditLabel(label)
     }, [label])
+
+    // Reset the trigger ref when shouldStartEditing becomes false
+    useEffect(() => {
+      if (!data?.shouldStartEditing) {
+        hasTriggeredEditRef.current = false
+      }
+    }, [data?.shouldStartEditing])
+
+    // Trigger edit mode if shouldStartEditing flag is set (only once per flag cycle)
+    useEffect(() => {
+      if (data?.shouldStartEditing && !isEditing && !hasTriggeredEditRef.current) {
+        hasTriggeredEditRef.current = true
+        setIsEditing(true)
+        setEditLabel(label)
+      }
+    }, [data?.shouldStartEditing, isEditing, label])
 
     // Focus input when editing starts
     useEffect(() => {
@@ -1645,12 +1664,43 @@ export const RelationshipEdge = memo(
     }
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' && isEditing) {
         e.preventDefault()
         handleSave()
+        // After saving, navigate to target node edit mode
+        navigateToTargetNode()
       } else if (e.key === 'Escape') {
         e.preventDefault()
         handleCancel()
+      } else if (e.key === 'Tab' && isEditing) {
+        e.preventDefault()
+        // Save current edit first
+        handleSave()
+        // Navigate to target node edit mode
+        navigateToTargetNode()
+      }
+    }
+
+    // Navigate to target node and trigger edit mode
+    const navigateToTargetNode = () => {
+      if (!target) return
+      
+      const targetNode = getNode(target)
+      if (targetNode && targetNode.data) {
+        // Set shouldStartEditing flag on the target node
+        const updatedNodes = nodes.map((node) => {
+          if (node.id === target && node.data && typeof node.data === 'object') {
+            return {
+              ...node,
+              data: {
+                ...(node.data as Record<string, unknown>),
+                shouldStartEditing: true,
+              },
+            }
+          }
+          return node
+        })
+        setNodes(updatedNodes)
       }
     }
 
@@ -1711,12 +1761,12 @@ export const RelationshipEdge = memo(
                 onChange={(e) => setEditLabel(e.target.value)}
                 onBlur={handleSave}
                 onKeyDown={handleKeyDown}
-                className="px-2 py-1 text-xs font-medium rounded shadow-lg outline-none min-w-[80px] text-foreground backdrop-blur-sm bg-[hsl(var(--edge-label-bg))] border-0"
+                className="px-2 py-1 text-xs font-medium rounded shadow-lg outline-none min-w-[80px] text-foreground backdrop-blur-sm bg-[hsl(var(--edge-label-bg))] border-0 text-center"
                 onClick={(e) => e.stopPropagation()}
               />
             ) : (
               <div
-                className={`px-2 py-1 text-xs font-medium rounded cursor-pointer hover:bg-accent text-foreground border-0 ${
+                className={`px-2 py-1 text-xs font-medium rounded cursor-pointer hover:bg-accent text-foreground border-0 text-center ${
                   isEditingPerspective && !isInPerspective ? 'opacity-50' : 'opacity-100'
                 } ${
                   selected 

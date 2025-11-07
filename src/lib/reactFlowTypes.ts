@@ -38,6 +38,8 @@ export interface RelationshipEdgeData {
   hasMultipleEdges?: boolean
   /** Index of this edge within a group of edges between the same nodes */
   edgeIndex?: number
+  /** Flag to trigger edit mode when edge is first created */
+  shouldStartEditing?: boolean
 }
 
 /**

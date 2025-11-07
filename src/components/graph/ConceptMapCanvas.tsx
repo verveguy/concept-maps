@@ -73,8 +73,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const nodeTypesRef = useRef(nodeTypes)
   const edgeTypesRef = useRef(edgeTypes)
   
-  // Track newly created concept IDs that should start in edit mode
-  const newlyCreatedConceptIdsRef = useRef<Set<string>>(new Set())
+  // Track relationship IDs connected to newly created concepts (for edit mode)
+  // When a new concept is created, the relationship enters edit mode first
+  const newlyCreatedRelationshipIdsRef = useRef<Map<string, string>>(new Map()) // conceptId -> relationshipId
   
   const currentMapId = useMapStore((state) => state.currentMapId)
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
@@ -245,47 +246,55 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const [nodes, setNodes, onNodesChangeBase] = useNodesState(allNodes)
   const [edges, setEdges, onEdgesChangeBase] = useEdgesState(newEdges)
 
-  // Update newly created nodes to start in edit mode
-  // Watch for when the concept appears in the concepts array and update the corresponding node
+  // Update newly created relationship edges to start in edit mode
+  // Watch for when the relationship appears in the relationships array and update the corresponding edge
   useEffect(() => {
-    const idsToUpdate = Array.from(newlyCreatedConceptIdsRef.current)
-    if (idsToUpdate.length === 0) return
+    const relationshipIdsToUpdate = Array.from(
+      newlyCreatedRelationshipIdsRef.current.values()
+    )
+    if (relationshipIdsToUpdate.length === 0) return
     
-    // Use the same concepts array that's used to create nodes
-    const conceptsForNodes = isEditingPerspective ? allConcepts : filteredConcepts
+    // Use the same relationships array that's used to create edges
+    const relationshipsForEdges = isEditingPerspective ? allRelationships : filteredRelationships
     
-    // Check if any of the tracked concepts have appeared (don't check label, just ID)
-    const conceptsToTrigger = conceptsForNodes.filter((c) => 
-      idsToUpdate.includes(c.id)
+    // Check if any of the tracked relationships have appeared
+    const relationshipsToTrigger = relationshipsForEdges.filter((r) => 
+      relationshipIdsToUpdate.includes(r.id)
     )
     
-    if (conceptsToTrigger.length > 0) {
-      // Wait for next frame to ensure nodes are rendered
+    if (relationshipsToTrigger.length > 0) {
+      // Wait for next frame to ensure edges are rendered
       requestAnimationFrame(() => {
-        const updatedNodes = nodes.map((node) => {
-          const conceptId = conceptsToTrigger.find((c) => c.id === node.id)?.id
-          if (conceptId && !node.data.shouldStartEditing) {
-            // Remove from tracking set immediately to prevent re-triggering
-            newlyCreatedConceptIdsRef.current.delete(conceptId)
+        const updatedEdges = edges.map((edge) => {
+          const relationshipId = relationshipsToTrigger.find((r) => r.id === edge.id)?.id
+          if (relationshipId && !edge.data?.shouldStartEditing) {
+            // Remove from tracking map immediately to prevent re-triggering
+            // Find and remove the entry for this relationship
+            for (const [conceptId, relId] of newlyCreatedRelationshipIdsRef.current.entries()) {
+              if (relId === relationshipId) {
+                newlyCreatedRelationshipIdsRef.current.delete(conceptId)
+                break
+              }
+            }
             return {
-              ...node,
+              ...edge,
               data: {
-                ...node.data,
+                ...edge.data,
                 shouldStartEditing: true,
               },
             }
           }
-          return node
+          return edge
         })
         
         // Only update if we actually changed something
-        const hasChanges = updatedNodes.some((node, index) => node !== nodes[index])
+        const hasChanges = updatedEdges.some((edge, index) => edge !== edges[index])
         if (hasChanges) {
-          setNodes(updatedNodes)
+          setEdges(updatedEdges)
         }
       })
     }
-  }, [filteredConcepts, allConcepts, isEditingPerspective, nodes, setNodes])
+  }, [filteredRelationships, allRelationships, isEditingPerspective, edges, setEdges])
 
   // Clear shouldStartEditing flag after it's been used (to prevent re-triggering)
   useEffect(() => {
@@ -311,6 +320,31 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       return () => clearTimeout(timeoutId)
     }
   }, [nodes, setNodes])
+
+  // Clear shouldStartEditing flag from edges after it's been used
+  useEffect(() => {
+    const edgesWithFlag = edges.filter((edge) => edge.data?.shouldStartEditing)
+    if (edgesWithFlag.length > 0) {
+      // Clear the flag after a short delay to allow edit mode to trigger
+      const timeoutId = setTimeout(() => {
+        const updatedEdges = edges.map((edge) => {
+          if (edge.data?.shouldStartEditing) {
+            return {
+              ...edge,
+              data: {
+                ...edge.data,
+                shouldStartEditing: false,
+              },
+            }
+          }
+          return edge
+        })
+        setEdges(updatedEdges)
+      }, 100) // Small delay to ensure edit mode has triggered
+      
+      return () => clearTimeout(timeoutId)
+    }
+  }, [edges, setEdges])
 
   // Wrap onNodesChange to intercept deletions and delete from database
   const onNodesChange = useCallback(
@@ -739,8 +773,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
               }),
           ])
           
-          // Mark this concept to start in edit mode
-          newlyCreatedConceptIdsRef.current.add(newConceptId)
+          // Track the relationship to start in edit mode (not the node)
+          // The relationship will be edited first, then Tab/Enter will move to the node
+          newlyCreatedRelationshipIdsRef.current.set(newConceptId, newRelationshipId)
         } catch (error) {
           console.error('Failed to create concept and relationship from connection:', error)
         }
