@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Concept Mapping Tool</title>
+    <script>
+      // GitHub Pages 404.html for SPA routing
+      // When GitHub Pages serves this 404.html, the URL in the browser is still the original requested URL
+      // We redirect to index.html with the original path as a query parameter
+      const path = window.location.pathname;
+      const basePath = '/concept-maps/app';
+      
+      if (path.startsWith(basePath)) {
+        // Extract the path after the base path
+        const pathAfterBase = path.substring(basePath.length);
+        const search = window.location.search;
+        const hash = window.location.hash;
+        
+        // Redirect to index.html with the original path as a redirect query param
+        // The SPA will read this and update the history
+        const redirectParam = encodeURIComponent(pathAfterBase + search + hash);
+        window.location.replace(basePath + '/index.html?redirect=' + redirectParam);
+      } else {
+        // Not an app route, redirect to base path
+        window.location.replace(basePath + '/');
+      }
+    </script>
+  </head>
+  <body>
+    <p>Redirecting...</p>
+  </body>
+</html>
+

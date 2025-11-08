@@ -11,6 +11,10 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  optimizeDeps: {
+    exclude: ['elkjs'],
+    include: ['elkjs/lib/elk.bundled.js'],
+  },
   // GitHub Pages deployment configuration
   base: process.env.NODE_ENV === 'production' ? '/concept-maps/app/' : '/',
 })

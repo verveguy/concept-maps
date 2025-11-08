@@ -70,6 +70,12 @@ jobs:
           # Copy docs build to deploy/docs
           cp -r docs/build/* deploy/docs/
           
+          # Copy 404.html to root for GitHub Pages SPA routing
+          # GitHub Pages serves 404.html from the root when a file is not found
+          if [ -f dist/404.html ]; then
+            cp dist/404.html deploy/404.html
+          fi
+          
           # Create index.html redirect to app
           cat > deploy/index.html << 'EOF'
           <!DOCTYPE html>

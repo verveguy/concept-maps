@@ -497,7 +497,7 @@ export function useSharing(mapId: string | null) {
  * The link includes the map ID and invitation token as query parameters.
  * 
  * **Link Format:**
- * `{origin}/map/{mapId}?inviteToken={token}`
+ * `{origin}{basePath}/map/{mapId}?inviteToken={token}`
  * 
  * **Use Case:**
  * After creating an invitation, generate a shareable link to send to the invitee.
@@ -519,7 +519,10 @@ export function useSharing(mapId: string | null) {
  */
 export function generateShareLink(mapId: string, token: string): string {
   const baseUrl = window.location.origin
-  const url = new URL(`${baseUrl}/map/${mapId}`)
+  // Use import.meta.env.BASE_URL which includes the base path from vite config
+  // BASE_URL always ends with a slash, so we remove it before appending our path
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, '')
+  const url = new URL(`${baseUrl}${basePath}/map/${mapId}`)
   url.searchParams.set('inviteToken', token)
   return url.toString()
 }
