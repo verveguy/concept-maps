@@ -9,6 +9,7 @@ import { useUIStore } from '@/stores/uiStore'
 import { MarkdownEditor } from '@/components/notes/MarkdownEditor'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { stripLineBreaks } from '@/lib/textRepresentation'
+import { id } from '@/lib/instant'
 
 /**
  * Style attribute keys that should be treated as built-in attributes, not metadata
@@ -231,7 +232,7 @@ function ConceptEditorContent({
         } else {
           // New entry, generate UUID
           metadataEntries.push({
-            id: crypto.randomUUID(),
+            id: id(),
             key,
             value: typeof value === 'object' ? JSON.stringify(value) : String(value),
           })
@@ -295,16 +296,17 @@ function ConceptEditorContent({
         }
       }
     })
-    // Preserve style attributes when saving metadata
+    
+    // Build new metadata object with style attributes preserved
     const currentMetadata = concept.metadata || {}
-    const newMetadata = {
-      ...currentMetadata,
-      ...metadataObj,
-      // Ensure style attributes are preserved
+    const newMetadata: Record<string, unknown> = {
+      // Preserve style attributes
       fillColor: currentMetadata.fillColor,
       borderColor: currentMetadata.borderColor,
       borderStyle: currentMetadata.borderStyle,
       textColor: currentMetadata.textColor,
+      // Add/update non-style metadata (this replaces all non-style metadata)
+      ...metadataObj,
     }
     
     // Only save if metadata actually changed
@@ -365,7 +367,7 @@ function ConceptEditorContent({
   const handleAddMetadata = () => {
     if (!hasWriteAccess) return
     const newEntry: MetadataEntry = {
-      id: crypto.randomUUID(),
+      id: id(),
       key: `key${metadata.length + 1}`,
       value: '',
     }
@@ -744,7 +746,7 @@ function RelationshipEditorContent({
         } else {
           // New entry, generate UUID
           metadataEntries.push({
-            id: crypto.randomUUID(),
+            id: id(),
             key,
             value: typeof value === 'object' ? JSON.stringify(value) : String(value),
           })
@@ -849,15 +851,16 @@ function RelationshipEditorContent({
         }
       }
     })
-    // Preserve style attributes when saving metadata
+    
+    // Build new metadata object with style attributes preserved
     const currentMetadata = relationship.metadata || {}
-    const newMetadata = {
-      ...currentMetadata,
-      ...metadataObj,
-      // Ensure style attributes are preserved
+    const newMetadata: Record<string, unknown> = {
+      // Preserve style attributes
       edgeType: currentMetadata.edgeType,
       edgeColor: currentMetadata.edgeColor,
       edgeStyle: currentMetadata.edgeStyle,
+      // Add/update non-style metadata (this replaces all non-style metadata)
+      ...metadataObj,
     }
     
     // Only save if metadata actually changed
@@ -881,7 +884,7 @@ function RelationshipEditorContent({
   const handleAddMetadata = () => {
     if (!hasWriteAccess) return
     const newEntry: MetadataEntry = {
-      id: crypto.randomUUID(),
+      id: id(),
       key: `key${metadata.length + 1}`,
       value: '',
     }
