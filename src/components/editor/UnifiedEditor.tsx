@@ -196,9 +196,16 @@ function ConceptEditorContent({
   const [isSaving, setIsSaving] = useState(false)
   const isEditingRef = useRef(false)
   const nextMetadataIdRef = useRef(0)
+  const previousConceptIdRef = useRef<string | null>(null)
 
   // Update form when concept changes
   useEffect(() => {
+    // Reset ID counter when concept ID changes
+    if (previousConceptIdRef.current !== concept.id) {
+      nextMetadataIdRef.current = 0
+      previousConceptIdRef.current = concept.id
+    }
+    
     if (!isEditingRef.current) {
       setLabel(concept.label)
       setNotes(concept.notes || '')
@@ -207,7 +214,7 @@ function ConceptEditorContent({
       const metadataEntries: MetadataEntry[] = []
       Object.entries(nonStyleMetadata).forEach(([key, value]) => {
         metadataEntries.push({
-          id: `meta-${nextMetadataIdRef.current++}`,
+          id: `meta-${concept.id}-${nextMetadataIdRef.current++}`,
           key,
           value: typeof value === 'object' ? JSON.stringify(value) : String(value),
         })
@@ -338,7 +345,7 @@ function ConceptEditorContent({
   const handleAddMetadata = () => {
     if (!hasWriteAccess) return
     const newEntry: MetadataEntry = {
-      id: `meta-${nextMetadataIdRef.current++}`,
+      id: `meta-${concept.id}-${Date.now()}-${nextMetadataIdRef.current++}`,
       key: `key${metadata.length + 1}`,
       value: '',
     }
@@ -680,9 +687,16 @@ function RelationshipEditorContent({
   const [isSaving, setIsSaving] = useState(false)
   const isEditingRef = useRef(false)
   const nextMetadataIdRef = useRef(0)
+  const previousRelationshipIdRef = useRef<string | null>(null)
 
   // Update form when relationship changes
   useEffect(() => {
+    // Reset ID counter when relationship ID changes
+    if (previousRelationshipIdRef.current !== relationship.id) {
+      nextMetadataIdRef.current = 0
+      previousRelationshipIdRef.current = relationship.id
+    }
+    
     if (!isEditingRef.current) {
       // Strip line breaks when loading labels for text panel editing
       setPrimaryLabel(stripLineBreaks(relationship.primaryLabel))
@@ -693,7 +707,7 @@ function RelationshipEditorContent({
       const metadataEntries: MetadataEntry[] = []
       Object.entries(nonStyleMetadata).forEach(([key, value]) => {
         metadataEntries.push({
-          id: `meta-${nextMetadataIdRef.current++}`,
+          id: `meta-${relationship.id}-${nextMetadataIdRef.current++}`,
           key,
           value: typeof value === 'object' ? JSON.stringify(value) : String(value),
         })
@@ -827,7 +841,7 @@ function RelationshipEditorContent({
   const handleAddMetadata = () => {
     if (!hasWriteAccess) return
     const newEntry: MetadataEntry = {
-      id: `meta-${nextMetadataIdRef.current++}`,
+      id: `meta-${relationship.id}-${Date.now()}-${nextMetadataIdRef.current++}`,
       key: `key${metadata.length + 1}`,
       value: '',
     }
