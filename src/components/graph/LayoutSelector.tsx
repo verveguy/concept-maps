@@ -80,7 +80,7 @@ export function LayoutSelector({
   const [isHovered, setIsHovered] = useState(false)
   const [isMenuHovered, setIsMenuHovered] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const timeoutRef = useRef<number | null>(null)
 
   // Find the selected layout option
   const selectedOption = LAYOUT_OPTIONS.find((opt) => opt.id === selectedLayout) || LAYOUT_OPTIONS[0]
