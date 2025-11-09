@@ -58,6 +58,7 @@ import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
 import { useMapStore } from '@/stores/mapStore'
 import { useUIStore } from '@/stores/uiStore'
 import { db } from '@/lib/instant'
+import { navigateToMap } from '@/utils/navigation'
 import { format } from 'date-fns'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import {
@@ -288,14 +289,28 @@ export const Sidebar = () => {
     setExpandedMaps(newExpanded)
   }
 
+  /**
+   * Handle selecting a map.
+   * Navigates to the map URL and clears the current perspective.
+   * 
+   * @param mapId - ID of the map to select
+   */
   const handleSelectMap = (mapId: string) => {
-    setCurrentMapId(mapId)
+    navigateToMap(mapId)
     setCurrentPerspectiveId(null) // Clear perspective when selecting map
   }
 
+  /**
+   * Handle selecting a perspective.
+   * Navigates to the map URL and sets the selected perspective.
+   * 
+   * @param perspectiveId - ID of the perspective to select
+   * @param mapId - ID of the map containing the perspective
+   * @param e - Mouse event to stop propagation
+   */
   const handleSelectPerspective = (perspectiveId: string, mapId: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    setCurrentMapId(mapId)
+    navigateToMap(mapId)
     setCurrentPerspectiveId(perspectiveId)
   }
 

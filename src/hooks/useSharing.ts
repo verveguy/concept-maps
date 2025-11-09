@@ -87,6 +87,9 @@ export function useSharing(mapId: string | null) {
   // Query share invitations and share records for the provided map
   // Include permission links for debugging and consistency
   // Include map link on shares so permission checks can traverse to map.creator
+  // Filter invitations at query level using InstantDB's OR operator:
+  // - Show all non-accepted invitations (pending, declined, revoked, expired)
+  // - OR show accepted invitations that don't have a corresponding share
   const { data } = db.useQuery(
     mapId
       ? {
@@ -98,8 +101,10 @@ export function useSharing(mapId: string | null) {
                 creator: {},
               },
               creator: {},
+              invitation: {},
             },
             shareInvitations: {
+              share: {}, // Include share link to enable filtering (optional link)
               creator: {},
             },
             writePermissions: {},
@@ -110,37 +115,50 @@ export function useSharing(mapId: string | null) {
   )
 
   // Transform InstantDB data to domain schema format
-  const invitations: ShareInvitation[] = useMemo(
-    () =>
-      data?.maps?.[0]?.shareInvitations?.map((inv: any) => ({
-        id: inv.id,
-        mapId: inv.map?.id || mapId || '',
-        invitedEmail: inv.invitedEmail,
-        invitedUserId: inv.invitedUserId ?? null,
-        permission: inv.permission as 'view' | 'edit',
-        token: inv.token,
-        status: inv.status as ShareInvitation['status'],
-        createdBy: inv.creator?.id || '',
-        createdAt: new Date(inv.createdAt),
-        expiresAt: inv.expiresAt ? new Date(inv.expiresAt) : null,
-        respondedAt: inv.respondedAt ? new Date(inv.respondedAt) : null,
-        revokedAt: inv.revokedAt ? new Date(inv.revokedAt) : null,
-      })) || [],
-    [data?.maps, mapId]
-  )
+  // Filter out accepted invitations that have a corresponding Share
+  // (Shares created from invitations are linked via `invitation` field)
+  const invitations: ShareInvitation[] = useMemo(() => {
+    const rawInvitations = data?.maps?.[0]?.shareInvitations || []
+    const sharesData = data?.maps?.[0]?.shares || []
+    
+    // Create a set of invitation IDs that have corresponding shares
+    const invitationIdsWithShares = new Set(
+      sharesData
+        .filter((s: any) => s.invitation?.id)
+        .map((s: any) => s.invitation.id)
+    )
+    
+    return (
+      rawInvitations
+        .filter((inv: any) => {
+          // Show all non-accepted invitations (pending, declined, revoked, expired)
+          if (inv.status !== 'accepted') return true
+          // For accepted invitations, only show if there's no corresponding share
+          return !invitationIdsWithShares.has(inv.id)
+        })
+        .map((inv: any) => ({
+          id: inv.id,
+          mapId: inv.map?.id || mapId || '',
+          invitedEmail: inv.invitedEmail,
+          invitedUserId: inv.invitedUserId ?? null,
+          permission: inv.permission as 'view' | 'edit',
+          token: inv.token,
+          status: inv.status as ShareInvitation['status'],
+          createdBy: inv.creator?.id || '',
+          createdAt: new Date(inv.createdAt),
+          expiresAt: inv.expiresAt ? new Date(inv.expiresAt) : null,
+          respondedAt: inv.respondedAt ? new Date(inv.respondedAt) : null,
+          revokedAt: inv.revokedAt ? new Date(inv.revokedAt) : null,
+        }))
+    )
+  }, [data?.maps, mapId])
 
   const shares: Share[] = useMemo(() => {
     const sharesData = data?.maps?.[0]?.shares || []
     return sharesData.map((s: any) => {
       const userId = s.user?.id || ''
-      // Shares created from invitations use the invitation ID as the share ID
-      // So we can match directly by ID, or fall back to matching by userId
-      const matchingInvitation = invitations.find(
-        (inv) => inv.id === s.id || (inv.invitedUserId === userId && inv.status === 'accepted')
-      )
-      
-      // Get email from user object if available, otherwise from matching invitation
-      const userEmail = s.user?.email || matchingInvitation?.invitedEmail || null
+      // Get email from user object if available, otherwise from linked invitation
+      const userEmail = s.user?.email || s.invitation?.invitedEmail || null
 
       return {
         id: s.id,
@@ -152,10 +170,10 @@ export function useSharing(mapId: string | null) {
         acceptedAt: s.acceptedAt ? new Date(s.acceptedAt) : null,
         status: (s.status ?? 'pending') as Share['status'],
         revokedAt: s.revokedAt ? new Date(s.revokedAt) : null,
-        invitationId: null, // No longer tracked as attribute
+        invitationId: s.invitation?.id || null,
       }
     })
-  }, [data?.maps, mapId, invitations])
+  }, [data?.maps, mapId])
 
   /**
    * Create a new invitation for a map collaborator.
@@ -238,6 +256,9 @@ export function useSharing(mapId: string | null) {
         throw new Error('Map owner information is missing. Cannot create share.')
       }
 
+      // Generate a new share ID (don't reuse invitation ID)
+      const shareId = id()
+
       // Single atomic transaction combining all operations
       await db.transact([
         tx.shareInvitations[invitationId].update({
@@ -246,7 +267,7 @@ export function useSharing(mapId: string | null) {
           respondedAt: Date.now(),
           revokedAt: null,
         }),
-        tx.shares[invitation.id]
+        tx.shares[shareId]
           .update({
             permission: invitation.permission,
             createdAt: Date.now(),
@@ -258,6 +279,7 @@ export function useSharing(mapId: string | null) {
             user: userId,
             map: invitation.mapId,
             creator: mapOwnerId, // Link creator to map owner for permission checks
+            invitation: invitationId, // Link to the invitation that created this share
           }),
         // Create permission links based on the invitation permission
         ...(invitation.permission === 'edit'
@@ -321,9 +343,9 @@ export function useSharing(mapId: string | null) {
       const invitation = invitations.find((inv) => inv.id === invitationId)
       if (!invitation) throw new Error('Invitation not found')
 
-      // Find associated share - shares created from invitations use the invitation ID as the share ID
+      // Find associated share using the invitation link
       const sharesData = data?.maps?.[0]?.shares || []
-      const associatedShare = sharesData.find((s: any) => s.id === invitationId)
+      const associatedShare = sharesData.find((s: any) => s.invitation?.id === invitationId)
 
       const operations: any[] = [
         tx.shareInvitations[invitationId].update({
@@ -335,7 +357,7 @@ export function useSharing(mapId: string | null) {
       // If there's an associated share that was accepted, revoke it and remove permission links
       if (associatedShare && associatedShare.status === 'active') {
         operations.push(
-          tx.shares[invitationId].update({
+          tx.shares[associatedShare.id].update({
             status: 'revoked',
             revokedAt: Date.now(),
           })
@@ -380,18 +402,8 @@ export function useSharing(mapId: string | null) {
       if (!share) throw new Error('Share not found')
       if (!share.mapId) throw new Error('Share map ID is required')
       
-      // Get userId from link - try shareRecord first, then fallback to transformed share.userId
-      // The transformed share.userId comes from the same query data, so if one is missing, both will be
-      // But we try both in case of timing/refresh issues
+      // Get userId from link - should always exist for active shares
       let userId: string | null = shareRecord.user?.id || share.userId || null
-      if (!userId || userId.trim() === '') {
-        // Last resort: try to get from the invitation if this share was created from one
-        const matchingInvitation = invitations.find(
-          (inv) => inv.id === shareId && inv.status === 'accepted'
-        )
-        userId = matchingInvitation?.invitedUserId || null
-      }
-      
       if (!userId || userId.trim() === '') {
         console.error('Share data:', { shareRecord, share, sharesData })
         throw new Error(
@@ -434,6 +446,7 @@ export function useSharing(mapId: string | null) {
 
   /**
    * Revoke a share (owner action) and remove permission links.
+   * Also updates the linked invitation to 'revoked' status for audit purposes.
    *
    * @param shareId - ID of the share to revoke
    */
@@ -465,6 +478,17 @@ export function useSharing(mapId: string | null) {
         }),
       ]
 
+      // If this share was created from an invitation, also update the invitation to revoked status for audit purposes
+      const linkedInvitationId = shareRecord.invitation?.id
+      if (linkedInvitationId) {
+        operations.push(
+          tx.shareInvitations[linkedInvitationId].update({
+            status: 'revoked',
+            revokedAt: Date.now(),
+          })
+        )
+      }
+
       // Remove permission links based on current permission
       operations.push(
         ...(share.permission === 'edit'
@@ -474,17 +498,46 @@ export function useSharing(mapId: string | null) {
 
       await db.transact(operations)
     },
-    [shares, data]
+    [shares, data, invitations]
+  )
+
+  /**
+   * Delete a revoked invitation permanently (owner action).
+   * Only revoked invitations can be deleted. This permanently removes the
+   * invitation from the database and cannot be undone.
+   *
+   * @param invitationId - ID of the invitation to delete
+   */
+  const deleteInvitation = useCallback(
+    async (invitationId: string) => {
+      if (!currentUser?.id) throw new Error('Authentication required to delete invitations')
+
+      const invitation = invitations.find((inv) => inv.id === invitationId)
+      if (!invitation) throw new Error('Invitation not found')
+      
+      // Only allow deleting revoked invitations
+      if (invitation.status !== 'revoked') {
+        throw new Error('Only revoked invitations can be deleted')
+      }
+
+      // Permanently delete the invitation
+      await db.transact([
+        tx.shareInvitations[invitationId].delete(),
+      ])
+    },
+    [currentUser?.id, invitations]
   )
 
   return {
     currentUser,
+    currentUserEmail,
     shares,
     invitations,
     createInvitation,
     acceptInvitation,
     declineInvitation,
     revokeInvitation,
+    deleteInvitation,
     updateSharePermission,
     revokeShare,
   }

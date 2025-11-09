@@ -210,6 +210,18 @@ const _schema = i.schema({
         label: 'shareInvitations',
       },
     },
+    sharesInvitation: {
+      forward: {
+        on: 'shares',
+        has: 'one',
+        label: 'invitation',
+      },
+      reverse: {
+        on: 'shareInvitations',
+        has: 'one',
+        label: 'share',
+      },
+    },
     sharesCreator: {
       forward: {
         on: 'shares',

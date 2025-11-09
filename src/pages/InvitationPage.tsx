@@ -6,8 +6,9 @@
  */
 
 import { useMemo, useState } from 'react'
-import { db, tx } from '@/lib/instant'
+import { db, tx, id } from '@/lib/instant'
 import { useMapStore } from '@/stores/mapStore'
+import { navigateToMap, navigateToRoot } from '@/utils/navigation'
 import type { ShareInvitation } from '@/lib/schema'
 
 /**
@@ -91,14 +92,6 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
     }
   }, [invitationRecord])
 
-  /**
-   * Utility to navigate to the root of the app after the flow finishes.
-   */
-  const navigateToApp = () => {
-    // Navigate to app base path, removing any query params
-    const basePath = import.meta.env.BASE_URL
-    window.location.href = basePath
-  }
 
   /**
    * Accepts the invitation and provisions a share for the authenticated user.
@@ -150,6 +143,9 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
         return
       }
 
+      // Generate a new share ID (don't reuse invitation ID)
+      const shareId = id()
+
       // Combine both operations in a single transaction to ensure atomicity
       await db.transact([
         tx.shareInvitations[invitation.id].update({
@@ -158,7 +154,7 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
           respondedAt: Date.now(),
           revokedAt: null,
         }),
-        tx.shares[invitation.id]
+        tx.shares[shareId]
           .update({
             permission: invitation.permission,
             createdAt: Date.now(),
@@ -170,6 +166,7 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
             user: auth.user.id,
             map: invitation.map.id,
             creator: mapOwnerId, // Link creator to map owner for permission checks
+            invitation: invitation.id, // Link to the invitation that created this share
           }),
         // Create permission links based on the invitation permission
         ...(invitation.permission === 'edit'
@@ -177,7 +174,8 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
           : [tx.maps[invitation.map.id].link({ readPermissions: auth.user.id })]),
       ])
 
-      setCurrentMapId(invitation.map.id)
+      // Navigate to the map URL after accepting the invitation
+      navigateToMap(invitation.map.id)
     } catch (error) {
       console.error('Failed to accept invitation', error)
       setErrorMessage('Failed to accept the invitation. Please try again or contact the owner.')
@@ -258,7 +256,7 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
           </p>
           <button
             className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-            onClick={navigateToApp}
+            onClick={() => navigateToRoot()}
           >
             Return to app
           </button>
@@ -352,10 +350,17 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
           )}
           {isAccepted ? (
             <button
-              onClick={navigateToApp}
+              onClick={() => {
+                // Navigate to the map URL
+                if (invitation.map?.id) {
+                  navigateToMap(invitation.map.id)
+                } else {
+                  navigateToRoot()
+                }
+              }}
               className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
             >
-              Continue
+              Open Map
             </button>
           ) : (
             <button

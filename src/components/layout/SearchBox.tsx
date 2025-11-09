@@ -8,6 +8,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Search, MapPin, Link2 } from 'lucide-react'
 import { useSearchQuery, type SearchResult } from '@/hooks/useSearch'
 import { useMapStore } from '@/stores/mapStore'
+import { navigateToMap } from '@/utils/navigation'
 
 /**
  * Search box component for searching concepts and relationships across all maps.
@@ -59,7 +60,7 @@ export function SearchBox() {
   const [selectedIndex, setSelectedIndex] = useState(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const { setCurrentMapId, setCurrentPerspectiveId } = useMapStore()
+  const { setCurrentPerspectiveId } = useMapStore()
   
   // Get search results - only queries when debouncedQuery is set (hook handles null/empty query)
   // Permissions automatically filter to only accessible maps
@@ -138,18 +139,16 @@ export function SearchBox() {
 
   /**
    * Handle selecting a search result.
-   * Navigates to the map and selects the concept or relationship.
+   * Navigates to the map URL and clears the current perspective.
+   * The concept/relationship will be displayed in the map canvas.
    */
   const handleSelectResult = useCallback((result: SearchResult) => {
-    setCurrentMapId(result.mapId)
+    navigateToMap(result.mapId)
     setCurrentPerspectiveId(null) // Clear perspective when navigating
     setQuery('')
     setDebouncedQuery('')
     setIsOpen(false)
-    
-    // The concept/relationship will be displayed in the map canvas
-    // The map store handles switching to the correct map
-  }, [setCurrentMapId, setCurrentPerspectiveId])
+  }, [setCurrentPerspectiveId])
 
   return (
     <div className="relative">

@@ -17,21 +17,28 @@ import { useMapStore } from '@/stores/mapStore'
  * The hook subscribes to real-time updates, so the returned map object will
  * automatically update when the map is modified by any user with access.
  * 
- * **Return Value:**
- * Returns the map entity object if a map is selected, or `null` if no map
- * is currently selected. The map object includes:
- * - Basic map properties (id, name, timestamps)
- * - Creator link (for ownership checks)
- * - Permission links (for access control)
+ * **Access Control:**
+ * If a user doesn't have permission to view a map, InstantDB will filter it out
+ * and the hook will return `null`. Use `isLoading` to distinguish between
+ * "still loading" and "no access/doesn't exist".
  * 
- * @returns The current map entity object, or `null` if no map is selected
+ * **Return Value:**
+ * Returns an object containing:
+ * - `map`: The current map entity object, or `null` if no map is selected or user lacks access
+ * - `isLoading`: Whether the query is still loading
+ * 
+ * @returns Object with `map` and `isLoading` properties
  * 
  * @example
  * ```tsx
  * import { useMap } from '@/hooks/useMap'
  * 
  * function MapHeader() {
- *   const map = useMap()
+ *   const { map, isLoading } = useMap()
+ *   
+ *   if (isLoading) {
+ *     return <div>Loading...</div>
+ *   }
  *   
  *   if (!map) {
  *     return <div>No map selected</div>
@@ -44,7 +51,7 @@ import { useMapStore } from '@/stores/mapStore'
 export function useMap() {
   const currentMapId = useMapStore((state) => state.currentMapId)
 
-  const { data } = db.useQuery(
+  const { data, isLoading } = db.useQuery(
     currentMapId
       ? {
           maps: {
@@ -57,5 +64,8 @@ export function useMap() {
       : null
   )
 
-  return data?.maps?.[0] || null
+  return {
+    map: data?.maps?.[0] || null,
+    isLoading,
+  }
 }

@@ -78,38 +78,77 @@ export interface ShareDialogProps {
 export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
   const {
     currentUser,
+    currentUserEmail,
     shares,
     invitations,
     createInvitation,
     updateSharePermission,
     revokeShare,
     revokeInvitation,
+    deleteInvitation,
   } = useSharing(mapId)
-  const map = useMap()
+  const { map } = useMap()
   
   const [emailInput, setEmailInput] = useState('')
   const [permissionInput, setPermissionInput] = useState<'view' | 'edit'>('edit')
   const [isSharing, setIsSharing] = useState(false)
-  const [lastShareLink, setLastShareLink] = useState<string | null>(null)
   const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
 
   // Check if current user is the map owner
   const isOwner = map?.creator?.id === currentUser?.id
+
+  // Invitations are already filtered in useSharing hook to exclude accepted ones with shares
+  // So we can use invitations directly
+  const visibleInvitations = invitations
 
   const handleShare = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!mapId || !emailInput.trim()) return
 
+    // Clear previous errors
+    setEmailError(null)
+
+    const inviteEmail = emailInput.trim().toLowerCase()
+
+    // Validate that user is not sharing with themselves
+    if (currentUserEmail && inviteEmail === currentUserEmail.toLowerCase()) {
+      setEmailError('You cannot share a map with yourself. Please enter a different email address.')
+      return
+    }
+
+    // Check if user already has an active share
+    const existingActiveShare = shares.find(
+      (share) =>
+        share.status === 'active' &&
+        share.userEmail?.toLowerCase() === inviteEmail
+    )
+    if (existingActiveShare) {
+      setEmailError(
+        `This map is already shared with ${inviteEmail}. They have ${existingActiveShare.permission} access.`
+      )
+      return
+    }
+
+    // Check if there's already a pending invitation for this email
+    const existingPendingInvitation = invitations.find(
+      (inv) =>
+        inv.status === 'pending' &&
+        inv.invitedEmail.toLowerCase() === inviteEmail
+    )
+    if (existingPendingInvitation) {
+      setEmailError(
+        `There is already a pending invitation for ${inviteEmail}. Please revoke the existing invitation first if you want to send a new one.`
+      )
+      return
+    }
+
     setIsSharing(true)
     try {
-      // For now, we'll use email as userId (in a real app, you'd look up userId by email)
-      // This is a simplified implementation - in production, you'd need user lookup
-      const inviteEmail = emailInput.trim().toLowerCase()
-
-      const token = await createInvitation(inviteEmail, permissionInput)
-      setLastShareLink(generateShareLink(mapId, token))
+      await createInvitation(inviteEmail, permissionInput)
       setEmailInput('')
       setPermissionInput('edit')
+      setEmailError(null)
     } catch (error) {
       console.error('Failed to share map:', error)
       alert('Failed to share map. Please try again.')
@@ -163,6 +202,17 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
     }
   }
 
+  const handleDeleteInvitation = async (invitationId: string) => {
+    if (!confirm('Permanently delete this invitation? This action cannot be undone.')) return
+
+    try {
+      await deleteInvitation(invitationId)
+    } catch (error) {
+      console.error('Failed to delete invitation:', error)
+      alert('Failed to delete invitation. Please try again.')
+    }
+  }
+
   if (!mapId || !map) return null
 
   return (
@@ -182,71 +232,54 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Last Generated Invitation Link */}
-          {lastShareLink && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Most Recent Invitation Link
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={lastShareLink}
-                  readOnly
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-sm"
-                />
-                <button
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(lastShareLink)
-                    } catch (error) {
-                      console.error('Failed to copy link:', error)
-                      alert('Failed to copy link. Please try again.')
-                    }
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
-                >
-                  <Copy className="h-4 w-4" />
-                  Copy
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-gray-500">
-                Share this link with the invitee. Links are tied to individual invitations and become invalid if revoked.
-              </p>
-            </div>
-          )}
-
           {/* Share with User Section */}
           {isOwner && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Share with User
               </label>
-              <form onSubmit={handleShare} className="flex gap-2">
-                <input
-                  type="email"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="user@example.com"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
-                  required
-                />
-                <select
-                  value={permissionInput}
-                  onChange={(e) => setPermissionInput(e.target.value as 'view' | 'edit')}
-                  className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-                >
-                  <option value="view">View</option>
-                  <option value="edit">Edit</option>
-                </select>
-                <button
-                  type="submit"
-                  disabled={isSharing}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  <Mail className="h-4 w-4" />
-                  Share
-                </button>
+              <form onSubmit={handleShare}>
+                <div className="flex gap-2 items-start">
+                  <div className="flex-1">
+                    <input
+                      type="email"
+                      value={emailInput}
+                      onChange={(e) => {
+                        setEmailInput(e.target.value)
+                        // Clear error when user starts typing
+                        if (emailError) setEmailError(null)
+                      }}
+                      placeholder="user@example.com"
+                      className={`w-full px-3 py-2 border rounded-md text-sm ${
+                        emailError
+                          ? 'border-red-300 bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500'
+                          : 'border-gray-300'
+                      }`}
+                      required
+                    />
+                    {emailError && (
+                      <p className="mt-1 text-xs text-red-600">{emailError}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2 items-start">
+                    <select
+                      value={permissionInput}
+                      onChange={(e) => setPermissionInput(e.target.value as 'view' | 'edit')}
+                      className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                    >
+                      <option value="view">View</option>
+                      <option value="edit">Edit</option>
+                    </select>
+                    <button
+                      type="submit"
+                      disabled={isSharing || !!emailError}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                      <Mail className="h-4 w-4" />
+                      Share
+                    </button>
+                  </div>
+                </div>
               </form>
             </div>
           )}
@@ -254,13 +287,13 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
           {/* Invitation List */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Invitations ({invitations.length})
+              Invitations ({visibleInvitations.length})
             </label>
-            {invitations.length === 0 ? (
-              <p className="text-sm text-gray-500">No invitations created yet.</p>
+            {visibleInvitations.length === 0 ? (
+              <p className="text-sm text-gray-500">No pending invitations.</p>
             ) : (
               <div className="space-y-2">
-                {invitations.map((invitation) => (
+                {visibleInvitations.map((invitation) => (
                   <div
                     key={invitation.id}
                     className="p-3 bg-gray-50 rounded-md border border-gray-100 flex flex-col gap-2"
@@ -272,9 +305,9 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                           Permission: {invitation.permission} ? Status: {invitation.status}
                         </div>
                         <div className="text-xs text-gray-400 mt-0.5">
-                          Created {format(invitation.createdAt, 'MMM d, yyyy h:mm a')}
+                          Invited {format(invitation.createdAt, 'MMM d, yyyy h:mm a')}
                           {invitation.respondedAt && (
-                            <> ? Responded {format(invitation.respondedAt, 'MMM d, yyyy h:mm a')}</>
+                            <> ? {invitation.status === 'accepted' ? 'Accepted' : invitation.status === 'declined' ? 'Rejected' : 'Responded'} {format(invitation.respondedAt, 'MMM d, yyyy h:mm a')}</>
                           )}
                           {invitation.revokedAt && (
                             <> ? Revoked {format(invitation.revokedAt, 'MMM d, yyyy h:mm a')}</>
@@ -296,6 +329,16 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                             className="px-2 py-1 text-xs text-red-600 border border-red-200 rounded-md hover:bg-red-50"
                           >
                             Revoke
+                          </button>
+                        )}
+                        {isOwner && invitation.status === 'revoked' && (
+                          <button
+                            onClick={() => handleDeleteInvitation(invitation.id)}
+                            className="px-2 py-1 text-xs text-red-600 border border-red-200 rounded-md hover:bg-red-50 flex items-center gap-1"
+                            title="Permanently delete this invitation"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Delete
                           </button>
                         )}
                       </div>

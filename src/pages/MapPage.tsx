@@ -5,7 +5,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react'
-import { Plus, X, Share2, Eye, Edit, PanelLeft } from 'lucide-react'
+import { Plus, X, Share2, Eye, Edit, PanelLeft, Lock } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ConceptMapCanvas, type ConceptMapCanvasRef } from '@/components/graph/ConceptMapCanvas'
 import { UnifiedEditor } from '@/components/editor/UnifiedEditor'
@@ -20,6 +20,7 @@ import { useConceptActions } from '@/hooks/useConceptActions'
 import { useMap } from '@/hooks/useMap'
 import { usePerspectives } from '@/hooks/usePerspectives'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
+import { navigateToRoot } from '@/utils/navigation'
 
 /**
  * Main map page component.
@@ -35,7 +36,7 @@ export function MapPage() {
   const setIsEditingPerspective = useMapStore((state) => state.setIsEditingPerspective)
   const sidebarOpen = useUIStore((state) => state.sidebarOpen)
   const setSidebarOpen = useUIStore((state) => state.setSidebarOpen)
-  const map = useMap()
+  const { map, isLoading: isMapLoading } = useMap()
   const perspectives = usePerspectives()
   const currentPerspective = perspectives.find((p) => p.id === currentPerspectiveId)
   const { createConcept } = useConceptActions()
@@ -95,6 +96,46 @@ export function MapPage() {
             <p className="text-muted-foreground">
               Select a map from the sidebar to begin editing
             </p>
+          </div>
+        </div>
+      </AppLayout>
+    )
+  }
+
+  // Show loading state while checking map access
+  if (isMapLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold mb-2">Loading map...</h2>
+            <p className="text-muted-foreground">Please wait</p>
+          </div>
+        </div>
+      </AppLayout>
+    )
+  }
+
+  // Check if user has access to the map
+  // If currentMapId is set but map is null and not loading, user doesn't have access
+  if (!map) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center max-w-md space-y-4">
+            <div className="flex justify-center">
+              <Lock className="h-12 w-12 text-muted-foreground" />
+            </div>
+            <h2 className="text-2xl font-semibold">Access Denied</h2>
+            <p className="text-muted-foreground">
+              You don't have permission to view this map. The map may not exist, or you may need to request access from the map owner.
+            </p>
+            <button
+              onClick={() => navigateToRoot()}
+              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+            >
+              Return to Home
+            </button>
           </div>
         </div>
       </AppLayout>
