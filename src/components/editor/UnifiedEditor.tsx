@@ -398,10 +398,55 @@ function ConceptEditorContent({
     isEditingRef.current = true
   }
 
-  const handleRemoveMetadata = (id: string) => {
+  const handleRemoveMetadata = async (id: string) => {
     if (!hasWriteAccess) return
-    setMetadata(metadata.filter((entry) => entry.id !== id))
-    isEditingRef.current = true
+    
+    // Remove from state using functional update to get the latest state
+    const updatedMetadata = metadata.filter((entry) => entry.id !== id)
+    setMetadata(updatedMetadata)
+    
+    // Set editing flag to false BEFORE saving to prevent useEffect from resetting fields
+    isEditingRef.current = false
+    
+    // Build complete metadata from updated state (without the deleted entry)
+    const userMetadata: Record<string, unknown> = {}
+    updatedMetadata.forEach((entry) => {
+      if (entry.key.trim() && entry.value.trim()) {
+        try {
+          userMetadata[entry.key] = JSON.parse(entry.value)
+        } catch {
+          userMetadata[entry.key] = entry.value
+        }
+      }
+    })
+    
+    // Get current style attributes
+    const currentMetadata = concept.metadata || {}
+    const styleMetadata: Record<string, unknown> = {
+      fillColor: fillColor ?? currentMetadata.fillColor,
+      borderColor: borderColor ?? currentMetadata.borderColor,
+      borderStyle: borderStyle ?? currentMetadata.borderStyle,
+      textColor: textColor ?? currentMetadata.textColor,
+    }
+    
+    // Combine style + user metadata
+    const newMetadata = {
+      ...styleMetadata,
+      ...userMetadata,
+    }
+    
+    // Save immediately
+    setIsSaving(true)
+    try {
+      await onUpdate(concept.id, { metadata: newMetadata })
+    } catch (error) {
+      console.error('Failed to delete metadata field:', error)
+      alert('Failed to delete metadata field. Please try again.')
+      // Revert editing flag on error so form can be reset
+      isEditingRef.current = true
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -652,12 +697,9 @@ function ConceptEditorContent({
                     tabIndex={19 + index * 2}
                   />
                   <button
-                    onClick={() => {
-                      handleRemoveMetadata(entry.id)
-                      handleSaveMetadata()
-                    }}
+                    onClick={() => handleRemoveMetadata(entry.id)}
                     className="p-1 text-red-600 hover:bg-red-50 rounded"
-                    disabled={!hasWriteAccess}
+                    disabled={!hasWriteAccess || isSaving}
                     tabIndex={20 + index * 2}
                   >
                     <X className="h-4 w-4" />
@@ -926,10 +968,54 @@ function RelationshipEditorContent({
     isEditingRef.current = true
   }
 
-  const handleRemoveMetadata = (id: string) => {
+  const handleRemoveMetadata = async (id: string) => {
     if (!hasWriteAccess) return
-    setMetadata(metadata.filter((entry) => entry.id !== id))
-    isEditingRef.current = true
+    
+    // Remove from state using functional update to get the latest state
+    const updatedMetadata = metadata.filter((entry) => entry.id !== id)
+    setMetadata(updatedMetadata)
+    
+    // Set editing flag to false BEFORE saving to prevent useEffect from resetting fields
+    isEditingRef.current = false
+    
+    // Build complete metadata from updated state (without the deleted entry)
+    const userMetadata: Record<string, unknown> = {}
+    updatedMetadata.forEach((entry) => {
+      if (entry.key.trim() && entry.value.trim()) {
+        try {
+          userMetadata[entry.key] = JSON.parse(entry.value)
+        } catch {
+          userMetadata[entry.key] = entry.value
+        }
+      }
+    })
+    
+    // Get current style attributes
+    const currentMetadata = relationship.metadata || {}
+    const styleMetadata: Record<string, unknown> = {
+      edgeType: edgeType ?? currentMetadata.edgeType,
+      edgeColor: edgeColor ?? currentMetadata.edgeColor,
+      edgeStyle: edgeStyle ?? currentMetadata.edgeStyle,
+    }
+    
+    // Combine style + user metadata
+    const newMetadata = {
+      ...styleMetadata,
+      ...userMetadata,
+    }
+    
+    // Save immediately
+    setIsSaving(true)
+    try {
+      await onUpdate(relationship.id, { metadata: newMetadata })
+    } catch (error) {
+      console.error('Failed to delete metadata field:', error)
+      alert('Failed to delete metadata field. Please try again.')
+      // Revert editing flag on error so form can be reset
+      isEditingRef.current = true
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleDelete = async () => {
@@ -1185,12 +1271,9 @@ function RelationshipEditorContent({
                     tabIndex={11 + index * 2}
                   />
                   <button
-                    onClick={() => {
-                      handleRemoveMetadata(entry.id)
-                      handleSaveMetadata()
-                    }}
+                    onClick={() => handleRemoveMetadata(entry.id)}
                     className="p-1 text-red-600 hover:bg-red-50 rounded"
-                    disabled={!hasWriteAccess}
+                    disabled={!hasWriteAccess || isSaving}
                     tabIndex={12 + index * 2}
                   >
                     <X className="h-4 w-4" />
