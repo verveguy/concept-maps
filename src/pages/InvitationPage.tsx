@@ -7,7 +7,6 @@
 
 import { useMemo, useState } from 'react'
 import { db, tx, id } from '@/lib/instant'
-import { useMapStore } from '@/stores/mapStore'
 import { navigateToMap, navigateToRoot } from '@/utils/navigation'
 import type { ShareInvitation } from '@/lib/schema'
 
@@ -27,7 +26,6 @@ interface InvitationPageProps {
  */
 export function InvitationPage({ inviteToken }: InvitationPageProps) {
   const auth = db.useAuth()
-  const { setCurrentMapId } = useMapStore()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
