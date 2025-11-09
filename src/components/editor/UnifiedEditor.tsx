@@ -239,34 +239,46 @@ function ConceptEditorContent({
 
   const handleSaveMetadata = async () => {
     if (!hasWriteAccess) return
-    setIsSaving(true)
+    
+    // Set editing flag to false BEFORE starting save to prevent useEffect from resetting fields
     isEditingRef.current = false
-    try {
-      const metadataObj: Record<string, unknown> = {}
-      Object.entries(metadata).forEach(([key, value]) => {
-        if (key.trim() && value.trim()) {
-          try {
-            metadataObj[key] = JSON.parse(value)
-          } catch {
-            metadataObj[key] = value
-          }
+    
+    // Check if metadata actually changed before saving
+    const metadataObj: Record<string, unknown> = {}
+    Object.entries(metadata).forEach(([key, value]) => {
+      if (key.trim() && value.trim()) {
+        try {
+          metadataObj[key] = JSON.parse(value)
+        } catch {
+          metadataObj[key] = value
         }
-      })
-      // Preserve style attributes when saving metadata
-      const currentMetadata = concept.metadata || {}
-      const newMetadata = {
-        ...currentMetadata,
-        ...metadataObj,
-        // Ensure style attributes are preserved
-        fillColor: currentMetadata.fillColor,
-        borderColor: currentMetadata.borderColor,
-        borderStyle: currentMetadata.borderStyle,
-        textColor: currentMetadata.textColor,
       }
+    })
+    // Preserve style attributes when saving metadata
+    const currentMetadata = concept.metadata || {}
+    const newMetadata = {
+      ...currentMetadata,
+      ...metadataObj,
+      // Ensure style attributes are preserved
+      fillColor: currentMetadata.fillColor,
+      borderColor: currentMetadata.borderColor,
+      borderStyle: currentMetadata.borderStyle,
+      textColor: currentMetadata.textColor,
+    }
+    
+    // Only save if metadata actually changed
+    const currentMetadataStr = JSON.stringify(currentMetadata)
+    const newMetadataStr = JSON.stringify(newMetadata)
+    if (currentMetadataStr === newMetadataStr) return
+    
+    setIsSaving(true)
+    try {
       await onUpdate(concept.id, { metadata: newMetadata })
     } catch (error) {
       console.error('Failed to update concept metadata:', error)
       alert('Failed to update concept metadata. Please try again.')
+      // Revert editing flag on error so form can be reset
+      isEditingRef.current = true
     } finally {
       setIsSaving(false)
     }
@@ -566,6 +578,9 @@ function ConceptEditorContent({
                     type="text"
                     value={key}
                     onChange={(e) => handleUpdateMetadataKey(key, e.target.value)}
+                    onFocus={() => {
+                      isEditingRef.current = true
+                    }}
                     onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Key"
@@ -576,6 +591,9 @@ function ConceptEditorContent({
                     type="text"
                     value={value}
                     onChange={(e) => handleUpdateMetadataValue(key, e.target.value)}
+                    onFocus={() => {
+                      isEditingRef.current = true
+                    }}
                     onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Value"
@@ -746,33 +764,45 @@ function RelationshipEditorContent({
 
   const handleSaveMetadata = async () => {
     if (!hasWriteAccess) return
-    setIsSaving(true)
+    
+    // Set editing flag to false BEFORE starting save to prevent useEffect from resetting fields
     isEditingRef.current = false
-    try {
-      const metadataObj: Record<string, unknown> = {}
-      Object.entries(metadata).forEach(([key, value]) => {
-        if (key.trim() && value.trim()) {
-          try {
-            metadataObj[key] = JSON.parse(value)
-          } catch {
-            metadataObj[key] = value
-          }
+    
+    // Check if metadata actually changed before saving
+    const metadataObj: Record<string, unknown> = {}
+    Object.entries(metadata).forEach(([key, value]) => {
+      if (key.trim() && value.trim()) {
+        try {
+          metadataObj[key] = JSON.parse(value)
+        } catch {
+          metadataObj[key] = value
         }
-      })
-      // Preserve style attributes when saving metadata
-      const currentMetadata = relationship.metadata || {}
-      const newMetadata = {
-        ...currentMetadata,
-        ...metadataObj,
-        // Ensure style attributes are preserved
-        edgeType: currentMetadata.edgeType,
-        edgeColor: currentMetadata.edgeColor,
-        edgeStyle: currentMetadata.edgeStyle,
       }
+    })
+    // Preserve style attributes when saving metadata
+    const currentMetadata = relationship.metadata || {}
+    const newMetadata = {
+      ...currentMetadata,
+      ...metadataObj,
+      // Ensure style attributes are preserved
+      edgeType: currentMetadata.edgeType,
+      edgeColor: currentMetadata.edgeColor,
+      edgeStyle: currentMetadata.edgeStyle,
+    }
+    
+    // Only save if metadata actually changed
+    const currentMetadataStr = JSON.stringify(currentMetadata)
+    const newMetadataStr = JSON.stringify(newMetadata)
+    if (currentMetadataStr === newMetadataStr) return
+    
+    setIsSaving(true)
+    try {
       await onUpdate(relationship.id, { metadata: newMetadata })
     } catch (error) {
       console.error('Failed to update relationship metadata:', error)
       alert('Failed to update relationship metadata. Please try again.')
+      // Revert editing flag on error so form can be reset
+      isEditingRef.current = true
     } finally {
       setIsSaving(false)
     }
@@ -1040,6 +1070,9 @@ function RelationshipEditorContent({
                     type="text"
                     value={key}
                     onChange={(e) => handleUpdateMetadataKey(key, e.target.value)}
+                    onFocus={() => {
+                      isEditingRef.current = true
+                    }}
                     onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Key"
@@ -1050,6 +1083,9 @@ function RelationshipEditorContent({
                     type="text"
                     value={value}
                     onChange={(e) => handleUpdateMetadataValue(key, e.target.value)}
+                    onFocus={() => {
+                      isEditingRef.current = true
+                    }}
                     onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Value"
