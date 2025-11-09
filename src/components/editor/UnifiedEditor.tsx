@@ -195,56 +195,43 @@ function ConceptEditorContent({
   const [isDeleting, setIsDeleting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const isEditingRef = useRef(false)
-  const nextMetadataIdRef = useRef(0)
-  const previousConceptIdRef = useRef<string | null>(null)
-  const focusedMetadataInputRef = useRef<string | null>(null) // Track which metadata input is focused
 
   // Update form when concept changes
   useEffect(() => {
-    // Reset ID counter when concept ID changes
-    if (previousConceptIdRef.current !== concept.id) {
-      nextMetadataIdRef.current = 0
-      previousConceptIdRef.current = concept.id
-      focusedMetadataInputRef.current = null
-    }
-    
-    // Don't reset metadata if user is actively editing a metadata field
-    if (!isEditingRef.current && !focusedMetadataInputRef.current) {
+    if (!isEditingRef.current) {
       setLabel(concept.label)
       setNotes(concept.notes || '')
       // Only include non-style metadata in the editable metadata fields
       const nonStyleMetadata = getNonStyleMetadata(concept.metadata || {}, NODE_STYLE_ATTRIBUTES)
       
-      // Try to preserve existing metadata entry IDs by matching keys
+      // Preserve existing entry IDs by matching keys
       // Also preserve entries that don't exist in concept.metadata yet (newly added, not saved)
       const existingEntriesByKey = new Map<string, MetadataEntry>()
       const unsavedEntries: MetadataEntry[] = []
       metadata.forEach((entry) => {
         if (entry.key.trim()) {
-          // Check if this key exists in the concept's metadata
           if (nonStyleMetadata.hasOwnProperty(entry.key)) {
             existingEntriesByKey.set(entry.key, entry)
           } else {
-            // This is a newly added entry that hasn't been saved yet - preserve it
+            // Newly added entry that hasn't been saved yet - preserve it
             unsavedEntries.push(entry)
           }
         }
       })
       
       const metadataEntries: MetadataEntry[] = []
-      // Add entries from concept.metadata (preserving IDs when possible)
       Object.entries(nonStyleMetadata).forEach(([key, value]) => {
         const existingEntry = existingEntriesByKey.get(key)
         if (existingEntry) {
-          // Preserve the existing ID and update the value
+          // Preserve existing ID, update value
           metadataEntries.push({
             ...existingEntry,
             value: typeof value === 'object' ? JSON.stringify(value) : String(value),
           })
         } else {
-          // Create new entry with new ID
+          // New entry, generate UUID
           metadataEntries.push({
-            id: `meta-${concept.id}-${nextMetadataIdRef.current++}`,
+            id: crypto.randomUUID(),
             key,
             value: typeof value === 'object' ? JSON.stringify(value) : String(value),
           })
@@ -378,7 +365,7 @@ function ConceptEditorContent({
   const handleAddMetadata = () => {
     if (!hasWriteAccess) return
     const newEntry: MetadataEntry = {
-      id: `meta-${concept.id}-${Date.now()}-${nextMetadataIdRef.current++}`,
+      id: crypto.randomUUID(),
       key: `key${metadata.length + 1}`,
       value: '',
     }
@@ -631,12 +618,8 @@ function ConceptEditorContent({
                     onChange={(e) => handleUpdateMetadataKey(entry.id, e.target.value)}
                     onFocus={() => {
                       isEditingRef.current = true
-                      focusedMetadataInputRef.current = entry.id
                     }}
-                    onBlur={() => {
-                      focusedMetadataInputRef.current = null
-                      handleSaveMetadata()
-                    }}
+                    onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Key"
                     disabled={!hasWriteAccess}
@@ -648,12 +631,8 @@ function ConceptEditorContent({
                     onChange={(e) => handleUpdateMetadataValue(entry.id, e.target.value)}
                     onFocus={() => {
                       isEditingRef.current = true
-                      focusedMetadataInputRef.current = entry.id
                     }}
-                    onBlur={() => {
-                      focusedMetadataInputRef.current = null
-                      handleSaveMetadata()
-                    }}
+                    onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Value"
                     disabled={!hasWriteAccess}
@@ -727,21 +706,10 @@ function RelationshipEditorContent({
   const [isDeleting, setIsDeleting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const isEditingRef = useRef(false)
-  const nextMetadataIdRef = useRef(0)
-  const previousRelationshipIdRef = useRef<string | null>(null)
-  const focusedMetadataInputRef = useRef<string | null>(null) // Track which metadata input is focused
 
   // Update form when relationship changes
   useEffect(() => {
-    // Reset ID counter when relationship ID changes
-    if (previousRelationshipIdRef.current !== relationship.id) {
-      nextMetadataIdRef.current = 0
-      previousRelationshipIdRef.current = relationship.id
-      focusedMetadataInputRef.current = null
-    }
-    
-    // Don't reset metadata if user is actively editing a metadata field
-    if (!isEditingRef.current && !focusedMetadataInputRef.current) {
+    if (!isEditingRef.current) {
       // Strip line breaks when loading labels for text panel editing
       setPrimaryLabel(stripLineBreaks(relationship.primaryLabel))
       setReverseLabel(stripLineBreaks(relationship.reverseLabel))
@@ -749,36 +717,34 @@ function RelationshipEditorContent({
       // Only include non-style metadata in the editable metadata fields
       const nonStyleMetadata = getNonStyleMetadata(relationship.metadata || {}, EDGE_STYLE_ATTRIBUTES)
       
-      // Try to preserve existing metadata entry IDs by matching keys
+      // Preserve existing entry IDs by matching keys
       // Also preserve entries that don't exist in relationship.metadata yet (newly added, not saved)
       const existingEntriesByKey = new Map<string, MetadataEntry>()
       const unsavedEntries: MetadataEntry[] = []
       metadata.forEach((entry) => {
         if (entry.key.trim()) {
-          // Check if this key exists in the relationship's metadata
           if (nonStyleMetadata.hasOwnProperty(entry.key)) {
             existingEntriesByKey.set(entry.key, entry)
           } else {
-            // This is a newly added entry that hasn't been saved yet - preserve it
+            // Newly added entry that hasn't been saved yet - preserve it
             unsavedEntries.push(entry)
           }
         }
       })
       
       const metadataEntries: MetadataEntry[] = []
-      // Add entries from relationship.metadata (preserving IDs when possible)
       Object.entries(nonStyleMetadata).forEach(([key, value]) => {
         const existingEntry = existingEntriesByKey.get(key)
         if (existingEntry) {
-          // Preserve the existing ID and update the value
+          // Preserve existing ID, update value
           metadataEntries.push({
             ...existingEntry,
             value: typeof value === 'object' ? JSON.stringify(value) : String(value),
           })
         } else {
-          // Create new entry with new ID
+          // New entry, generate UUID
           metadataEntries.push({
-            id: `meta-${relationship.id}-${nextMetadataIdRef.current++}`,
+            id: crypto.randomUUID(),
             key,
             value: typeof value === 'object' ? JSON.stringify(value) : String(value),
           })
@@ -915,7 +881,7 @@ function RelationshipEditorContent({
   const handleAddMetadata = () => {
     if (!hasWriteAccess) return
     const newEntry: MetadataEntry = {
-      id: `meta-${relationship.id}-${Date.now()}-${nextMetadataIdRef.current++}`,
+      id: crypto.randomUUID(),
       key: `key${metadata.length + 1}`,
       value: '',
     }
@@ -1173,12 +1139,8 @@ function RelationshipEditorContent({
                     onChange={(e) => handleUpdateMetadataKey(entry.id, e.target.value)}
                     onFocus={() => {
                       isEditingRef.current = true
-                      focusedMetadataInputRef.current = entry.id
                     }}
-                    onBlur={() => {
-                      focusedMetadataInputRef.current = null
-                      handleSaveMetadata()
-                    }}
+                    onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Key"
                     disabled={!hasWriteAccess}
@@ -1190,12 +1152,8 @@ function RelationshipEditorContent({
                     onChange={(e) => handleUpdateMetadataValue(entry.id, e.target.value)}
                     onFocus={() => {
                       isEditingRef.current = true
-                      focusedMetadataInputRef.current = entry.id
                     }}
-                    onBlur={() => {
-                      focusedMetadataInputRef.current = null
-                      handleSaveMetadata()
-                    }}
+                    onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Value"
                     disabled={!hasWriteAccess}
