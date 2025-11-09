@@ -59,6 +59,12 @@ export interface ForceDirectedLayoutOptions {
   distance?: number
   /** Number of simulation iterations (default: 300) */
   iterations?: number
+  /** Set of node IDs to keep fixed (for incremental layout) */
+  fixedNodeIds?: Set<string>
+  /** Set of node IDs that are newly added (for incremental layout) */
+  newNodeIds?: Set<string>
+  /** Number of hops to include around new nodes (default: 1) - only layout this neighborhood */
+  neighborhoodHops?: number
 }
 
 /**
@@ -127,21 +133,144 @@ export function applyForceDirectedLayout(
     strength = -300,
     distance = 150,
     iterations = 300,
+    fixedNodeIds,
+    newNodeIds,
+    neighborhoodHops = 1,
   } = options
 
+  // Determine if we're doing incremental layout
+  const isIncremental = fixedNodeIds !== undefined && fixedNodeIds.size > 0
+  
+  // If incremental with new nodes, find the neighborhood to layout
+  let nodesToLayout: Set<string> = new Set()
+  let computedFixedNodeIds: Set<string> | undefined = fixedNodeIds
+  
+  if (isIncremental && newNodeIds && newNodeIds.size > 0) {
+    // Find neighborhood: new nodes + their neighbors (up to neighborhoodHops away)
+    nodesToLayout = new Set<string>(newNodeIds)
+    
+    // Build adjacency map for efficient neighbor lookup
+    const adjacencyMap = new Map<string, Set<string>>()
+    nodes.forEach(node => adjacencyMap.set(node.id, new Set()))
+    edges.forEach(edge => {
+      adjacencyMap.get(edge.source)?.add(edge.target)
+      adjacencyMap.get(edge.target)?.add(edge.source)
+    })
+    
+    // Expand neighborhood by specified number of hops
+    let currentLevel = new Set(newNodeIds)
+    for (let hop = 0; hop < neighborhoodHops; hop++) {
+      const nextLevel = new Set<string>()
+      currentLevel.forEach(nodeId => {
+        const neighbors = adjacencyMap.get(nodeId)
+        if (neighbors) {
+          neighbors.forEach(neighborId => {
+            if (!nodesToLayout.has(neighborId)) {
+              nodesToLayout.add(neighborId)
+              nextLevel.add(neighborId)
+            }
+          })
+        }
+      })
+      currentLevel = nextLevel
+    }
+    
+    // Fixed nodes are all nodes NOT in the neighborhood
+    computedFixedNodeIds = new Set(
+      nodes
+        .map(n => n.id)
+        .filter(id => !nodesToLayout.has(id))
+    )
+  }
+
+  // Adaptive parameter tuning based on graph characteristics
+  const nodeCount = nodes.length
+  const edgeCount = edges.length
+  const avgDegree = edgeCount / Math.max(nodeCount, 1)
+  
+  // Adjust charge strength based on graph density
+  // Denser graphs need stronger repulsion
+  const adaptiveStrength = avgDegree > 3 
+    ? strength * 1.5  // Dense graphs: stronger repulsion
+    : strength * 0.8  // Sparse graphs: weaker repulsion
+  
+  // Adjust link distance based on graph size
+  // Larger graphs need more spacing
+  const adaptiveDistance = nodeCount > 20
+    ? distance * 1.3
+    : distance
+  
+  // Adjust iterations based on graph complexity
+  // More complex graphs need more iterations to stabilize
+  const adaptiveIterations = nodeCount > 15 || edgeCount > 30
+    ? Math.max(iterations, 400)
+    : iterations
+
   // Create nodes with x, y properties for d3-force
-  const simulationNodes = nodes.map((node) => ({
-    id: node.id,
-    x: node.position.x,
-    y: node.position.y,
-  }))
+  // Use better initial positioning: spread nodes in a circle if they're all at origin
+  const allAtOrigin = nodes.every(n => Math.abs(n.position.x) < 10 && Math.abs(n.position.y) < 10)
+  const simulationNodes = nodes.map((node, i) => {
+    let x = node.position.x
+    let y = node.position.y
+    const isFixed = computedFixedNodeIds?.has(node.id) ?? false
+    
+    // If all nodes are at origin and not incremental, initialize them in a circle
+    if (!isIncremental && allAtOrigin && nodeCount > 1) {
+      const angle = (2 * Math.PI * i) / nodeCount
+      const radius = Math.min(width, height) * 0.3
+      x = width / 2 + radius * Math.cos(angle)
+      y = height / 2 + radius * Math.sin(angle)
+    }
+    
+    // For incremental layout with new nodes, position new nodes near their connections
+    if (isIncremental && newNodeIds?.has(node.id)) {
+      // Find connected nodes to position new node near them
+      const connectedEdges = edges.filter(
+        e => e.source === node.id || e.target === node.id
+      )
+      if (connectedEdges.length > 0) {
+        // Find average position of connected fixed nodes (nodes not in the neighborhood)
+        const connectedNodeIds = new Set<string>()
+        connectedEdges.forEach(e => {
+          if (e.source !== node.id) connectedNodeIds.add(e.source)
+          if (e.target !== node.id) connectedNodeIds.add(e.target)
+        })
+        
+        const connectedFixedNodes = nodes.filter(
+          n => connectedNodeIds.has(n.id) && computedFixedNodeIds?.has(n.id)
+        )
+        
+        if (connectedFixedNodes.length > 0) {
+          const avgX = connectedFixedNodes.reduce((sum, n) => sum + n.position.x, 0) / connectedFixedNodes.length
+          const avgY = connectedFixedNodes.reduce((sum, n) => sum + n.position.y, 0) / connectedFixedNodes.length
+          // Position new node offset from average position
+          x = avgX + (adaptiveDistance * 0.8)
+          y = avgY + (adaptiveDistance * 0.8)
+        }
+      }
+    }
+    
+    return {
+      id: node.id,
+      x,
+      y,
+      fx: isFixed ? x : undefined, // Fix position for fixed nodes
+      fy: isFixed ? y : undefined,
+    }
+  })
 
   // Create a map for quick node lookup
   const nodeMap = new Map(simulationNodes.map((n, i) => [n.id, i]))
 
   // Create links for d3-force (using indices)
+  // For incremental layout with neighborhood, only include edges that connect nodes in the layout neighborhood
+  // This prevents fixed nodes from being pulled around
+  const relevantEdges = isIncremental && nodesToLayout.size > 0
+    ? edges.filter(e => nodesToLayout.has(e.source) || nodesToLayout.has(e.target))
+    : edges
+  
   // Calculate per-edge distances based on label width
-  const simulationLinks = edges
+  const simulationLinks = relevantEdges
     .map((edge) => {
       const sourceIndex = nodeMap.get(edge.source)
       const targetIndex = nodeMap.get(edge.target)
@@ -153,7 +282,7 @@ export function applyForceDirectedLayout(
       
       // Calculate distance: base distance + extra space for label
       // Add 50% of label width to ensure labels don't overlap nodes
-      const edgeDistance = distance + (labelWidth * 0.5)
+      const edgeDistance = adaptiveDistance + (labelWidth * 0.5)
       
       return {
         source: sourceIndex,
@@ -163,17 +292,30 @@ export function applyForceDirectedLayout(
     })
     .filter((link): link is { source: number; target: number; distance: number } => link !== null)
 
-  // Create force simulation
+  // Create force simulation with improved parameters
   const simulation = forceSimulation(simulationNodes as any)
-    .force('link', forceLink(simulationLinks).distance((d: any) => d.distance || distance).strength(0.5))
-    .force('charge', forceManyBody().strength(strength))
-    .force('center', forceCenter(width / 2, height / 2))
-    .force('collision', forceCollide().radius(80))
+    .force('link', forceLink(simulationLinks)
+      .distance((d: any) => d.distance || adaptiveDistance)
+      .strength(0.7)) // Increased link strength for better connectivity
+    .force('charge', forceManyBody()
+      .strength(adaptiveStrength)
+      .distanceMax(Math.max(width, height) * 0.6)) // Limit charge range for performance
+    .force('center', forceCenter(width / 2, height / 2)
+      .strength(0.1)) // Weaker center force to allow natural spread
+    .force('collision', forceCollide()
+      .radius(85) // Slightly larger collision radius for better spacing
+      .strength(0.8)) // Strong collision to prevent overlap
 
+  // Run simulation with alpha decay for smoother convergence
+  simulation.alpha(1).alphaDecay(1 - Math.pow(0.001, 1 / adaptiveIterations))
+  
   // Run simulation for specified iterations
-  for (let i = 0; i < iterations; i++) {
+  for (let i = 0; i < adaptiveIterations; i++) {
     simulation.tick()
   }
+
+  // Stop simulation to free resources
+  simulation.stop()
 
   // Extract positions and update nodes
   return nodes.map((node) => {
