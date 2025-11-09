@@ -95,8 +95,9 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
    * Utility to navigate to the root of the app after the flow finishes.
    */
   const navigateToApp = () => {
-    // Navigate to root path, removing any query params
-    window.location.href = '/'
+    // Navigate to app base path, removing any query params
+    const basePath = import.meta.env.BASE_URL
+    window.location.href = basePath
   }
 
   /**

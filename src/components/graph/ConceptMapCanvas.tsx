@@ -81,12 +81,13 @@ import { useMapStore } from '@/stores/mapStore'
 import { db, tx, id } from '@/lib/instant'
 import { nodeTypes, edgeTypes } from './reactFlowTypes'
 import type { LayoutType } from '@/lib/layouts'
-import { applyForceDirectedLayout, applyHierarchicalLayout } from '@/lib/layouts'
-import { Network, Layers, FileText } from 'lucide-react'
+import { applyForceDirectedLayout, applyHierarchicalLayout, applyCircularLayout, applyLayeredLayout, applyStressLayout } from '@/lib/layouts'
+import { FileText } from 'lucide-react'
 import { usePresenceEditing } from '@/hooks/usePresenceEditing'
 import { usePresenceCursorSetter } from '@/hooks/usePresenceCursorSetter'
 import { PeerCursors } from '@/components/presence/PeerCursors'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
+import { LayoutSelector } from './LayoutSelector'
 import { CustomConnectionLine } from './CustomConnectionLine'
 
 /**
@@ -127,13 +128,22 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   
   // Track active layout for sticky behavior - auto-apply when nodes are added
   const [activeLayout, setActiveLayout] = useState<LayoutType | null>(null)
+  // Track selected layout (shown on main button)
+  const [selectedLayout, setSelectedLayout] = useState<LayoutType>('force-directed')
   
   // Track if we've checked for initial concept creation (to avoid creating multiple)
   const hasCheckedInitialConceptRef = useRef<Set<string>>(new Set())
+  // Track which nodes have been laid out (for incremental layout)
+  const laidOutNodeIdsRef = useRef<Set<string>>(new Set())
   
   const currentMapId = useMapStore((state) => state.currentMapId)
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
   const isEditingPerspective = useMapStore((state) => state.isEditingPerspective)
+  
+  // Reset laid-out nodes when switching maps
+  useEffect(() => {
+    laidOutNodeIdsRef.current.clear()
+  }, [currentMapId])
   
   // Check if user has write access to the current map
   const { hasWriteAccess } = useMapPermissions()
@@ -546,24 +556,48 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     applyLayout: async (layoutType: LayoutType) => {
       if (!currentMapId) return
       
-      const conceptNodesArray = nodes.filter(n => n.type === 'concept')
+      // Use getNodes/getEdges to get the latest state
+      const currentNodes = getNodes()
+      const currentEdges = getEdges()
+      
+      const conceptNodesArray = currentNodes.filter(n => n.type === 'concept')
       if (conceptNodesArray.length === 0) return
 
       let layoutNodes: Node[]
       
       if (layoutType === 'force-directed') {
-        layoutNodes = applyForceDirectedLayout(conceptNodesArray, edges, {
+        layoutNodes = applyForceDirectedLayout(conceptNodesArray, currentEdges, {
           width: 2000,
           height: 2000,
         })
       } else if (layoutType === 'hierarchical') {
-        layoutNodes = applyHierarchicalLayout(conceptNodesArray, edges, {
+        layoutNodes = applyHierarchicalLayout(conceptNodesArray, currentEdges, {
           direction: 'TB',
           nodeWidth: 150,
           nodeHeight: 100,
         })
+      } else if (layoutType === 'circular') {
+        layoutNodes = applyCircularLayout(conceptNodesArray, currentEdges, {
+          width: 2000,
+          height: 2000,
+        })
+      } else if (layoutType === 'layered') {
+        layoutNodes = await applyLayeredLayout(conceptNodesArray, currentEdges, {
+          width: 2000,
+          height: 2000,
+          direction: 'DOWN',
+        })
+      } else if (layoutType === 'stress') {
+        layoutNodes = await applyStressLayout(conceptNodesArray, currentEdges, {
+          width: 2000,
+          height: 2000,
+          nodeSpacing: 600, // Very generous spacing for less dense layout
+          edgeNodeSpacing: 150,
+        })
       } else {
-        return // Manual layout - no changes
+        // Manual layout - clear active layout
+        setActiveLayout(null)
+        return
       }
 
       // Batch update all concept positions in InstantDB
@@ -576,6 +610,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
           })
         )
         await db.transact(updates)
+        
+        // Mark all nodes as laid out (full layout via ref)
+        laidOutNodeIdsRef.current = new Set(conceptNodesArray.map(n => n.id))
         
         // Fit view to show all nodes after layout
         setTimeout(() => {
@@ -674,7 +711,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   
   // Layout handler function for buttons
   const handleApplyLayout = useCallback(
-    async (layoutType: LayoutType, makeSticky: boolean = false) => {
+    async (layoutType: LayoutType, makeSticky: boolean = false, incremental: boolean = false) => {
       if (!currentMapId) return
       
       // Use getNodes/getEdges to get the latest state (important for auto-apply)
@@ -684,12 +721,22 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       const conceptNodesArray = currentNodes.filter(n => n.type === 'concept')
       if (conceptNodesArray.length === 0) return
 
+      // For incremental layout, identify new nodes
+      const newConceptIds = incremental 
+        ? new Set(conceptNodesArray.filter(n => !laidOutNodeIdsRef.current.has(n.id)).map(n => n.id))
+        : undefined
+      const fixedNodeIds = incremental && laidOutNodeIdsRef.current.size > 0
+        ? laidOutNodeIdsRef.current
+        : undefined
+
       let layoutNodes: Node[]
       
       if (layoutType === 'force-directed') {
         layoutNodes = applyForceDirectedLayout(conceptNodesArray, currentEdges, {
           width: 2000,
           height: 2000,
+          fixedNodeIds,
+          newNodeIds: newConceptIds,
         })
       } else if (layoutType === 'hierarchical') {
         layoutNodes = applyHierarchicalLayout(conceptNodesArray, currentEdges, {
@@ -697,12 +744,33 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
           nodeWidth: 150,
           nodeHeight: 100,
         })
+      } else if (layoutType === 'circular') {
+        layoutNodes = applyCircularLayout(conceptNodesArray, currentEdges, {
+          width: 2000,
+          height: 2000,
+        })
+      } else if (layoutType === 'layered') {
+        layoutNodes = await applyLayeredLayout(conceptNodesArray, currentEdges, {
+          width: 2000,
+          height: 2000,
+          direction: 'DOWN',
+        })
+      } else if (layoutType === 'stress') {
+        layoutNodes = await applyStressLayout(conceptNodesArray, currentEdges, {
+          width: 2000,
+          height: 2000,
+          nodeSpacing: 600, // Very generous spacing for less dense layout
+          edgeNodeSpacing: 150,
+        })
       } else {
         // Manual layout - clear active layout
         setActiveLayout(null)
         return
       }
 
+      // Update selected layout to show on button
+      setSelectedLayout(layoutType)
+      
       // Set active layout for sticky behavior only if makeSticky is true
       if (makeSticky) {
         setActiveLayout(layoutType)
@@ -712,7 +780,12 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
 
       // Batch update all concept positions in InstantDB
       try {
-        const updates = layoutNodes.map((node) =>
+        // For incremental layout, only update new nodes
+        const nodesToUpdate = incremental && newConceptIds
+          ? layoutNodes.filter(n => newConceptIds.has(n.id))
+          : layoutNodes
+        
+        const updates = nodesToUpdate.map((node) =>
           tx.concepts[node.id].update({
             positionX: node.position.x,
             positionY: node.position.y,
@@ -721,16 +794,26 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         )
         await db.transact(updates)
         
-        // Fit view to show all nodes after layout
-        setTimeout(() => {
-          fitView({ padding: 0.1 })
-        }, 100)
+        // Update laid-out nodes tracking
+        if (incremental && newConceptIds) {
+          newConceptIds.forEach(id => laidOutNodeIdsRef.current.add(id))
+        } else {
+          // Full layout - mark all nodes as laid out
+          laidOutNodeIdsRef.current = new Set(conceptNodesArray.map(n => n.id))
+        }
+        
+        // Fit view to show all nodes after layout (only for full layouts)
+        if (!incremental) {
+          setTimeout(() => {
+            fitView({ padding: 0.1 })
+          }, 100)
+        }
       } catch (error) {
         console.error('Failed to apply layout:', error)
         alert('Failed to apply layout. Please try again.')
       }
     },
-    [currentMapId, getNodes, getEdges, fitView]
+    [currentMapId, getNodes, getEdges, fitView, setSelectedLayout]
   )
   
   // Track previous concept IDs to detect new nodes (more reliable than count)
@@ -767,8 +850,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     if (newConceptIds.length > 0 && concepts.length > 0) {
       // Small delay to ensure the new node is fully created and edges are updated
       const timeoutId = setTimeout(() => {
-        // Auto-apply with makeSticky=true to preserve sticky state
-        handleApplyLayout(activeLayout, true).catch((error) => {
+        // Use incremental layout for force-directed, full layout for others
+        const useIncremental = activeLayout === 'force-directed' && laidOutNodeIdsRef.current.size > 0
+        handleApplyLayout(activeLayout, true, useIncremental).catch((error) => {
           console.error('Failed to auto-apply layout:', error)
         })
       }, 300)
@@ -1357,7 +1441,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         connectionLineComponent={CustomConnectionLine}
       >
         <Background />
-        <Controls className="!bg-white !border !border-gray-300 !rounded-md !shadow-md">
+        <Controls className="!bg-white !border !border-gray-300 !rounded-md !shadow-md !overflow-visible">
           {/* Graph/Text toggle buttons */}
           <button
             onClick={() => {
@@ -1372,24 +1456,15 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
           >
             <FileText className="h-4 w-4" />
           </button>
-          {/* Custom layout buttons */}
+          {/* Layout selector with slide-out menu */}
           <div className="h-px bg-gray-300" />
-          <button
-            onClick={(e) => handleApplyLayout('force-directed', e.shiftKey)}
+          <LayoutSelector
+            activeLayout={activeLayout}
+            selectedLayout={selectedLayout}
+            onSelectLayout={setSelectedLayout}
+            onApplyLayout={handleApplyLayout}
             disabled={conceptNodes.length === 0}
-            className={`react-flow__controls-button ${activeLayout === 'force-directed' ? '!bg-primary !text-primary-foreground' : ''}`}
-            title="Force-directed layout (spreads nodes evenly). Shift+Click to make sticky (auto-apply on new nodes)."
-          >
-            <Network className="h-4 w-4" />
-          </button>
-          <button
-            onClick={(e) => handleApplyLayout('hierarchical', e.shiftKey)}
-            disabled={conceptNodes.length === 0}
-            className={`react-flow__controls-button ${activeLayout === 'hierarchical' ? '!bg-primary !text-primary-foreground' : ''}`}
-            title="Hierarchical layout (top-to-bottom tree). Shift+Click to make sticky (auto-apply on new nodes)."
-          >
-            <Layers className="h-4 w-4" />
-          </button>
+          />
         </Controls>
         <MiniMap className="!bg-white !border !border-gray-300 !rounded-md !shadow-md" />
       </ReactFlow>
