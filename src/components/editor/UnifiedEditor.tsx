@@ -573,7 +573,7 @@ function ConceptEditorContent({
             </div>
             <div className="space-y-2">
               {Object.entries(metadata).map(([key, value], index) => (
-                <div key={`metadata-${key}-${index}`} className="flex gap-2">
+                <div key={`metadata-field-${index}`} className="flex gap-2">
                   <input
                     type="text"
                     value={key}
@@ -1065,7 +1065,7 @@ function RelationshipEditorContent({
             </div>
             <div className="space-y-2">
               {Object.entries(metadata).map(([key, value], index) => (
-                <div key={`metadata-${key}-${index}`} className="flex gap-2">
+                <div key={`metadata-field-${index}`} className="flex gap-2">
                   <input
                     type="text"
                     value={key}
