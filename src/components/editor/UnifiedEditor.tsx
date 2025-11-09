@@ -9,6 +9,7 @@ import { useUIStore } from '@/stores/uiStore'
 import { MarkdownEditor } from '@/components/notes/MarkdownEditor'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { stripLineBreaks } from '@/lib/textRepresentation'
+import { id } from '@/lib/instant'
 
 /**
  * Style attribute keys that should be treated as built-in attributes, not metadata
@@ -27,6 +28,15 @@ function getNonStyleMetadata(metadata: Record<string, unknown>, styleAttributes:
     }
   })
   return filtered
+}
+
+/**
+ * Metadata entry with stable ID for React keys
+ */
+interface MetadataEntry {
+  id: string
+  key: string
+  value: string
 }
 
 /**
@@ -178,7 +188,7 @@ function ConceptEditorContent({
   const { hasWriteAccess } = useMapPermissions()
   const [label, setLabel] = useState(concept.label)
   const [notes, setNotes] = useState(concept.notes || '')
-  const [metadata, setMetadata] = useState<Record<string, string>>({})
+  const [metadata, setMetadata] = useState<MetadataEntry[]>([])
   const [fillColor, setFillColor] = useState('#ffffff')
   const [borderColor, setBorderColor] = useState('#d1d5db')
   const [borderStyle, setBorderStyle] = useState<'solid' | 'dashed' | 'dotted'>('solid')
@@ -194,11 +204,43 @@ function ConceptEditorContent({
       setNotes(concept.notes || '')
       // Only include non-style metadata in the editable metadata fields
       const nonStyleMetadata = getNonStyleMetadata(concept.metadata || {}, NODE_STYLE_ATTRIBUTES)
-      const metadataStrings: Record<string, string> = {}
-      Object.entries(nonStyleMetadata).forEach(([key, value]) => {
-        metadataStrings[key] = typeof value === 'object' ? JSON.stringify(value) : String(value)
+      
+      // Preserve existing entry IDs by matching keys
+      // Also preserve entries that don't exist in concept.metadata yet (newly added, not saved)
+      const existingEntriesByKey = new Map<string, MetadataEntry>()
+      const unsavedEntries: MetadataEntry[] = []
+      metadata.forEach((entry) => {
+        if (entry.key.trim()) {
+          if (nonStyleMetadata.hasOwnProperty(entry.key)) {
+            existingEntriesByKey.set(entry.key, entry)
+          } else {
+            // Newly added entry that hasn't been saved yet - preserve it
+            unsavedEntries.push(entry)
+          }
+        }
       })
-      setMetadata(metadataStrings)
+      
+      const metadataEntries: MetadataEntry[] = []
+      Object.entries(nonStyleMetadata).forEach(([key, value]) => {
+        const existingEntry = existingEntriesByKey.get(key)
+        if (existingEntry) {
+          // Preserve existing ID, update value
+          metadataEntries.push({
+            ...existingEntry,
+            value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+          })
+        } else {
+          // New entry, generate UUID
+          metadataEntries.push({
+            id: id(),
+            key,
+            value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+          })
+        }
+      })
+      // Append unsaved entries (newly added fields)
+      metadataEntries.push(...unsavedEntries)
+      setMetadata(metadataEntries)
       const conceptMetadata = concept.metadata || {}
       setFillColor((conceptMetadata.fillColor as string) || '#ffffff')
       setBorderColor((conceptMetadata.borderColor as string) || '#d1d5db')
@@ -237,36 +279,67 @@ function ConceptEditorContent({
     }
   }
 
+  /**
+   * Build complete metadata object from current form state (style + user-defined metadata)
+   * This ensures deleted metadata fields don't come back when saving style changes
+   */
+  const buildCompleteMetadata = (styleOverrides?: {
+    fillColor?: string
+    borderColor?: string
+    borderStyle?: 'solid' | 'dashed' | 'dotted'
+    textColor?: string
+  }): Record<string, unknown> => {
+    // Get current style attributes from form state or overrides
+    const currentMetadata = concept.metadata || {}
+    const styleMetadata: Record<string, unknown> = {
+      fillColor: styleOverrides?.fillColor ?? fillColor ?? currentMetadata.fillColor,
+      borderColor: styleOverrides?.borderColor ?? borderColor ?? currentMetadata.borderColor,
+      borderStyle: styleOverrides?.borderStyle ?? borderStyle ?? currentMetadata.borderStyle,
+      textColor: styleOverrides?.textColor ?? textColor ?? currentMetadata.textColor,
+    }
+    
+    // Get user-defined metadata from form state
+    const userMetadata: Record<string, unknown> = {}
+    metadata.forEach((entry) => {
+      if (entry.key.trim() && entry.value.trim()) {
+        try {
+          userMetadata[entry.key] = JSON.parse(entry.value)
+        } catch {
+          userMetadata[entry.key] = entry.value
+        }
+      }
+    })
+    
+    // Combine style + user metadata (style first so user metadata can't override style attributes)
+    return {
+      ...styleMetadata,
+      ...userMetadata,
+    }
+  }
+
   const handleSaveMetadata = async () => {
     if (!hasWriteAccess) return
-    setIsSaving(true)
+    
+    // Set editing flag to false BEFORE starting save to prevent useEffect from resetting fields
     isEditingRef.current = false
+    
+    // Build complete metadata from current form state
+    const newMetadata = buildCompleteMetadata()
+    
+    // Only save if metadata actually changed
+    const currentMetadata = concept.metadata || {}
+    const currentMetadataStr = JSON.stringify(currentMetadata)
+    const newMetadataStr = JSON.stringify(newMetadata)
+    if (currentMetadataStr === newMetadataStr) return
+    
+    setIsSaving(true)
     try {
-      const metadataObj: Record<string, unknown> = {}
-      Object.entries(metadata).forEach(([key, value]) => {
-        if (key.trim() && value.trim()) {
-          try {
-            metadataObj[key] = JSON.parse(value)
-          } catch {
-            metadataObj[key] = value
-          }
-        }
-      })
-      // Preserve style attributes when saving metadata
-      const currentMetadata = concept.metadata || {}
-      const newMetadata = {
-        ...currentMetadata,
-        ...metadataObj,
-        // Ensure style attributes are preserved
-        fillColor: currentMetadata.fillColor,
-        borderColor: currentMetadata.borderColor,
-        borderStyle: currentMetadata.borderStyle,
-        textColor: currentMetadata.textColor,
-      }
       await onUpdate(concept.id, { metadata: newMetadata })
     } catch (error) {
       console.error('Failed to update concept metadata:', error)
       alert('Failed to update concept metadata. Please try again.')
+      // Revert editing flag on error so form can be reset
+      isEditingRef.current = true
     } finally {
       setIsSaving(false)
     }
@@ -279,14 +352,7 @@ function ConceptEditorContent({
     textColor?: string
   }) => {
     if (!hasWriteAccess) return
-    const currentMetadata = concept.metadata || {}
-    const newMetadata = {
-      ...currentMetadata,
-      fillColor: overrideValues?.fillColor ?? fillColor,
-      borderColor: overrideValues?.borderColor ?? borderColor,
-      borderStyle: overrideValues?.borderStyle ?? borderStyle,
-      textColor: overrideValues?.textColor ?? textColor,
-    }
+    const newMetadata = buildCompleteMetadata(overrideValues)
     try {
       await onUpdate(concept.id, { metadata: newMetadata })
     } catch (error) {
@@ -311,34 +377,76 @@ function ConceptEditorContent({
 
   const handleAddMetadata = () => {
     if (!hasWriteAccess) return
-    const newKey = `key${Object.keys(metadata).length + 1}`
-    setMetadata({ ...metadata, [newKey]: '' })
-    isEditingRef.current = true
-  }
-
-  const handleUpdateMetadataKey = (oldKey: string, newKey: string) => {
-    if (!hasWriteAccess || newKey === oldKey) return
-    const newMetadata = { ...metadata }
-    delete newMetadata[oldKey]
-    if (newKey.trim()) {
-      newMetadata[newKey] = metadata[oldKey] || ''
+    const newEntry: MetadataEntry = {
+      id: id(),
+      key: `key${metadata.length + 1}`,
+      value: '',
     }
-    setMetadata(newMetadata)
+    setMetadata([...metadata, newEntry])
     isEditingRef.current = true
   }
 
-  const handleUpdateMetadataValue = (key: string, value: string) => {
+  const handleUpdateMetadataKey = (id: string, newKey: string) => {
     if (!hasWriteAccess) return
-    setMetadata({ ...metadata, [key]: value })
+    setMetadata(metadata.map((entry) => (entry.id === id ? { ...entry, key: newKey } : entry)))
     isEditingRef.current = true
   }
 
-  const handleRemoveMetadata = (key: string) => {
+  const handleUpdateMetadataValue = (id: string, value: string) => {
     if (!hasWriteAccess) return
-    const newMetadata = { ...metadata }
-    delete newMetadata[key]
-    setMetadata(newMetadata)
+    setMetadata(metadata.map((entry) => (entry.id === id ? { ...entry, value } : entry)))
     isEditingRef.current = true
+  }
+
+  const handleRemoveMetadata = async (id: string) => {
+    if (!hasWriteAccess) return
+    
+    // Remove from state using functional update to get the latest state
+    const updatedMetadata = metadata.filter((entry) => entry.id !== id)
+    setMetadata(updatedMetadata)
+    
+    // Set editing flag to false BEFORE saving to prevent useEffect from resetting fields
+    isEditingRef.current = false
+    
+    // Build complete metadata from updated state (without the deleted entry)
+    const userMetadata: Record<string, unknown> = {}
+    updatedMetadata.forEach((entry) => {
+      if (entry.key.trim() && entry.value.trim()) {
+        try {
+          userMetadata[entry.key] = JSON.parse(entry.value)
+        } catch {
+          userMetadata[entry.key] = entry.value
+        }
+      }
+    })
+    
+    // Get current style attributes
+    const currentMetadata = concept.metadata || {}
+    const styleMetadata: Record<string, unknown> = {
+      fillColor: fillColor ?? currentMetadata.fillColor,
+      borderColor: borderColor ?? currentMetadata.borderColor,
+      borderStyle: borderStyle ?? currentMetadata.borderStyle,
+      textColor: textColor ?? currentMetadata.textColor,
+    }
+    
+    // Combine style + user metadata
+    const newMetadata = {
+      ...styleMetadata,
+      ...userMetadata,
+    }
+    
+    // Save immediately
+    setIsSaving(true)
+    try {
+      await onUpdate(concept.id, { metadata: newMetadata })
+    } catch (error) {
+      console.error('Failed to delete metadata field:', error)
+      alert('Failed to delete metadata field. Please try again.')
+      // Revert editing flag on error so form can be reset
+      isEditingRef.current = true
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -560,12 +668,15 @@ function ConceptEditorContent({
               </button>
             </div>
             <div className="space-y-2">
-              {Object.entries(metadata).map(([key, value], index) => (
-                <div key={`metadata-${key}-${index}`} className="flex gap-2">
+              {metadata.map((entry, index) => (
+                <div key={entry.id} className="flex gap-2">
                   <input
                     type="text"
-                    value={key}
-                    onChange={(e) => handleUpdateMetadataKey(key, e.target.value)}
+                    value={entry.key}
+                    onChange={(e) => handleUpdateMetadataKey(entry.id, e.target.value)}
+                    onFocus={() => {
+                      isEditingRef.current = true
+                    }}
                     onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Key"
@@ -574,8 +685,11 @@ function ConceptEditorContent({
                   />
                   <input
                     type="text"
-                    value={value}
-                    onChange={(e) => handleUpdateMetadataValue(key, e.target.value)}
+                    value={entry.value}
+                    onChange={(e) => handleUpdateMetadataValue(entry.id, e.target.value)}
+                    onFocus={() => {
+                      isEditingRef.current = true
+                    }}
                     onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Value"
@@ -583,19 +697,16 @@ function ConceptEditorContent({
                     tabIndex={19 + index * 2}
                   />
                   <button
-                    onClick={() => {
-                      handleRemoveMetadata(key)
-                      handleSaveMetadata()
-                    }}
+                    onClick={() => handleRemoveMetadata(entry.id)}
                     className="p-1 text-red-600 hover:bg-red-50 rounded"
-                    disabled={!hasWriteAccess}
+                    disabled={!hasWriteAccess || isSaving}
                     tabIndex={20 + index * 2}
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
               ))}
-              {Object.keys(metadata).length === 0 && (
+              {metadata.length === 0 && (
                 <p className="text-xs text-muted-foreground">No metadata fields</p>
               )}
             </div>
@@ -643,7 +754,7 @@ function RelationshipEditorContent({
   const [primaryLabel, setPrimaryLabel] = useState(relationship.primaryLabel)
   const [reverseLabel, setReverseLabel] = useState(relationship.reverseLabel)
   const [notes, setNotes] = useState(relationship.notes || '')
-  const [metadata, setMetadata] = useState<Record<string, string>>({})
+  const [metadata, setMetadata] = useState<MetadataEntry[]>([])
   const [edgeType, setEdgeType] = useState<'bezier' | 'smoothstep' | 'step' | 'straight'>('bezier')
   const [edgeColor, setEdgeColor] = useState('#6366f1')
   const [edgeStyle, setEdgeStyle] = useState<'solid' | 'dashed'>('solid')
@@ -660,11 +771,43 @@ function RelationshipEditorContent({
       setNotes(relationship.notes || '')
       // Only include non-style metadata in the editable metadata fields
       const nonStyleMetadata = getNonStyleMetadata(relationship.metadata || {}, EDGE_STYLE_ATTRIBUTES)
-      const metadataStrings: Record<string, string> = {}
-      Object.entries(nonStyleMetadata).forEach(([key, value]) => {
-        metadataStrings[key] = typeof value === 'object' ? JSON.stringify(value) : String(value)
+      
+      // Preserve existing entry IDs by matching keys
+      // Also preserve entries that don't exist in relationship.metadata yet (newly added, not saved)
+      const existingEntriesByKey = new Map<string, MetadataEntry>()
+      const unsavedEntries: MetadataEntry[] = []
+      metadata.forEach((entry) => {
+        if (entry.key.trim()) {
+          if (nonStyleMetadata.hasOwnProperty(entry.key)) {
+            existingEntriesByKey.set(entry.key, entry)
+          } else {
+            // Newly added entry that hasn't been saved yet - preserve it
+            unsavedEntries.push(entry)
+          }
+        }
       })
-      setMetadata(metadataStrings)
+      
+      const metadataEntries: MetadataEntry[] = []
+      Object.entries(nonStyleMetadata).forEach(([key, value]) => {
+        const existingEntry = existingEntriesByKey.get(key)
+        if (existingEntry) {
+          // Preserve existing ID, update value
+          metadataEntries.push({
+            ...existingEntry,
+            value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+          })
+        } else {
+          // New entry, generate UUID
+          metadataEntries.push({
+            id: id(),
+            key,
+            value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+          })
+        }
+      })
+      // Append unsaved entries (newly added fields)
+      metadataEntries.push(...unsavedEntries)
+      setMetadata(metadataEntries)
       const relationshipMetadata = relationship.metadata || {}
       setEdgeType((relationshipMetadata.edgeType as 'bezier' | 'smoothstep' | 'step' | 'straight') || 'bezier')
       setEdgeColor((relationshipMetadata.edgeColor as string) || '#6366f1')
@@ -723,19 +866,49 @@ function RelationshipEditorContent({
     }
   }
 
+  /**
+   * Build complete metadata object from current form state (style + user-defined metadata)
+   * This ensures deleted metadata fields don't come back when saving style changes
+   */
+  const buildCompleteMetadata = (styleOverrides?: {
+    edgeType?: 'bezier' | 'smoothstep' | 'step' | 'straight'
+    edgeColor?: string
+    edgeStyle?: 'solid' | 'dashed'
+  }): Record<string, unknown> => {
+    // Get current style attributes from form state or overrides
+    const currentMetadata = relationship.metadata || {}
+    const styleMetadata: Record<string, unknown> = {
+      edgeType: styleOverrides?.edgeType ?? edgeType ?? currentMetadata.edgeType,
+      edgeColor: styleOverrides?.edgeColor ?? edgeColor ?? currentMetadata.edgeColor,
+      edgeStyle: styleOverrides?.edgeStyle ?? edgeStyle ?? currentMetadata.edgeStyle,
+    }
+    
+    // Get user-defined metadata from form state
+    const userMetadata: Record<string, unknown> = {}
+    metadata.forEach((entry) => {
+      if (entry.key.trim() && entry.value.trim()) {
+        try {
+          userMetadata[entry.key] = JSON.parse(entry.value)
+        } catch {
+          userMetadata[entry.key] = entry.value
+        }
+      }
+    })
+    
+    // Combine style + user metadata (style first so user metadata can't override style attributes)
+    return {
+      ...styleMetadata,
+      ...userMetadata,
+    }
+  }
+
   const handleSaveEdgeStyle = async (overrideValues?: {
     edgeType?: 'bezier' | 'smoothstep' | 'step' | 'straight'
     edgeColor?: string
     edgeStyle?: 'solid' | 'dashed'
   }) => {
     if (!hasWriteAccess) return
-    const currentMetadata = relationship.metadata || {}
-    const newMetadata = {
-      ...currentMetadata,
-      edgeType: overrideValues?.edgeType ?? edgeType,
-      edgeColor: overrideValues?.edgeColor ?? edgeColor,
-      edgeStyle: overrideValues?.edgeStyle ?? edgeStyle,
-    }
+    const newMetadata = buildCompleteMetadata(overrideValues)
     try {
       await onUpdate(relationship.id, { metadata: newMetadata })
     } catch (error) {
@@ -746,33 +919,27 @@ function RelationshipEditorContent({
 
   const handleSaveMetadata = async () => {
     if (!hasWriteAccess) return
-    setIsSaving(true)
+    
+    // Set editing flag to false BEFORE starting save to prevent useEffect from resetting fields
     isEditingRef.current = false
+    
+    // Build complete metadata from current form state
+    const newMetadata = buildCompleteMetadata()
+    
+    // Only save if metadata actually changed
+    const currentMetadata = relationship.metadata || {}
+    const currentMetadataStr = JSON.stringify(currentMetadata)
+    const newMetadataStr = JSON.stringify(newMetadata)
+    if (currentMetadataStr === newMetadataStr) return
+    
+    setIsSaving(true)
     try {
-      const metadataObj: Record<string, unknown> = {}
-      Object.entries(metadata).forEach(([key, value]) => {
-        if (key.trim() && value.trim()) {
-          try {
-            metadataObj[key] = JSON.parse(value)
-          } catch {
-            metadataObj[key] = value
-          }
-        }
-      })
-      // Preserve style attributes when saving metadata
-      const currentMetadata = relationship.metadata || {}
-      const newMetadata = {
-        ...currentMetadata,
-        ...metadataObj,
-        // Ensure style attributes are preserved
-        edgeType: currentMetadata.edgeType,
-        edgeColor: currentMetadata.edgeColor,
-        edgeStyle: currentMetadata.edgeStyle,
-      }
       await onUpdate(relationship.id, { metadata: newMetadata })
     } catch (error) {
       console.error('Failed to update relationship metadata:', error)
       alert('Failed to update relationship metadata. Please try again.')
+      // Revert editing flag on error so form can be reset
+      isEditingRef.current = true
     } finally {
       setIsSaving(false)
     }
@@ -780,34 +947,75 @@ function RelationshipEditorContent({
 
   const handleAddMetadata = () => {
     if (!hasWriteAccess) return
-    const newKey = `key${Object.keys(metadata).length + 1}`
-    setMetadata({ ...metadata, [newKey]: '' })
-    isEditingRef.current = true
-  }
-
-  const handleUpdateMetadataKey = (oldKey: string, newKey: string) => {
-    if (!hasWriteAccess || newKey === oldKey) return
-    const newMetadata = { ...metadata }
-    delete newMetadata[oldKey]
-    if (newKey.trim()) {
-      newMetadata[newKey] = metadata[oldKey] || ''
+    const newEntry: MetadataEntry = {
+      id: id(),
+      key: `key${metadata.length + 1}`,
+      value: '',
     }
-    setMetadata(newMetadata)
+    setMetadata([...metadata, newEntry])
     isEditingRef.current = true
   }
 
-  const handleUpdateMetadataValue = (key: string, value: string) => {
+  const handleUpdateMetadataKey = (id: string, newKey: string) => {
     if (!hasWriteAccess) return
-    setMetadata({ ...metadata, [key]: value })
+    setMetadata(metadata.map((entry) => (entry.id === id ? { ...entry, key: newKey } : entry)))
     isEditingRef.current = true
   }
 
-  const handleRemoveMetadata = (key: string) => {
+  const handleUpdateMetadataValue = (id: string, value: string) => {
     if (!hasWriteAccess) return
-    const newMetadata = { ...metadata }
-    delete newMetadata[key]
-    setMetadata(newMetadata)
+    setMetadata(metadata.map((entry) => (entry.id === id ? { ...entry, value } : entry)))
     isEditingRef.current = true
+  }
+
+  const handleRemoveMetadata = async (id: string) => {
+    if (!hasWriteAccess) return
+    
+    // Remove from state using functional update to get the latest state
+    const updatedMetadata = metadata.filter((entry) => entry.id !== id)
+    setMetadata(updatedMetadata)
+    
+    // Set editing flag to false BEFORE saving to prevent useEffect from resetting fields
+    isEditingRef.current = false
+    
+    // Build complete metadata from updated state (without the deleted entry)
+    const userMetadata: Record<string, unknown> = {}
+    updatedMetadata.forEach((entry) => {
+      if (entry.key.trim() && entry.value.trim()) {
+        try {
+          userMetadata[entry.key] = JSON.parse(entry.value)
+        } catch {
+          userMetadata[entry.key] = entry.value
+        }
+      }
+    })
+    
+    // Get current style attributes
+    const currentMetadata = relationship.metadata || {}
+    const styleMetadata: Record<string, unknown> = {
+      edgeType: edgeType ?? currentMetadata.edgeType,
+      edgeColor: edgeColor ?? currentMetadata.edgeColor,
+      edgeStyle: edgeStyle ?? currentMetadata.edgeStyle,
+    }
+    
+    // Combine style + user metadata
+    const newMetadata = {
+      ...styleMetadata,
+      ...userMetadata,
+    }
+    
+    // Save immediately
+    setIsSaving(true)
+    try {
+      await onUpdate(relationship.id, { metadata: newMetadata })
+    } catch (error) {
+      console.error('Failed to delete metadata field:', error)
+      alert('Failed to delete metadata field. Please try again.')
+      // Revert editing flag on error so form can be reset
+      isEditingRef.current = true
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleDelete = async () => {
@@ -1034,12 +1242,15 @@ function RelationshipEditorContent({
               </button>
             </div>
             <div className="space-y-2">
-              {Object.entries(metadata).map(([key, value], index) => (
-                <div key={`metadata-${key}-${index}`} className="flex gap-2">
+              {metadata.map((entry, index) => (
+                <div key={entry.id} className="flex gap-2">
                   <input
                     type="text"
-                    value={key}
-                    onChange={(e) => handleUpdateMetadataKey(key, e.target.value)}
+                    value={entry.key}
+                    onChange={(e) => handleUpdateMetadataKey(entry.id, e.target.value)}
+                    onFocus={() => {
+                      isEditingRef.current = true
+                    }}
                     onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Key"
@@ -1048,8 +1259,11 @@ function RelationshipEditorContent({
                   />
                   <input
                     type="text"
-                    value={value}
-                    onChange={(e) => handleUpdateMetadataValue(key, e.target.value)}
+                    value={entry.value}
+                    onChange={(e) => handleUpdateMetadataValue(entry.id, e.target.value)}
+                    onFocus={() => {
+                      isEditingRef.current = true
+                    }}
                     onBlur={handleSaveMetadata}
                     className="flex-1 px-2 py-1 text-xs border rounded"
                     placeholder="Value"
@@ -1057,19 +1271,16 @@ function RelationshipEditorContent({
                     tabIndex={11 + index * 2}
                   />
                   <button
-                    onClick={() => {
-                      handleRemoveMetadata(key)
-                      handleSaveMetadata()
-                    }}
+                    onClick={() => handleRemoveMetadata(entry.id)}
                     className="p-1 text-red-600 hover:bg-red-50 rounded"
-                    disabled={!hasWriteAccess}
+                    disabled={!hasWriteAccess || isSaving}
                     tabIndex={12 + index * 2}
                   >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
               ))}
-              {Object.keys(metadata).length === 0 && (
+              {metadata.length === 0 && (
                 <p className="text-xs text-muted-foreground">No metadata fields</p>
               )}
             </div>
