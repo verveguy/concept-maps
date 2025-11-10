@@ -135,6 +135,8 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const hasCheckedInitialConceptRef = useRef<Set<string>>(new Set())
   // Track which nodes have been laid out (for incremental layout)
   const laidOutNodeIdsRef = useRef<Set<string>>(new Set())
+  // Track if we're currently centering on a concept (to prevent timeout cleanup)
+  const isCenteringRef = useRef(false)
   
   const currentMapId = useMapStore((state) => state.currentMapId)
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
@@ -143,6 +145,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   // Reset laid-out nodes when switching maps
   useEffect(() => {
     laidOutNodeIdsRef.current.clear()
+    isCenteringRef.current = false // Reset centering flag when switching maps
   }, [currentMapId])
   
   // Check if user has write access to the current map
@@ -188,7 +191,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     textViewPosition,
     setTextViewPosition,
   } = useUIStore()
-  const { screenToFlowPosition, fitView } = useReactFlow()
+  const { screenToFlowPosition, fitView, getNode, setCenter, getViewport } = useReactFlow()
   
   // Presence tracking - split into separate hooks to prevent unnecessary re-renders
   // Cursor setter: only updates cursor position, doesn't subscribe to peer cursors
@@ -198,6 +201,10 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   
   const selectedConceptId = useUIStore((state) => state.selectedConceptId)
   const selectedRelationshipId = useUIStore((state) => state.selectedRelationshipId)
+  const currentConceptId = useMapStore((state) => state.currentConceptId)
+  const shouldAutoCenterConcept = useMapStore((state) => state.shouldAutoCenterConcept)
+  const setCurrentConceptId = useMapStore((state) => state.setCurrentConceptId)
+  const setShouldAutoCenterConcept = useMapStore((state) => state.setShouldAutoCenterConcept)
   
   // Track cursor movement on the React Flow pane
   // Convert screen coordinates to flow coordinates for storage
@@ -409,6 +416,122 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       return () => clearTimeout(timeoutId)
     }
   }, [edges, setEdges])
+
+  // Handle deep linking to concepts: select and center when concept ID is in URL
+  // This must be after nodes is declared
+  // Only triggers when shouldAutoCenterConcept is true (set during URL navigation)
+  useEffect(() => {
+    console.log('[ConceptMapCanvas] Deep link effect triggered', {
+      shouldAutoCenterConcept,
+      currentConceptId,
+      conceptsCount: concepts.length,
+      nodesCount: nodes.length,
+    })
+    
+    // Only trigger if auto-centering is enabled and we have a concept ID
+    if (!shouldAutoCenterConcept || !currentConceptId) {
+      console.log('[ConceptMapCanvas] Early return: missing flag or concept ID')
+      return
+    }
+    
+    // Wait for concepts to be available (concepts are the source of truth, nodes are derived)
+    if (!concepts.length) {
+      console.log('[ConceptMapCanvas] Waiting for concepts to load...')
+      return
+    }
+    
+    // Check if the concept exists in the concepts array
+    const conceptExists = concepts.some((c) => c.id === currentConceptId)
+    console.log('[ConceptMapCanvas] Concept exists check', {
+      conceptExists,
+      conceptIds: concepts.map((c) => c.id),
+      lookingFor: currentConceptId,
+    })
+    
+    if (!conceptExists) {
+      console.log('[ConceptMapCanvas] Concept not found in concepts array')
+      return
+    }
+    
+    // Wait for nodes to be available as well
+    if (!nodes.length) {
+      console.log('[ConceptMapCanvas] Waiting for nodes to be available...')
+      return
+    }
+    
+    // Find the concept node
+    const conceptNode = nodes.find((node) => node.id === currentConceptId)
+    if (!conceptNode) {
+      console.log('[ConceptMapCanvas] Concept node not found in nodes array')
+      return
+    }
+    
+    console.log('[ConceptMapCanvas] Proceeding with auto-center', { conceptId: currentConceptId })
+    
+    // Check if we're already centering (prevent duplicate calls)
+    if (isCenteringRef.current) {
+      console.log('[ConceptMapCanvas] Already centering, skipping')
+      return
+    }
+    
+    // Mark that we're centering
+    isCenteringRef.current = true
+    
+    // Select the concept FIRST (before clearing flag)
+    setSelectedConceptId(currentConceptId)
+    console.log('[ConceptMapCanvas] Selected concept', { conceptId: currentConceptId })
+    
+    // Also select the node in React Flow by updating its selected property
+    setNodes((currentNodes) => {
+      return currentNodes.map((node) => {
+        if (node.id === currentConceptId) {
+          return { ...node, selected: true }
+        }
+        return { ...node, selected: false }
+      })
+    })
+    console.log('[ConceptMapCanvas] Set node selected property in React Flow')
+    
+    // Disable auto-centering flag AFTER selection to prevent re-triggering
+    setShouldAutoCenterConcept(false)
+    
+    // Center on the concept and fit view to show the whole map
+    // Use setTimeout to ensure React Flow is ready
+    const timeoutId = setTimeout(() => {
+      console.log('[ConceptMapCanvas] Starting fitView')
+      // First fit view to show the whole map (this sets the zoom level)
+      fitView({ padding: 0.1, duration: 300 })
+      
+      // After fitView completes, get the current viewport and center on the concept
+      setTimeout(() => {
+        const node = getNode(currentConceptId)
+        console.log('[ConceptMapCanvas] Getting node for centering', { node: node ? { id: node.id, position: node.position } : null })
+        if (node) {
+          // Get current viewport to preserve zoom level from fitView
+          const viewport = getViewport()
+          console.log('[ConceptMapCanvas] Centering on concept', { position: node.position, zoom: viewport.zoom })
+          // Center on the concept node while preserving the zoom from fitView
+          setCenter(node.position.x, node.position.y, { zoom: viewport.zoom, duration: 300 })
+          console.log('[ConceptMapCanvas] Centered on concept', { position: node.position })
+        } else {
+          console.warn('[ConceptMapCanvas] Node not found when trying to center', { conceptId: currentConceptId })
+        }
+        // Clear currentConceptId from store after handling to prevent interference with normal selection
+        setCurrentConceptId(null)
+        // Reset centering flag
+        isCenteringRef.current = false
+        console.log('[ConceptMapCanvas] Cleared currentConceptId from store and reset centering flag')
+      }, 350)
+    }, 100)
+    
+    // Only clear timeout if we're not currently centering (prevent cleanup from canceling the operation)
+    return () => {
+      if (!isCenteringRef.current) {
+        console.log('[ConceptMapCanvas] Cleaning up timeout')
+        clearTimeout(timeoutId)
+      }
+    }
+  }, [shouldAutoCenterConcept, currentConceptId, concepts, nodes, setSelectedConceptId, setNodes, fitView, getNode, setCenter, getViewport, setCurrentConceptId, setShouldAutoCenterConcept])
 
   // Wrap onNodesChange to intercept deletions and delete from database
   const onNodesChange = useCallback(

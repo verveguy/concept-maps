@@ -8,7 +8,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Search, MapPin, Link2 } from 'lucide-react'
 import { useSearchQuery, type SearchResult } from '@/hooks/useSearch'
 import { useMapStore } from '@/stores/mapStore'
-import { navigateToMap } from '@/utils/navigation'
+import { navigateToMap, navigateToConcept } from '@/utils/navigation'
 
 /**
  * Search box component for searching concepts and relationships across all maps.
@@ -140,10 +140,17 @@ export function SearchBox() {
   /**
    * Handle selecting a search result.
    * Navigates to the map URL and clears the current perspective.
+   * For concepts, also navigates to the concept deep link.
    * The concept/relationship will be displayed in the map canvas.
    */
   const handleSelectResult = useCallback((result: SearchResult) => {
-    navigateToMap(result.mapId)
+    if (result.type === 'concept') {
+      // Navigate to concept deep link
+      navigateToConcept(result.mapId, result.id)
+    } else {
+      // Navigate to map only for relationships
+      navigateToMap(result.mapId)
+    }
     setCurrentPerspectiveId(null) // Clear perspective when navigating
     setQuery('')
     setDebouncedQuery('')
@@ -165,7 +172,7 @@ export function SearchBox() {
           }}
           onKeyDown={handleKeyDown}
           placeholder="Search concepts and relationships..."
-          className="w-64 pl-10 pr-4 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          className="w-64 pl-10 pr-4 py-2 text-sm border rounded-md bg-card focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
         />
       </div>
 
@@ -173,7 +180,7 @@ export function SearchBox() {
       {isOpen && debouncedQuery.trim() && filteredResults.length > 0 && (
         <div
           ref={dropdownRef}
-          className="absolute top-full right-0 mt-1 w-96 max-h-96 overflow-y-auto bg-card border rounded-md shadow-lg z-50"
+          className="absolute top-full right-0 mt-1 w-96 max-h-96 overflow-y-auto bg-popover border rounded-md shadow-lg z-50"
         >
           <div className="p-2">
             <div className="text-xs text-muted-foreground px-2 py-1 mb-1">
@@ -223,7 +230,7 @@ export function SearchBox() {
       {isOpen && debouncedQuery.trim() && filteredResults.length === 0 && (
         <div
           ref={dropdownRef}
-          className="absolute top-full right-0 mt-1 w-96 bg-card border rounded-md shadow-lg z-50 p-4 text-center text-sm text-muted-foreground"
+          className="absolute top-full right-0 mt-1 w-96 bg-popover border rounded-md shadow-lg z-50 p-4 text-center text-sm text-muted-foreground"
         >
           No results found for &quot;{debouncedQuery}&quot;
         </div>

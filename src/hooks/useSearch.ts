@@ -123,6 +123,7 @@ export function useSearchQuery(query: string) {
 
   // Query concepts with server-side filtering using $like operator
   // Permissions automatically filter to only accessible maps
+  // Exclude soft-deleted concepts (deletedAt must be null)
   const { data: conceptsData } = db.useQuery(
     searchPattern
       ? {
@@ -130,6 +131,7 @@ export function useSearchQuery(query: string) {
             $: {
               where: {
                 label: { $ilike: searchPattern },
+                deletedAt: { $isNull: true },
               },
             },
             map: {
@@ -145,6 +147,7 @@ export function useSearchQuery(query: string) {
   // Query relationships with server-side filtering using $like operator
   // Need to match either primaryLabel OR reverseLabel, so we need two queries
   // Permissions automatically filter to only accessible maps
+  // Exclude soft-deleted relationships (deletedAt must be null)
   const { data: relationshipsDataPrimary } = db.useQuery(
     searchPattern
       ? {
@@ -152,6 +155,7 @@ export function useSearchQuery(query: string) {
             $: {
               where: {
                 primaryLabel: { $ilike: searchPattern },
+                deletedAt: { $isNull: true },
               },
             },
             map: {
@@ -171,6 +175,7 @@ export function useSearchQuery(query: string) {
             $: {
               where: {
                 reverseLabel: { $ilike: searchPattern },
+                deletedAt: { $isNull: true },
               },
             },
             map: {

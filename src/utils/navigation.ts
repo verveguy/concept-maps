@@ -6,6 +6,33 @@
 import { useMapStore } from '@/stores/mapStore'
 
 /**
+ * Navigate to a concept within a map URL.
+ * Updates both the browser URL and the map store.
+ * Works with GitHub Pages SPA routing.
+ * 
+ * @param mapId - The ID of the map to navigate to
+ * @param conceptId - The ID of the concept to navigate to
+ */
+export function navigateToConcept(mapId: string, conceptId: string): void {
+  if (typeof window === 'undefined') return
+
+  const basePath = import.meta.env.BASE_URL.replace(/\/$/, '')
+  const newPath = `${basePath}/map/${mapId}/concept/${conceptId}`
+  
+  console.log('[navigation] navigateToConcept', { mapId, conceptId, newPath })
+  
+  // Update URL without reloading (works with GitHub Pages 404.html redirect mechanism)
+  window.history.pushState({}, '', newPath)
+  
+  // Update the store directly
+  const { setCurrentMapId, setCurrentConceptId, setShouldAutoCenterConcept } = useMapStore.getState()
+  console.log('[navigation] Setting store values', { mapId, conceptId, shouldAutoCenter: true })
+  setCurrentMapId(mapId)
+  setCurrentConceptId(conceptId)
+  setShouldAutoCenterConcept(true) // Enable auto-centering for URL navigation
+}
+
+/**
  * Navigate to a map URL by map ID.
  * Updates both the browser URL and the map store.
  * Works with GitHub Pages SPA routing.
@@ -22,8 +49,9 @@ export function navigateToMap(mapId: string): void {
   window.history.pushState({}, '', newPath)
   
   // Update the store directly (App.tsx will sync URL->store on popstate, but we're using pushState)
-  const { setCurrentMapId } = useMapStore.getState()
+  const { setCurrentMapId, setCurrentConceptId } = useMapStore.getState()
   setCurrentMapId(mapId)
+  setCurrentConceptId(null) // Clear concept ID when navigating to map without concept
 }
 
 /**

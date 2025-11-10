@@ -20,6 +20,8 @@ import { useMapStore } from '@/stores/mapStore'
 function App() {
   const auth = db.useAuth()
   const setCurrentMapId = useMapStore((state) => state.setCurrentMapId)
+  const setCurrentConceptId = useMapStore((state) => state.setCurrentConceptId)
+  const setShouldAutoCenterConcept = useMapStore((state) => state.setShouldAutoCenterConcept)
   
   // Extract inviteToken from query params
   const inviteToken = typeof window !== 'undefined'
@@ -52,14 +54,28 @@ function App() {
       // Remove base path if present (e.g., /concept-maps/app)
       const pathWithoutBase = basePath ? pathname.replace(basePath, '') : pathname
       
-      // Match /map/{mapId} pattern
+      // Match /map/{mapId}/concept/{conceptId} or /map/{mapId} pattern
+      const conceptMatch = pathWithoutBase.match(/^\/map\/([^/]+)\/concept\/([^/]+)/)
       const mapMatch = pathWithoutBase.match(/^\/map\/([^/]+)/)
-      if (mapMatch && mapMatch[1]) {
+      
+      if (conceptMatch && conceptMatch[1] && conceptMatch[2]) {
+        // URL has both map ID and concept ID
+        const mapId = conceptMatch[1]
+        const conceptId = conceptMatch[2]
+        setCurrentMapId(mapId)
+        setCurrentConceptId(conceptId)
+        setShouldAutoCenterConcept(true) // Enable auto-centering for URL navigation
+      } else if (mapMatch && mapMatch[1]) {
+        // URL has only map ID
         const mapId = mapMatch[1]
         setCurrentMapId(mapId)
+        setCurrentConceptId(null) // Clear concept ID when navigating to map without concept
+        setShouldAutoCenterConcept(false) // Disable auto-centering
       } else {
-        // If no map ID in path, clear the current map ID
+        // If no map ID in path, clear both
         setCurrentMapId(null)
+        setCurrentConceptId(null)
+        setShouldAutoCenterConcept(false)
       }
     }
 
@@ -72,7 +88,7 @@ function App() {
     return () => {
       window.removeEventListener('popstate', updateMapIdFromUrl)
     }
-  }, [setCurrentMapId])
+  }, [setCurrentMapId, setCurrentConceptId, setShouldAutoCenterConcept])
 
   useEffect(() => {
     // Check authentication status

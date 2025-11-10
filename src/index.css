@@ -91,4 +91,14 @@
   .react-flow__node {
     z-index: 1;
   }
+  
+  /* Ensure popover backgrounds are fully opaque */
+  .bg-popover {
+    background-color: hsl(var(--popover)) !important;
+  }
+  
+  /* Ensure card backgrounds are fully opaque */
+  .bg-card {
+    background-color: hsl(var(--card)) !important;
+  }
 }

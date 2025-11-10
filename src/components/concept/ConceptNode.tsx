@@ -150,10 +150,12 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
     const defaultBorderColor = isDarkMode ? 'hsl(217.2 32.6% 17.5%)' : 'hsl(214.3 31.8% 91.4%)'
     const defaultTextColor = isDarkMode ? 'hsl(210 40% 98%)' : 'hsl(222.2 84% 4.9%)'
     const defaultPrimaryColor = isDarkMode ? 'hsl(210 40% 98%)' : 'hsl(222.2 47.4% 11.2%)'
+    // Pale yellow for selected state - subtle but noticeable
+    const selectedFillColor = isDarkMode ? 'hsl(54 50% 20%)' : 'hsl(54 96% 88%)'
     
     return {
-      fillColor: (metadata.fillColor as string) || defaultFillColor,
-      borderColor: (metadata.borderColor as string) || (selected ? defaultPrimaryColor : defaultBorderColor),
+      fillColor: selected ? selectedFillColor : ((metadata.fillColor as string) || defaultFillColor),
+      borderColor: selected ? defaultPrimaryColor : ((metadata.borderColor as string) || defaultBorderColor),
       borderStyle: (metadata.borderStyle as 'solid' | 'dashed' | 'dotted') || 'solid',
       textColor: (metadata.textColor as string) || defaultTextColor,
     }

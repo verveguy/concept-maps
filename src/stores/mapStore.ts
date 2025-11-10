@@ -13,10 +13,18 @@ export interface MapState {
   currentMapId: string | null
   /** Current active perspective ID */
   currentPerspectiveId: string | null
+  /** Current concept ID from URL (for deep linking) */
+  currentConceptId: string | null
+  /** Whether to auto-center on the current concept (set when navigating via URL) */
+  shouldAutoCenterConcept: boolean
   /** Set the current map ID */
   setCurrentMapId: (id: string | null) => void
   /** Set the current perspective ID */
   setCurrentPerspectiveId: (id: string | null) => void
+  /** Set the current concept ID (from URL) */
+  setCurrentConceptId: (id: string | null) => void
+  /** Set whether to auto-center on the concept */
+  setShouldAutoCenterConcept: (should: boolean) => void
 
   /** Whether perspective selection mode is active */
   perspectiveSelectionMode: boolean
@@ -42,8 +50,12 @@ export interface MapState {
 export const useMapStore = create<MapState>((set) => ({
   currentMapId: null,
   currentPerspectiveId: null,
+  currentConceptId: null,
+  shouldAutoCenterConcept: false,
   setCurrentMapId: (id) => set({ currentMapId: id }),
   setCurrentPerspectiveId: (id) => set({ currentPerspectiveId: id }),
+  setCurrentConceptId: (id) => set({ currentConceptId: id }),
+  setShouldAutoCenterConcept: (should) => set({ shouldAutoCenterConcept: should }),
   perspectiveSelectionMode: false,
   setPerspectiveSelectionMode: (on) => set({ perspectiveSelectionMode: on }),
   hideNonPerspective: false,
@@ -54,6 +66,8 @@ export const useMapStore = create<MapState>((set) => ({
     set({
       currentMapId: null,
       currentPerspectiveId: null,
+      currentConceptId: null,
+      shouldAutoCenterConcept: false,
       perspectiveSelectionMode: false,
       hideNonPerspective: false,
       isEditingPerspective: false,
