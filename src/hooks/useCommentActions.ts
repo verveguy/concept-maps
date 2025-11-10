@@ -5,7 +5,6 @@
  */
 
 import { db, tx, id } from '@/lib/instant'
-import { auth } from '@/lib/instant'
 
 /**
  * Data structure for creating a new comment.

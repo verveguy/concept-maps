@@ -184,7 +184,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   
   const concepts = isEditingPerspective ? allConcepts : filteredConcepts
   const relationships = isEditingPerspective ? allRelationships : filteredRelationships
-  const { updateConcept, deleteConcept, createConcept } = useConceptActions()
+  const { updateConcept, deleteConcept } = useConceptActions()
   const { createRelationship, deleteRelationship } = useRelationshipActions()
   const { deleteComment, updateComment, createComment, linkCommentToConcept, unlinkCommentFromConcept } = useCommentActions()
   const { recordDeletion, startOperation, endOperation } = useUndo()
@@ -199,7 +199,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     textViewPosition,
     setTextViewPosition,
   } = useUIStore()
-  const { screenToFlowPosition, flowToScreenPosition, fitView, getNode, setCenter, getViewport } = useReactFlow()
+  const { screenToFlowPosition, fitView, getNode, setCenter, getViewport } = useReactFlow()
   
   // Presence tracking - split into separate hooks to prevent unnecessary re-renders
   // Cursor setter: only updates cursor position, doesn't subscribe to peer cursors

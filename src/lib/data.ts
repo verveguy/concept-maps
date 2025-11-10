@@ -327,7 +327,7 @@ export function nodesToConcepts(nodes: Node[]): Partial<Concept>[] {
  */
 export function commentsToNodes(
   comments: Comment[],
-  perspectiveConceptIds?: Set<string>
+  _perspectiveConceptIds?: Set<string>
 ): Node[] {
   return comments
     .filter((comment) => comment.id && comment.id.trim()) // Filter out empty IDs

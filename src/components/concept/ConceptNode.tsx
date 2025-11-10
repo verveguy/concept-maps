@@ -756,7 +756,7 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
     </div>
     {selectedConceptId === data.concept.id && !conceptEditorOpen && (
       <NodeToolbar
-        nodeRef={nodeRef}
+        nodeRef={nodeRef as React.RefObject<HTMLDivElement>}
         visible={true}
         type="concept"
         concept={data.concept}

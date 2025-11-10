@@ -121,7 +121,7 @@ function getTapePositionOffset(commentId: string, position: { x: number; y: numb
   return Math.round(normalized * 10) / 10
 }
 
-export const CommentNode = memo(({ data, selected, id: nodeId }: NodeProps<CommentNodeData>) => {
+export const CommentNode = memo(({ data, selected }: NodeProps<CommentNodeData>) => {
   const { updateComment } = useCommentActions()
   const { hasWriteAccess } = useMapPermissions()
   const setSelectedCommentId = useUIStore((state) => state.setSelectedCommentId)
@@ -273,7 +273,7 @@ export const CommentNode = memo(({ data, selected, id: nodeId }: NodeProps<Comme
     }
   }, [isEditing])
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = (_e: React.MouseEvent) => {
     // Clear other selections
     setSelectedConceptId(null)
     setSelectedRelationshipId(null)
@@ -586,7 +586,7 @@ export const CommentNode = memo(({ data, selected, id: nodeId }: NodeProps<Comme
     </div>
     {selectedCommentId === data.comment.id && (
       <NodeToolbar
-        nodeRef={nodeRef}
+        nodeRef={nodeRef as React.RefObject<HTMLDivElement>}
         visible={true}
         type="comment"
         comment={{

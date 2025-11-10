@@ -66,7 +66,6 @@ export function FloatingToolbar({
       const sideBuffer = 16 // Buffer from left/right edges when constraining
 
       let targetX: number
-      let targetY: number
       let targetTop: number
       let targetBottom: number
 
@@ -79,13 +78,11 @@ export function FloatingToolbar({
           return
         }
         targetX = nodeRect.left + nodeRect.width / 2
-        targetY = nodeRect.top
         targetTop = nodeRect.top
         targetBottom = nodeRect.bottom
       } else if (midpoint) {
         // Position relative to midpoint
         targetX = midpoint.x
-        targetY = midpoint.y
         targetTop = midpoint.y
         targetBottom = midpoint.y
       } else {
@@ -96,14 +93,12 @@ export function FloatingToolbar({
       const reactFlowContainer = document.getElementById('concept-map-canvas')
       
       let canvasTop = 0
-      let canvasBottom = window.innerHeight
       let canvasLeft = 0
       let canvasRight = window.innerWidth
       
       if (reactFlowContainer) {
         const containerRect = reactFlowContainer.getBoundingClientRect()
         canvasTop = containerRect.top
-        canvasBottom = containerRect.bottom
         canvasLeft = containerRect.left
         canvasRight = containerRect.right
       }

@@ -33,7 +33,6 @@ export const CommentEdge = memo(
     sourcePosition,
     targetPosition,
     style = {},
-    markerEnd,
     selected,
   }: EdgeProps) => {
     const [edgePath] = getBezierPath({

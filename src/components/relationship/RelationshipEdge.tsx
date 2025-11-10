@@ -1312,7 +1312,6 @@ export const RelationshipEdge = memo(
     const isInPerspective = data?.isInPerspective ?? true
     const selectedRelationshipId = useUIStore((state) => state.selectedRelationshipId)
     const relationshipEditorOpen = useUIStore((state) => state.relationshipEditorOpen)
-    const setSelectedRelationshipId = useUIStore((state) => state.setSelectedRelationshipId)
     
     // Track dark mode state for theme-aware defaults
     const [isDarkMode, setIsDarkMode] = useState(() => 
