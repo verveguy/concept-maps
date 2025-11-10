@@ -8,6 +8,7 @@ import { useState, useCallback, useRef } from 'react'
 import { Plus, X, Share2, Eye, Edit, PanelLeft, Lock } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ConceptMapCanvas, type ConceptMapCanvasRef } from '@/components/graph/ConceptMapCanvas'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { UnifiedEditor } from '@/components/editor/UnifiedEditor'
 import { PerspectiveEditor } from '@/components/perspective/PerspectiveEditor'
 import { ShareDialog } from '@/components/share/ShareDialog'
@@ -268,7 +269,15 @@ export function MapPage() {
 
         {/* Canvas or Text View */}
         <div className="flex-1 overflow-hidden relative">
-          <ConceptMapCanvas ref={canvasRef} onCreateConcept={handleCreateConcept} />
+          <ErrorBoundary
+            name="ConceptMapCanvas"
+            onError={(error, errorInfo) => {
+              console.error('[MapPage] ConceptMapCanvas error:', error)
+              console.error('[MapPage] Error info:', errorInfo)
+            }}
+          >
+            <ConceptMapCanvas ref={canvasRef} onCreateConcept={handleCreateConcept} />
+          </ErrorBoundary>
           {/* Unified Editor - show when no perspective OR when viewing (not editing) a perspective */}
           {(!currentPerspectiveId || !isEditingPerspective) && <UnifiedEditor />}
           {/* Perspective Editor - only show when actively editing a perspective */}

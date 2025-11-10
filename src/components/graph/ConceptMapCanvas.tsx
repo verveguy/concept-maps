@@ -87,6 +87,7 @@ import { usePresenceEditing } from '@/hooks/usePresenceEditing'
 import { usePresenceCursorSetter } from '@/hooks/usePresenceCursorSetter'
 import { PeerCursors } from '@/components/presence/PeerCursors'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
+import { useRenderTracker } from '@/hooks/useRenderTracker'
 import { LayoutSelector } from './LayoutSelector'
 import { CustomConnectionLine } from './CustomConnectionLine'
 import { CanvasContextMenu } from './CanvasContextMenu'
@@ -118,6 +119,22 @@ export interface ConceptMapCanvasRef {
  */
 const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasProps>(
   (_props, ref) => {
+  // Track renders to detect infinite loops
+  useRenderTracker({
+    name: 'ConceptMapCanvasInner',
+    maxRenders: 100,
+    logRenders: import.meta.env.DEV,
+    onMaxRendersExceeded: () => {
+      console.error('[ConceptMapCanvasInner] Infinite loop detected!')
+      // Try to identify the cause
+      console.error('Current store state:', {
+        activeLayout: useCanvasStore.getState().activeLayout,
+        laidOutNodeIdsSize: useCanvasStore.getState().laidOutNodeIds.size,
+        newlyCreatedRelationshipIdsSize: useCanvasStore.getState().newlyCreatedRelationshipIds.size,
+      })
+    },
+  })
+  
   // Use refs to ensure nodeTypes and edgeTypes have stable references
   // This prevents React Flow from detecting them as new objects on each render
   const nodeTypesRef = useRef(nodeTypes)
