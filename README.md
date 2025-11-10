@@ -7,6 +7,9 @@ A collaborative concept mapping tool built with React, InstantDB, and React Flow
 - Real-time collaborative editing via InstantDB
 - Dual editing modes: Graph view (React Flow) and Structured Text view
 - Presence indicators showing where collaborators are working
+- Comments: Sticky note-style annotations linked to concepts
+- Visual customization: Customize colors, styles, and appearance of nodes and edges
+- Floating toolbars: Quick-access toolbars for editing nodes and relationships
 - Perspectives: Filtered subsets of concept maps
 - Rich metadata support for concepts and relationships
 - Markdown notes/documents for concepts and relationships

@@ -41,6 +41,16 @@ This guide will help you get started with the Concept Mapping Tool.
    - The system creates the relationship and new concept automatically
    - The new concept enters edit mode so you can continue typing more triples!
 
+5. **Add Comments (Optional)**
+   - Right-click on the canvas and select "Add Comment"
+   - Double-click the comment to edit its text
+   - Drag connection handles to link comments to concepts
+
+6. **Customize Appearance**
+   - Select any node or edge to see the floating toolbar
+   - Use the toolbar to customize colors, styles, and line thickness
+   - Changes are saved automatically
+
 ## Editing Modes
 
 The tool supports two editing modes:
@@ -55,3 +65,4 @@ Switch between modes using the toggle in the top toolbar.
 - Learn about [Creating Maps](/docs/user-guide/creating-maps)
 - Explore [Editing Concepts](/docs/user-guide/editing-concepts)
 - Understand [Relationships](/docs/user-guide/relationships)
+- Add [Comments](/docs/user-guide/comments) to your maps
