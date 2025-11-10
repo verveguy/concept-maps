@@ -435,7 +435,7 @@ export function EdgeToolbar({
       onEdit()
     } else {
       setRelationshipEditorOpen(true)
-      setSelectedRelationshipId(null) // Hide toolbar
+      // Keep selectedRelationshipId so UnifiedEditor knows which relationship to edit
     }
   }
 

@@ -99,6 +99,7 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   const setSelectedRelationshipId = useUIStore((state) => state.setSelectedRelationshipId)
   const setSelectedCommentId = useUIStore((state) => state.setSelectedCommentId)
   const selectedConceptId = useUIStore((state) => state.selectedConceptId)
+  const conceptEditorOpen = useUIStore((state) => state.conceptEditorOpen)
   const setConceptEditorOpen = useUIStore((state) => state.setConceptEditorOpen)
   const { updateConcept } = useConceptActions()
   const { toggleConceptInPerspective } = usePerspectiveActions()
@@ -751,7 +752,7 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
         }}
       />
     </div>
-    {selectedConceptId === data.concept.id && (
+    {selectedConceptId === data.concept.id && !conceptEditorOpen && (
       <NodeToolbar
         nodeRef={nodeRef}
         visible={true}
@@ -759,7 +760,7 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
         concept={data.concept}
         onEdit={() => {
           setConceptEditorOpen(true)
-          setSelectedConceptId(null)
+          // Keep selectedConceptId so UnifiedEditor knows which concept to edit
         }}
       />
     )}

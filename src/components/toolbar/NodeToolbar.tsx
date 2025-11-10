@@ -466,7 +466,7 @@ export function NodeToolbar({
       onEdit()
     } else if (type === 'concept' && concept) {
       setConceptEditorOpen(true)
-      setSelectedConceptId(null) // Hide toolbar
+      // Keep selectedConceptId so UnifiedEditor knows which concept to edit
     }
   }
 
