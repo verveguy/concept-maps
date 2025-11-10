@@ -1337,8 +1337,8 @@ export const RelationshipEdge = memo(
       
       // Apply greyed-out styling when editing perspective and relationship is not included
       const isGreyedOut = isEditingPerspective && !isInPerspective
-      // Theme-aware selected color (primary color)
-      const selectedColor = isDarkMode ? 'hsl(210 40% 98%)' : 'hsl(222.2 47.4% 11.2%)'
+      // Red color when selected
+      const selectedColor = '#ef4444'
       let color = selected ? selectedColor : baseColor
       
       if (isGreyedOut) {

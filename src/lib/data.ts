@@ -5,7 +5,7 @@
 
 import type { Node, Edge } from 'reactflow'
 import { MarkerType } from 'reactflow'
-import type { Concept, Relationship } from '@/lib/schema'
+import type { Concept, Relationship, Comment } from '@/lib/schema'
 
 /**
  * Options for converting concepts to nodes.
@@ -289,4 +289,145 @@ export function nodesToConcepts(nodes: Node[]): Partial<Concept>[] {
     id: node.id,
     position: node.position,
   }))
+}
+
+/**
+ * Convert Comment entities to React Flow nodes.
+ * 
+ * Transforms domain model comments into React Flow node format for visualization.
+ * Each comment becomes a node with position and text content. Comments are rendered
+ * as yellow sticky note-style nodes.
+ * 
+ * **Node Data Structure:**
+ * - `id`: Comment ID
+ * - `type`: Always `'comment'` (for React Flow node type mapping)
+ * - `position`: Comment's x/y coordinates
+ * - `data.comment`: Full comment entity
+ * - `data.shouldStartEditing`: Flag to trigger edit mode when node is first created
+ * 
+ * **Filtering:**
+ * Comments with empty or whitespace-only IDs are automatically filtered out.
+ * 
+ * @param comments - Array of comments to convert to nodes
+ * @param perspectiveConceptIds - Optional set of concept IDs included in the current perspective (used for filtering)
+ * @returns Array of React Flow nodes ready for visualization
+ * 
+ * @example
+ * ```tsx
+ * import { commentsToNodes } from '@/lib/data'
+ * import { useComments } from '@/hooks/useComments'
+ * 
+ * function ConceptMap() {
+ *   const comments = useComments()
+ *   const nodes = commentsToNodes(comments)
+ *   
+ *   return <ReactFlow nodes={nodes} edges={edges} />
+ * }
+ * ```
+ */
+export function commentsToNodes(
+  comments: Comment[],
+  perspectiveConceptIds?: Set<string>
+): Node[] {
+  return comments
+    .filter((comment) => comment.id && comment.id.trim()) // Filter out empty IDs
+    .map((comment) => ({
+      id: comment.id,
+      type: 'comment',
+      position: comment.position,
+      data: {
+        comment,
+      },
+    }))
+}
+
+/**
+ * Convert Comment-Concept links to React Flow edges.
+ * 
+ * Transforms comment-concept associations into React Flow edge format for visualization.
+ * Each comment-concept link becomes a dashed bezier edge connecting the comment node
+ * to the concept node. Uses centered handles (same approach as Concept-Concept edges).
+ * 
+ * **Edge Features:**
+ * - Uses custom `CommentEdge` component for dashed bezier styling
+ * - No arrow markers (unlike Relationship edges)
+ * - Uses centered handles (top center for Comment source, bottom center for Concept target)
+ * - Only creates edges for visible concepts (respects perspective filtering)
+ * 
+ * **Edge Data Structure:**
+ * - `id`: Generated edge ID (format: `comment-{commentId}-concept-{conceptId}`)
+ * - `source`: Comment ID
+ * - `target`: Concept ID
+ * - `sourceHandle`: Always undefined (uses centered handle)
+ * - `targetHandle`: Always undefined (uses centered handle)
+ * - `type`: Always `'comment-edge'` (maps to CommentEdge component)
+ * - No `markerEnd` (no arrows for comments)
+ * 
+ * **Filtering:**
+ * - Only creates edges if the concept is visible (in perspectiveConceptIds if provided)
+ * - Comments with empty IDs or concepts with empty IDs are filtered out
+ * 
+ * @param comments - Array of comments with conceptIds populated
+ * @param concepts - Array of concepts to link to (used for validation and filtering)
+ * @param perspectiveConceptIds - Optional set of concept IDs included in the current perspective (used for filtering)
+ * @returns Array of React Flow edges ready for visualization
+ * 
+ * @example
+ * ```tsx
+ * import { commentsToEdges } from '@/lib/data'
+ * import { useComments } from '@/hooks/useComments'
+ * import { useConcepts } from '@/hooks/useConcepts'
+ * 
+ * function ConceptMap() {
+ *   const comments = useComments()
+ *   const concepts = useConcepts()
+ *   const edges = commentsToEdges(comments, concepts)
+ *   
+ *   return <ReactFlow nodes={nodes} edges={edges} />
+ * }
+ * ```
+ */
+export function commentsToEdges(
+  comments: Comment[],
+  concepts: Concept[],
+  perspectiveConceptIds?: Set<string>
+): Edge[] {
+  // Create a set of valid concept IDs for quick lookup
+  const validConceptIds = new Set(concepts.map((c) => c.id))
+  
+  // Filter comments and concepts with valid IDs
+  const validComments = comments.filter(
+    (comment) => comment.id && comment.id.trim()
+  )
+  
+  const edges: Edge[] = []
+  
+  validComments.forEach((comment) => {
+    // Only create edges for concepts that are linked to this comment
+    comment.conceptIds.forEach((conceptId) => {
+      // Skip if concept ID is invalid
+      if (!conceptId || !conceptId.trim()) return
+      
+      // Skip if concept doesn't exist in the concepts array
+      if (!validConceptIds.has(conceptId)) return
+      
+      // If perspective filtering is active, only create edges for visible concepts
+      if (perspectiveConceptIds && !perspectiveConceptIds.has(conceptId)) {
+        return
+      }
+      
+      // Create edge with centered handles (no specific handle IDs = uses center)
+      edges.push({
+        id: `comment-${comment.id}-concept-${conceptId}`,
+        source: comment.id,
+        target: conceptId,
+        sourceHandle: undefined, // Uses centered handle
+        targetHandle: undefined, // Uses centered handle
+        type: 'comment-edge', // Maps to CommentEdge component
+        // No markerEnd - comments don't have arrows
+      })
+    })
+  })
+  
+  return edges
 }
