@@ -964,15 +964,15 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   )
   
   // Track previous concept IDs to detect new nodes (more reliable than count)
-  const prevConceptIds = useCanvasStore((state) => state.prevConceptIds)
-  const setPrevConceptIds = useCanvasStore((state) => state.setPrevConceptIds)
+  // Use a ref instead of store to avoid infinite loops (Set reference changes trigger re-renders)
+  const prevConceptIdsRef = useRef<Set<string>>(new Set())
   
   // Initialize ref on first render
   useEffect(() => {
-    if (prevConceptIds.size === 0) {
-      setPrevConceptIds(new Set(concepts.map(c => c.id)))
+    if (prevConceptIdsRef.current.size === 0) {
+      prevConceptIdsRef.current = new Set(concepts.map(c => c.id))
     }
-  }, [concepts, prevConceptIds.size, setPrevConceptIds])
+  }, [concepts])
   
   // Create a stable string representation of concept IDs for dependency tracking
   const conceptIdsString = useMemo(
@@ -984,12 +984,12 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   useEffect(() => {
     if (!activeLayout) {
       // Update ref even if no active layout
-      setPrevConceptIds(new Set(concepts.map(c => c.id)))
+      prevConceptIdsRef.current = new Set(concepts.map(c => c.id))
       return
     }
     
     const currentConceptIds = new Set(concepts.map(c => c.id))
-    const previousConceptIds = prevConceptIds
+    const previousConceptIds = prevConceptIdsRef.current
     
     // Check if any new concepts were added (not just count change)
     const newConceptIds = Array.from(currentConceptIds).filter(id => !previousConceptIds.has(id))
@@ -1006,15 +1006,15 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       }, 300)
       
       // Update ref for next comparison
-      setPrevConceptIds(currentConceptIds)
+      prevConceptIdsRef.current = currentConceptIds
       
       return () => clearTimeout(timeoutId)
     }
     
     // Update ref even if no new nodes (in case nodes were deleted)
-    setPrevConceptIds(currentConceptIds)
+    prevConceptIdsRef.current = currentConceptIds
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conceptIdsString, activeLayout, handleApplyLayout, prevConceptIds, setPrevConceptIds, laidOutNodeIds])
+  }, [conceptIdsString, activeLayout, handleApplyLayout, laidOutNodeIds])
   
   // Memoize concept nodes to avoid recreating the filter on every render
   const conceptNodes = useMemo(() => nodes.filter(n => n.type === 'concept'), [nodes])

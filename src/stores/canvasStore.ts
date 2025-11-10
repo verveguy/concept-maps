@@ -104,12 +104,6 @@ export interface CanvasState {
   /** Clear all update times */
   clearUpdateTimes: () => void
 
-  // Previous state tracking (for sync optimization)
-  /** Previous concept IDs set (for detecting new nodes) */
-  prevConceptIds: Set<string>
-  /** Set previous concept IDs */
-  setPrevConceptIds: (ids: Set<string>) => void
-
   // Centering state
   /** Whether we're currently centering on a concept */
   isCentering: boolean
@@ -201,10 +195,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   getLastUpdateTime: (nodeId) => get().lastUpdateTime.get(nodeId) || 0,
   clearUpdateTimes: () => set({ lastUpdateTime: new Map<string, number>() }),
 
-  // Previous state tracking
-  prevConceptIds: new Set<string>(),
-  setPrevConceptIds: (ids) => set({ prevConceptIds: new Set(ids) }),
-
   // Centering state
   isCentering: false,
   setIsCentering: (centering) => set({ isCentering: centering }),
@@ -226,7 +216,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       newlyCreatedRelationshipIds: new Map<string, string>(),
       hasCheckedInitialConcept: new Set<string>(),
       lastUpdateTime: new Map<string, number>(),
-      prevConceptIds: new Set<string>(),
       isCentering: false,
       pendingConcept: null,
     }),
