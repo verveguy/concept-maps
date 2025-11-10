@@ -8,6 +8,63 @@ import { X, Copy, Mail, Trash2 } from 'lucide-react'
 import { useSharing, generateShareLink } from '@/hooks/useSharing'
 import { useMap } from '@/hooks/useMap'
 import { format } from 'date-fns'
+import { getAvatarUrl } from '@/lib/avatar'
+
+/**
+ * Simple avatar component for displaying user avatars in the share dialog.
+ * Shows Gravatar image if available, otherwise shows initials.
+ * 
+ * @param email - User's email address (used for Gravatar and initials)
+ * @param imageURL - Custom image URL (takes priority over Gravatar)
+ * @param size - Size of the avatar in pixels (default: 32)
+ */
+function ShareAvatar({ 
+  email, 
+  imageURL, 
+  size = 32 
+}: { 
+  email: string | null
+  imageURL?: string | null
+  size?: number 
+}) {
+  const avatarUrl = getAvatarUrl(email || undefined, imageURL || undefined, size)
+  const [imageError, setImageError] = useState(false)
+  
+  // Generate initials from email
+  const getInitials = (email: string | null): string => {
+    if (!email) return '?'
+    const parts = email.split('@')[0].split(/[._-]/)
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase().slice(0, 2)
+    }
+    return email.substring(0, 2).toUpperCase()
+  }
+  
+  const initials = getInitials(email)
+  
+  // Show avatar image if available and not errored
+  if (avatarUrl && !imageError) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={email || 'User'}
+        className="rounded-full shrink-0"
+        style={{ width: size, height: size }}
+        onError={() => setImageError(true)}
+      />
+    )
+  }
+  
+  // Fallback to initials
+  return (
+    <div
+      className="flex items-center justify-center rounded-full shrink-0 text-xs font-semibold text-white bg-gray-400"
+      style={{ width: size, height: size }}
+    >
+      {initials}
+    </div>
+  )
+}
 
 /**
  * Props for ShareDialog component.
@@ -216,14 +273,14 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
   if (!mapId || !map) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70">
+      <div className="bg-card text-card-foreground rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col border">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold">Share "{map.name}"</h2>
+          <h2 className="text-xl font-semibold text-card-foreground">Share "{map.name}"</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            className="p-2 hover:bg-accent rounded-full transition-colors text-card-foreground"
             aria-label="Close dialog"
           >
             <X className="h-5 w-5" />
@@ -235,12 +292,17 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
           {/* Share with User Section */}
           {isOwner && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Share with User
               </label>
               <form onSubmit={handleShare}>
                 <div className="flex gap-2 items-start">
-                  <div className="flex-1">
+                  <div className="flex-1 relative">
+                    {emailInput.trim() && (
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
+                        <ShareAvatar email={emailInput.trim()} size={20} />
+                      </div>
+                    )}
                     <input
                       type="email"
                       value={emailInput}
@@ -250,22 +312,24 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                         if (emailError) setEmailError(null)
                       }}
                       placeholder="user@example.com"
-                      className={`w-full px-3 py-2 border rounded-md text-sm ${
+                      className={`w-full py-2 border rounded-md text-sm bg-background text-foreground ${
+                        emailInput.trim() ? 'pl-10' : 'pl-3'
+                      } pr-3 ${
                         emailError
-                          ? 'border-red-300 bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500'
-                          : 'border-gray-300'
+                          ? 'border-red-300 bg-red-50 dark:bg-red-950 dark:border-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500'
+                          : 'border-input'
                       }`}
                       required
                     />
                     {emailError && (
-                      <p className="mt-1 text-xs text-red-600">{emailError}</p>
+                      <p className="mt-1 text-xs text-red-600 dark:text-red-400">{emailError}</p>
                     )}
                   </div>
                   <div className="flex gap-2 items-start">
                     <select
                       value={permissionInput}
                       onChange={(e) => setPermissionInput(e.target.value as 'view' | 'edit')}
-                      className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                      className="px-3 py-2 border border-input bg-background text-foreground rounded-md text-sm"
                     >
                       <option value="view">View</option>
                       <option value="edit">Edit</option>
@@ -273,7 +337,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                     <button
                       type="submit"
                       disabled={isSharing || !!emailError}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                       <Mail className="h-4 w-4" />
                       Share
@@ -286,25 +350,25 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
 
           {/* Invitation List */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Invitations ({visibleInvitations.length})
             </label>
             {visibleInvitations.length === 0 ? (
-              <p className="text-sm text-gray-500">No pending invitations.</p>
+              <p className="text-sm text-muted-foreground">No pending invitations.</p>
             ) : (
               <div className="space-y-2">
                 {visibleInvitations.map((invitation) => (
                   <div
                     key={invitation.id}
-                    className="p-3 bg-gray-50 rounded-md border border-gray-100 flex flex-col gap-2"
+                    className="p-3 bg-muted rounded-md border flex flex-col gap-2"
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="text-sm font-medium">{invitation.invitedEmail}</div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-sm font-medium text-foreground">{invitation.invitedEmail}</div>
+                        <div className="text-xs text-muted-foreground">
                           Permission: {invitation.permission} ? Status: {invitation.status}
                         </div>
-                        <div className="text-xs text-gray-400 mt-0.5">
+                        <div className="text-xs text-muted-foreground/70 mt-0.5">
                           Invited {format(invitation.createdAt, 'MMM d, yyyy h:mm a')}
                           {invitation.respondedAt && (
                             <> ? {invitation.status === 'accepted' ? 'Accepted' : invitation.status === 'declined' ? 'Rejected' : 'Responded'} {format(invitation.respondedAt, 'MMM d, yyyy h:mm a')}</>
@@ -317,7 +381,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleCopyLink(invitation.id, invitation.token)}
-                          className="px-2 py-1 text-xs border rounded-md flex items-center gap-1 hover:bg-gray-100"
+                          className="px-2 py-1 text-xs border border-input bg-background text-foreground rounded-md flex items-center gap-1 hover:bg-accent"
                           disabled={invitation.status === 'revoked'}
                         >
                           <Copy className="h-3 w-3" />
@@ -326,7 +390,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                         {isOwner && invitation.status !== 'revoked' && (
                           <button
                             onClick={() => handleRevokeInvitation(invitation.id)}
-                            className="px-2 py-1 text-xs text-red-600 border border-red-200 rounded-md hover:bg-red-50"
+                            className="px-2 py-1 text-xs text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-950"
                           >
                             Revoke
                           </button>
@@ -334,7 +398,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                         {isOwner && invitation.status === 'revoked' && (
                           <button
                             onClick={() => handleDeleteInvitation(invitation.id)}
-                            className="px-2 py-1 text-xs text-red-600 border border-red-200 rounded-md hover:bg-red-50 flex items-center gap-1"
+                            className="px-2 py-1 text-xs text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-950 flex items-center gap-1"
                             title="Permanently delete this invitation"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -351,41 +415,48 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
 
           {/* Shared Users List */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-foreground mb-2">
               Shared With ({shares.length})
             </label>
             {shares.length === 0 ? (
-              <p className="text-sm text-gray-500">No users shared yet</p>
+              <p className="text-sm text-muted-foreground">No users shared yet</p>
             ) : (
               <div className="space-y-2">
                 {shares.map((share) => (
                   <div
                     key={share.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                    className="flex items-center justify-between p-3 bg-muted rounded-md border"
                   >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <div className="text-sm font-medium">{share.userEmail || share.userId}</div>
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${
-                            share.status === 'active'
-                              ? 'bg-green-100 text-green-700'
-                              : share.status === 'pending'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          {share.status === 'active' ? 'Active' : share.status === 'pending' ? 'Pending' : 'Revoked'}
-                        </span>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Shared {format(share.createdAt, 'MMM d, yyyy')}
-                        {share.acceptedAt && share.status !== 'revoked' && (
-                          <> ? Accepted {format(share.acceptedAt, 'MMM d, yyyy')}</>
-                        )}
-                        {share.revokedAt && (
-                          <> ? Revoked {format(share.revokedAt, 'MMM d, yyyy')}</>
-                        )}
+                    <div className="flex-1 flex items-center gap-3">
+                      <ShareAvatar 
+                        email={share.userEmail} 
+                        imageURL={share.userImageURL}
+                        size={32}
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm font-medium text-foreground">{share.userEmail || share.userId}</div>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full ${
+                              share.status === 'active'
+                                ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+                                : share.status === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
+                                  : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
+                            }`}
+                          >
+                            {share.status === 'active' ? 'Active' : share.status === 'pending' ? 'Pending' : 'Revoked'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Shared {format(share.createdAt, 'MMM d, yyyy')}
+                          {share.acceptedAt && share.status !== 'revoked' && (
+                            <> ? Accepted {format(share.acceptedAt, 'MMM d, yyyy')}</>
+                          )}
+                          {share.revokedAt && (
+                            <> ? Revoked {format(share.revokedAt, 'MMM d, yyyy')}</>
+                          )}
+                        </div>
                       </div>
                     </div>
                     {isOwner && (
@@ -398,7 +469,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                               e.target.value as 'view' | 'edit'
                             )
                           }
-                          className="px-2 py-1 text-xs border border-gray-300 rounded-md"
+                          className="px-2 py-1 text-xs border border-input bg-background text-foreground rounded-md"
                           disabled={share.status !== 'active'}
                         >
                           <option value="view">View</option>
@@ -406,7 +477,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                         </select>
                         <button
                           onClick={() => handleRevokeShare(share.id)}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                          className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 rounded transition-colors"
                           aria-label="Revoke share"
                           disabled={share.status === 'revoked'}
                         >
@@ -415,7 +486,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                       </div>
                     )}
                     {!isOwner && (
-                      <span className="text-xs text-gray-500 capitalize">
+                      <span className="text-xs text-muted-foreground capitalize">
                         {share.permission}
                       </span>
                     )}
@@ -427,10 +498,10 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t bg-gray-50">
+        <div className="flex items-center justify-end gap-3 p-6 border-t bg-muted/50">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 text-foreground bg-background border border-input rounded-md hover:bg-accent transition-colors"
           >
             Close
           </button>

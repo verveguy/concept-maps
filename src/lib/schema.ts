@@ -168,6 +168,7 @@ export interface Share {
   mapId: string
   userId: string
   userEmail: string | null // Email address of the user with whom the map is shared
+  userImageURL: string | null // User's avatar image URL (if available)
   permission: 'view' | 'edit'
   createdAt: Date
   acceptedAt: Date | null // Timestamp when user accepted the share
@@ -214,4 +215,43 @@ export interface ShareInvitation {
   expiresAt: Date | null
   respondedAt: Date | null
   revokedAt: Date | null
+}
+
+/**
+ * Represents a comment (sticky note) attached to one or more concepts.
+ * 
+ * Comments allow users to add notes and annotations to concepts in a concept map.
+ * Each comment appears as a yellow sticky note node on the canvas, connected to
+ * one or more concepts via dashed edges.
+ * 
+ * **Linking:**
+ * Comments can be linked to multiple concepts via a many-to-many relationship.
+ * The `conceptIds` array is derived from the InstantDB links and contains all
+ * concept IDs that this comment is associated with.
+ * 
+ * **Position:**
+ * Comments have x/y coordinates that determine their position on the visualization
+ * canvas, similar to concepts.
+ * 
+ * **Ownership:**
+ * Comments are created by users (`createdBy`) and belong to a specific map.
+ * The creator's avatar is displayed when hovering over the comment.
+ * 
+ * **Soft Deletes:**
+ * Comments support soft deletion via the `deletedAt` field. Soft-deleted comments
+ * are excluded from normal queries but remain in the database for undo functionality.
+ */
+export interface Comment {
+  id: string
+  mapId: string
+  text: string
+  position: { x: number; y: number }
+  conceptIds: string[] // Derived from links
+  createdBy: string // User ID of the creator
+  creatorEmail?: string | null // Creator's email for avatar
+  creatorImageURL?: string | null // Creator's image URL for avatar
+  resolved: boolean // Whether the comment has been resolved
+  createdAt: Date
+  updatedAt: Date
+  deletedAt: Date | null // Timestamp when soft-deleted, null if not deleted
 }

@@ -7,6 +7,8 @@
 import { ConceptNode } from '../concept/ConceptNode'
 import { RelationshipEdge } from '../relationship/RelationshipEdge'
 import { TextViewNode } from './TextViewNode'
+import { CommentNode } from '../comment/CommentNode'
+import { CommentEdge } from '../comment/CommentEdge'
 
 /**
  * Registered node types for React Flow.
@@ -17,6 +19,8 @@ export const nodeTypes = Object.freeze({
   concept: ConceptNode,
   /** Text view node type */
   'text-view': TextViewNode,
+  /** Comment node type */
+  comment: CommentNode,
 })
 
 /**
@@ -26,5 +30,7 @@ export const nodeTypes = Object.freeze({
 export const edgeTypes = Object.freeze({
   /** Default relationship edge type */
   default: RelationshipEdge,
+  /** Comment edge type */
+  'comment-edge': CommentEdge,
 })
 

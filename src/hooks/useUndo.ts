@@ -7,6 +7,7 @@
 import { useCallback } from 'react'
 import { useConceptActions } from './useConceptActions'
 import { useRelationshipActions } from './useRelationshipActions'
+import { useCommentActions } from './useCommentActions'
 import { useUndoStore } from '@/stores/undoStore'
 
 /**
@@ -14,7 +15,7 @@ import { useUndoStore } from '@/stores/undoStore'
  */
 export interface DeletionEntry {
   /** Type of item deleted */
-  type: 'concept' | 'relationship'
+  type: 'concept' | 'relationship' | 'comment'
   /** ID of the deleted item */
   id: string
   /** Timestamp when deleted */
@@ -32,6 +33,7 @@ export interface DeletionEntry {
 export function useUndo() {
   const { undeleteConcept } = useConceptActions()
   const { undeleteRelationship } = useRelationshipActions()
+  const { undeleteComment } = useCommentActions()
   const {
     recordDeletion,
     getHistory,
@@ -84,7 +86,7 @@ export function useUndo() {
     
     try {
       // Undelete all items in the operation
-      // Process concepts first, then relationships
+      // Process concepts first, then relationships, then comments
       const conceptPromises = operation
         .filter((entry) => entry.type === 'concept')
         .map((entry) => {
@@ -99,8 +101,15 @@ export function useUndo() {
           return undeleteRelationship(entry.id)
         })
       
+      const commentPromises = operation
+        .filter((entry) => entry.type === 'comment')
+        .map((entry) => {
+          console.log('Undeleting comment:', entry.id)
+          return undeleteComment(entry.id)
+        })
+      
       // Execute all undeletes in parallel
-      await Promise.all([...conceptPromises, ...relationshipPromises])
+      await Promise.all([...conceptPromises, ...relationshipPromises, ...commentPromises])
       
       // Remove the entire operation from history after successful undo
       removeMostRecentOperation()
@@ -111,7 +120,7 @@ export function useUndo() {
       console.error('Failed to undo deletion operation:', error)
       return false
     }
-  }, [undeleteConcept, undeleteRelationship, getMostRecentOperation, removeMostRecentOperation])
+  }, [undeleteConcept, undeleteRelationship, undeleteComment, getMostRecentOperation, removeMostRecentOperation])
 
   return {
     undo,

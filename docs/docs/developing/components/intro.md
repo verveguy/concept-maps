@@ -11,6 +11,7 @@ This section provides detailed documentation for all React components in the Con
 The components are organized into several categories:
 
 - **Core Components**: Main functionality components (nodes, edges, editors)
+- **Toolbar Components**: Floating toolbars for editing nodes and edges
 - **Layout Components**: UI structure and navigation components
 - **Presence Components**: Real-time collaboration indicators
 
@@ -32,3 +33,8 @@ Start by exploring the core components:
 - [ConceptEditor](/docs/developing/components/concept-editor): Editor for concept properties
 - [RelationshipEdge](/docs/developing/components/relationship-edge): Visual representation of relationships
 - [ConceptMapCanvas](/docs/developing/components/concept-map-canvas): Main canvas component
+
+New components include:
+- **CommentNode**: Sticky note-style comment nodes with inline editing
+- **NodeToolbar**: Floating toolbar for customizing concept and comment appearance
+- **EdgeToolbar**: Floating toolbar for customizing relationship edges

@@ -61,6 +61,21 @@ Each relationship can have:
 
 ## Editing Relationships
 
+### Using the Toolbar
+When a relationship edge is selected, a **floating toolbar** appears near the edge midpoint with options to:
+
+- **Edit Labels**: Click the edit button to modify relationship labels
+- **Delete**: Remove the relationship
+- **Edge Type**: Change the connection style:
+  - **Bezier**: Curved, smooth connections (default)
+  - **Smoothstep**: S-shaped connections
+  - **Step**: Right-angled connections
+  - **Straight**: Direct line connections
+- **Edge Color**: Customize the color of the relationship line
+- **Line Style**: Choose solid, dashed, dotted, or long-dash styles
+- **Line Thickness**: Adjust from 1px to 8px
+
+### Using the Editor Panel
 1. Click on a relationship edge
 2. Use the relationship editor panel to modify:
    - Labels

@@ -22,6 +22,7 @@ Concepts are the fundamental building blocks of concept maps. They represent ide
 
 - **Double-click** on a concept node to edit its label inline
 - Or select the concept and use the concept editor panel
+- When selected, a **floating toolbar** appears with quick editing options
 
 ### Triple Entry Mode (Fast Keyboard Creation)
 
@@ -55,6 +56,22 @@ Each concept can have:
 - **Position**: X and Y coordinates (in graph view)
 - **Notes**: Markdown-formatted notes
 - **Metadata**: Custom key-value pairs
+- **Visual Styling**: Custom colors (fill, border, text) and line styles
+
+## Visual Customization
+
+When a concept is selected, a **floating toolbar** appears above or below the node with options to customize its appearance:
+
+### Color Customization
+- **Fill Color**: Background color of the concept node
+- **Border Color**: Color of the node border
+- **Text Color**: Color of the concept label text
+
+### Line Style Settings
+- **Border Style**: Choose from solid, dashed, dotted, or long-dash styles
+- **Border Thickness**: Adjust from 1px to 8px
+
+All changes are applied instantly and saved automatically.
 
 ## Editing Notes
 

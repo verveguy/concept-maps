@@ -21,6 +21,7 @@ const sidebars: SidebarsConfig = {
         'user-guide/creating-maps',
         'user-guide/editing-concepts',
         'user-guide/relationships',
+        'user-guide/comments',
         'user-guide/perspectives',
         'user-guide/collaboration',
         'user-guide/sharing',

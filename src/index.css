@@ -101,4 +101,93 @@
   .bg-card {
     background-color: hsl(var(--card)) !important;
   }
+  
+  /* React Flow Controls and MiniMap dark mode support */
+  .react-flow__controls {
+    background-color: hsl(var(--card)) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+  
+  .react-flow__controls-button {
+    background-color: hsl(var(--card)) !important;
+    border-color: hsl(var(--border)) !important;
+    color: hsl(var(--card-foreground)) !important;
+  }
+  
+  /* Target SVG icons inside React Flow control buttons - comprehensive targeting */
+  .react-flow__controls-button svg,
+  .react-flow__controls-button path,
+  .react-flow__controls-button g,
+  .react-flow__controls-button circle,
+  .react-flow__controls-button rect,
+  .react-flow__controls-button line,
+  .react-flow__controls-button polyline,
+  .react-flow__controls-button polygon {
+    stroke: hsl(var(--card-foreground)) !important;
+    fill: hsl(var(--card-foreground)) !important;
+  }
+  
+  /* Ensure all SVG elements inherit the color */
+  .react-flow__controls-button svg * {
+    stroke: hsl(var(--card-foreground)) !important;
+    fill: hsl(var(--card-foreground)) !important;
+  }
+  
+  .react-flow__controls-button:hover {
+    background-color: hsl(var(--accent)) !important;
+    color: hsl(var(--accent-foreground)) !important;
+  }
+  
+  .react-flow__controls-button:hover svg,
+  .react-flow__controls-button:hover path,
+  .react-flow__controls-button:hover g,
+  .react-flow__controls-button:hover circle,
+  .react-flow__controls-button:hover rect,
+  .react-flow__controls-button:hover line,
+  .react-flow__controls-button:hover polyline,
+  .react-flow__controls-button:hover polygon,
+  .react-flow__controls-button:hover svg * {
+    stroke: hsl(var(--accent-foreground)) !important;
+    fill: hsl(var(--accent-foreground)) !important;
+  }
+  
+  .react-flow__minimap {
+    background-color: hsl(var(--card)) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+  
+  .react-flow__minimap-mask {
+    fill: hsl(var(--background));
+    opacity: 0.1;
+  }
+  
+  .react-flow__minimap-node {
+    fill: hsl(var(--muted)) !important;
+  }
+  
+  /* Minimap viewport indicator - needs high contrast in both modes */
+  .react-flow__minimap-viewport,
+  .react-flow__minimap-viewport rect {
+    fill: hsl(var(--primary)) !important;
+    stroke: hsl(var(--primary)) !important;
+    opacity: 0.4 !important;
+    stroke-width: 2 !important;
+  }
+  
+  /* Light mode: use darker color for better visibility */
+  :root .react-flow__minimap-viewport,
+  :root .react-flow__minimap-viewport rect {
+    fill: hsl(222.2 47.4% 20%) !important;
+    stroke: hsl(222.2 47.4% 20%) !important;
+    opacity: 0.5 !important;
+  }
+  
+  /* Dark mode: use lighter primary color */
+  .dark .react-flow__minimap-viewport,
+  .dark .react-flow__minimap-viewport rect {
+    fill: hsl(var(--primary)) !important;
+    stroke: hsl(var(--primary)) !important;
+    opacity: 0.5 !important;
+    stroke-width: 2 !important;
+  }
 }

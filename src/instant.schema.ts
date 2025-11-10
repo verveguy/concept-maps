@@ -13,6 +13,15 @@ const _schema = i.schema({
       imageURL: i.string().optional(),
       type: i.string().optional(),
     }),
+    comments: i.entity({
+      createdAt: i.number().indexed(),
+      deletedAt: i.number().optional(),
+      positionX: i.number(),
+      positionY: i.number(),
+      resolved: i.boolean().optional(),
+      text: i.string(),
+      updatedAt: i.number().indexed(),
+    }),
     concepts: i.entity({
       createdAt: i.number().indexed(),
       deletedAt: i.number().optional(),
@@ -75,6 +84,42 @@ const _schema = i.schema({
         on: '$users',
         has: 'many',
         label: 'linkedGuestUsers',
+      },
+    },
+    commentsConcepts: {
+      forward: {
+        on: 'comments',
+        has: 'many',
+        label: 'concepts',
+      },
+      reverse: {
+        on: 'concepts',
+        has: 'many',
+        label: 'comments',
+      },
+    },
+    commentsCreator: {
+      forward: {
+        on: 'comments',
+        has: 'one',
+        label: 'creator',
+      },
+      reverse: {
+        on: '$users',
+        has: 'many',
+        label: 'createdComments',
+      },
+    },
+    commentsMap: {
+      forward: {
+        on: 'comments',
+        has: 'one',
+        label: 'map',
+      },
+      reverse: {
+        on: 'maps',
+        has: 'many',
+        label: 'comments',
       },
     },
     conceptsMap: {
@@ -210,18 +255,6 @@ const _schema = i.schema({
         label: 'shareInvitations',
       },
     },
-    sharesInvitation: {
-      forward: {
-        on: 'shares',
-        has: 'one',
-        label: 'invitation',
-      },
-      reverse: {
-        on: 'shareInvitations',
-        has: 'one',
-        label: 'share',
-      },
-    },
     sharesCreator: {
       forward: {
         on: 'shares',
@@ -232,6 +265,18 @@ const _schema = i.schema({
         on: '$users',
         has: 'many',
         label: 'createdShares',
+      },
+    },
+    sharesInvitation: {
+      forward: {
+        on: 'shares',
+        has: 'one',
+        label: 'invitation',
+      },
+      reverse: {
+        on: 'shareInvitations',
+        has: 'one',
+        label: 'share',
       },
     },
     sharesMap: {

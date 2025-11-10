@@ -450,11 +450,11 @@ function ConceptEditorContent({
   }
 
   return (
-    <div className="absolute right-0 top-0 h-full w-96 bg-white border-l shadow-lg z-40 flex flex-col">
+    <div className="absolute right-0 top-0 h-full w-96 bg-card border-l shadow-lg z-40 flex flex-col border">
       {/* Header */}
       <div className="p-4 border-b">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">
+          <h2 className="text-lg font-semibold text-card-foreground">
             {hasWriteAccess ? 'Edit Concept' : 'View Concept'}
           </h2>
           <button
@@ -467,8 +467,8 @@ function ConceptEditorContent({
           </button>
         </div>
         {!hasWriteAccess && (
-          <div className="mt-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md">
-            <p className="text-xs font-medium text-amber-800">
+          <div className="mt-2 px-3 py-2 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">
+            <p className="text-xs font-medium text-amber-800 dark:text-amber-200">
               Read-only mode: You have read-only access to this map
             </p>
           </div>
@@ -499,7 +499,7 @@ function ConceptEditorContent({
                   e.currentTarget.blur()
                 }
               }}
-              className="w-full px-3 py-2 border rounded-md"
+              className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md"
               required
               disabled={isDeleting || isSaving || !hasWriteAccess}
               tabIndex={2}
@@ -524,7 +524,7 @@ function ConceptEditorContent({
 
           {/* Node Style */}
           <div className="border-t pt-4">
-            <h3 className="text-sm font-semibold mb-3">Node Style</h3>
+            <h3 className="text-sm font-semibold mb-3 text-foreground">Node Style</h3>
             
             {/* Fill Color */}
             <div className="mb-3">
@@ -539,7 +539,7 @@ function ConceptEditorContent({
                       handleSaveNodeStyle({ fillColor: e.target.value })
                     }
                   }}
-                  className="w-12 h-8 border rounded cursor-pointer"
+                  className="w-12 h-8 border border-input rounded cursor-pointer"
                   disabled={!hasWriteAccess}
                   tabIndex={10}
                 />
@@ -553,7 +553,7 @@ function ConceptEditorContent({
                     }
                   }}
                   onBlur={() => handleSaveNodeStyle({ fillColor })}
-                  className="flex-1 px-2 py-1 text-xs border rounded"
+                  className="flex-1 px-2 py-1 text-xs border border-input bg-background text-foreground rounded"
                   placeholder="#ffffff"
                   disabled={!hasWriteAccess}
                   tabIndex={11}
@@ -574,7 +574,7 @@ function ConceptEditorContent({
                       handleSaveNodeStyle({ borderColor: e.target.value })
                     }
                   }}
-                  className="w-12 h-8 border rounded cursor-pointer"
+                  className="w-12 h-8 border border-input rounded cursor-pointer"
                   disabled={!hasWriteAccess}
                   tabIndex={12}
                 />
@@ -588,7 +588,7 @@ function ConceptEditorContent({
                     }
                   }}
                   onBlur={() => handleSaveNodeStyle({ borderColor })}
-                  className="flex-1 px-2 py-1 text-xs border rounded"
+                  className="flex-1 px-2 py-1 text-xs border border-input bg-background text-foreground rounded"
                   placeholder="#d1d5db"
                   disabled={!hasWriteAccess}
                   tabIndex={13}
@@ -608,7 +608,7 @@ function ConceptEditorContent({
                     handleSaveNodeStyle({ borderStyle: style })
                   }
                 }}
-                className="w-full px-2 py-1 text-xs border rounded"
+                className="w-full px-2 py-1 text-xs border border-input bg-background text-foreground rounded"
                 disabled={!hasWriteAccess}
                 tabIndex={14}
               >
@@ -631,7 +631,7 @@ function ConceptEditorContent({
                       handleSaveNodeStyle({ textColor: e.target.value })
                     }
                   }}
-                  className="w-12 h-8 border rounded cursor-pointer"
+                  className="w-12 h-8 border border-input rounded cursor-pointer"
                   disabled={!hasWriteAccess}
                   tabIndex={15}
                 />
@@ -645,7 +645,7 @@ function ConceptEditorContent({
                     }
                   }}
                   onBlur={() => handleSaveNodeStyle({ textColor })}
-                  className="flex-1 px-2 py-1 text-xs border rounded"
+                  className="flex-1 px-2 py-1 text-xs border border-input bg-background text-foreground rounded"
                   placeholder="#111827"
                   disabled={!hasWriteAccess}
                   tabIndex={16}
@@ -657,7 +657,7 @@ function ConceptEditorContent({
           {/* Metadata */}
           <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold">Metadata</h3>
+              <h3 className="text-sm font-semibold text-foreground">Metadata</h3>
               <button
                 onClick={handleAddMetadata}
                 className="p-1 text-primary hover:bg-primary/10 rounded"
@@ -678,7 +678,7 @@ function ConceptEditorContent({
                       isEditingRef.current = true
                     }}
                     onBlur={handleSaveMetadata}
-                    className="flex-1 px-2 py-1 text-xs border rounded"
+                    className="flex-1 px-2 py-1 text-xs border border-input bg-background text-foreground rounded"
                     placeholder="Key"
                     disabled={!hasWriteAccess}
                     tabIndex={18 + index * 2}
@@ -691,14 +691,14 @@ function ConceptEditorContent({
                       isEditingRef.current = true
                     }}
                     onBlur={handleSaveMetadata}
-                    className="flex-1 px-2 py-1 text-xs border rounded"
+                    className="flex-1 px-2 py-1 text-xs border border-input bg-background text-foreground rounded"
                     placeholder="Value"
                     disabled={!hasWriteAccess}
                     tabIndex={19 + index * 2}
                   />
                   <button
                     onClick={() => handleRemoveMetadata(entry.id)}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 rounded"
                     disabled={!hasWriteAccess || isSaving}
                     tabIndex={20 + index * 2}
                   >
@@ -714,11 +714,11 @@ function ConceptEditorContent({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t bg-gray-50">
+        <div className="p-4 border-t bg-muted/50">
           <button
             onClick={handleDelete}
             disabled={isDeleting || isSaving || !hasWriteAccess}
-            className="w-full px-4 py-2 text-sm text-red-600 bg-white border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 bg-background border border-red-300 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50 flex items-center justify-center gap-2"
             tabIndex={100}
           >
             <Trash2 className="h-4 w-4" />
@@ -1033,11 +1033,11 @@ function RelationshipEditorContent({
   }
 
   return (
-    <div className="absolute right-0 top-0 h-full w-96 bg-white border-l shadow-lg z-40 flex flex-col">
+    <div className="absolute right-0 top-0 h-full w-96 bg-card border-l shadow-lg z-40 flex flex-col border">
       {/* Header */}
       <div className="p-4 border-b">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">
+          <h2 className="text-lg font-semibold text-card-foreground">
             {hasWriteAccess ? 'Edit Relationship' : 'View Relationship'}
           </h2>
           <button
@@ -1050,8 +1050,8 @@ function RelationshipEditorContent({
           </button>
         </div>
         {!hasWriteAccess && (
-          <div className="mt-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md">
-            <p className="text-xs font-medium text-amber-800">
+          <div className="mt-2 px-3 py-2 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">
+            <p className="text-xs font-medium text-amber-800 dark:text-amber-200">
               Read-only mode: You have read-only access to this map
             </p>
           </div>
@@ -1082,7 +1082,7 @@ function RelationshipEditorContent({
                   e.currentTarget.blur()
                 }
               }}
-              className="w-full px-3 py-2 border rounded-md"
+              className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md"
               required
               disabled={isDeleting || isSaving || !hasWriteAccess}
               placeholder="e.g., 'related to'"
@@ -1117,7 +1117,7 @@ function RelationshipEditorContent({
                   e.currentTarget.blur()
                 }
               }}
-              className="w-full px-3 py-2 border rounded-md"
+              className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md"
               required
               disabled={isDeleting || isSaving || !hasWriteAccess}
               placeholder="e.g., 'related from'"
@@ -1146,7 +1146,7 @@ function RelationshipEditorContent({
 
           {/* Edge Style */}
           <div className="border-t pt-4">
-            <h3 className="text-sm font-semibold mb-3">Edge Style</h3>
+            <h3 className="text-sm font-semibold mb-3 text-foreground">Edge Style</h3>
             
             {/* Edge Type */}
             <div className="mb-3">
@@ -1160,7 +1160,7 @@ function RelationshipEditorContent({
                     handleSaveEdgeStyle({ edgeType: type })
                   }
                 }}
-                className="w-full px-2 py-1 text-xs border rounded"
+                className="w-full px-2 py-1 text-xs border border-input bg-background text-foreground rounded"
                 disabled={!hasWriteAccess}
                 tabIndex={5}
               >
@@ -1184,7 +1184,7 @@ function RelationshipEditorContent({
                       handleSaveEdgeStyle({ edgeColor: e.target.value })
                     }
                   }}
-                  className="w-12 h-8 border rounded cursor-pointer"
+                  className="w-12 h-8 border border-input rounded cursor-pointer"
                   disabled={!hasWriteAccess}
                   tabIndex={6}
                 />
@@ -1198,7 +1198,7 @@ function RelationshipEditorContent({
                     }
                   }}
                   onBlur={() => handleSaveEdgeStyle({ edgeColor })}
-                  className="flex-1 px-2 py-1 text-xs border rounded"
+                  className="flex-1 px-2 py-1 text-xs border border-input bg-background text-foreground rounded"
                   placeholder="#6366f1"
                   disabled={!hasWriteAccess}
                   tabIndex={7}
@@ -1218,7 +1218,7 @@ function RelationshipEditorContent({
                     handleSaveEdgeStyle({ edgeStyle: style })
                   }
                 }}
-                className="w-full px-2 py-1 text-xs border rounded"
+                className="w-full px-2 py-1 text-xs border border-input bg-background text-foreground rounded"
                 disabled={!hasWriteAccess}
                 tabIndex={8}
               >
@@ -1231,7 +1231,7 @@ function RelationshipEditorContent({
           {/* Metadata */}
           <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold">Metadata</h3>
+              <h3 className="text-sm font-semibold text-foreground">Metadata</h3>
               <button
                 onClick={handleAddMetadata}
                 className="p-1 text-primary hover:bg-primary/10 rounded"
@@ -1252,7 +1252,7 @@ function RelationshipEditorContent({
                       isEditingRef.current = true
                     }}
                     onBlur={handleSaveMetadata}
-                    className="flex-1 px-2 py-1 text-xs border rounded"
+                    className="flex-1 px-2 py-1 text-xs border border-input bg-background text-foreground rounded"
                     placeholder="Key"
                     disabled={!hasWriteAccess}
                     tabIndex={10 + index * 2}
@@ -1265,14 +1265,14 @@ function RelationshipEditorContent({
                       isEditingRef.current = true
                     }}
                     onBlur={handleSaveMetadata}
-                    className="flex-1 px-2 py-1 text-xs border rounded"
+                    className="flex-1 px-2 py-1 text-xs border border-input bg-background text-foreground rounded"
                     placeholder="Value"
                     disabled={!hasWriteAccess}
                     tabIndex={11 + index * 2}
                   />
                   <button
                     onClick={() => handleRemoveMetadata(entry.id)}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 rounded"
                     disabled={!hasWriteAccess || isSaving}
                     tabIndex={12 + index * 2}
                   >
@@ -1288,11 +1288,11 @@ function RelationshipEditorContent({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t bg-gray-50">
+        <div className="p-4 border-t bg-muted/50">
           <button
             onClick={handleDelete}
             disabled={isDeleting || isSaving || !hasWriteAccess}
-            className="w-full px-4 py-2 text-sm text-red-600 bg-white border border-red-300 rounded-md hover:bg-red-50 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 bg-background border border-red-300 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50 flex items-center justify-center gap-2"
             tabIndex={100}
           >
             <Trash2 className="h-4 w-4" />

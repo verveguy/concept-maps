@@ -11,6 +11,9 @@ The Concept Mapping Tool is a collaborative, real-time concept mapping applicati
 - **Real-time Collaboration**: Work together with instant synchronization via InstantDB
 - **Dual Editing Modes**: Switch between graph view (React Flow) and structured text view
 - **Presence Indicators**: See where collaborators are working in real-time
+- **Comments**: Add sticky note-style annotations linked to concepts
+- **Visual Customization**: Customize colors, styles, and appearance of nodes and edges
+- **Floating Toolbars**: Quick-access toolbars for editing nodes and relationships
 - **Perspectives**: Create filtered subsets of concept maps
 - **Rich Metadata**: Add custom metadata to concepts and relationships
 - **Markdown Notes**: Attach detailed notes to concepts and relationships
