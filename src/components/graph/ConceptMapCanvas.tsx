@@ -52,7 +52,7 @@
  * ```
  */
 
-import React, { useCallback, useMemo, useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react'
+import React, { useCallback, useMemo, useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
 import ReactFlow, {
   Background,
   Controls,
@@ -74,12 +74,10 @@ import { useConcepts, useAllConcepts } from '@/hooks/useConcepts'
 import { useRelationships, useAllRelationships } from '@/hooks/useRelationships'
 import { useComments } from '@/hooks/useComments'
 import { usePerspectives } from '@/hooks/usePerspectives'
-import { useConceptActions } from '@/hooks/useConceptActions'
-import { useRelationshipActions } from '@/hooks/useRelationshipActions'
-import { useCommentActions } from '@/hooks/useCommentActions'
-import { useUndo } from '@/hooks/useUndo'
+import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 import { useUIStore } from '@/stores/uiStore'
 import { useMapStore } from '@/stores/mapStore'
+import { useCanvasStore } from '@/stores/canvasStore'
 import { db, tx, id } from '@/lib/instant'
 import { nodeTypes, edgeTypes } from './reactFlowTypes'
 import type { LayoutType } from '@/lib/layouts'
@@ -125,21 +123,25 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const nodeTypesRef = useRef(nodeTypes)
   const edgeTypesRef = useRef(edgeTypes)
   
-  // Track relationship IDs connected to newly created concepts (for edit mode)
-  // When a new concept is created, the relationship enters edit mode first
-  const newlyCreatedRelationshipIdsRef = useRef<Map<string, string>>(new Map()) // conceptId -> relationshipId
+  // Canvas state from store
+  const {
+    activeLayout,
+    setActiveLayout,
+    selectedLayout,
+    setSelectedLayout,
+    laidOutNodeIds,
+    addLaidOutNodeIds,
+    clearLaidOutNodeIds,
+    setLaidOutNodeIds,
+    newlyCreatedRelationshipIds,
+    addNewlyCreatedRelationship,
+    removeNewlyCreatedRelationship,
+    markInitialConceptChecked,
+    isInitialConceptChecked,
+    isCentering,
+    setIsCentering,
+  } = useCanvasStore()
   
-  // Track active layout for sticky behavior - auto-apply when nodes are added
-  const [activeLayout, setActiveLayout] = useState<LayoutType | null>(null)
-  // Track selected layout (shown on main button)
-  const [selectedLayout, setSelectedLayout] = useState<LayoutType>('force-directed')
-  
-  // Track if we've checked for initial concept creation (to avoid creating multiple)
-  const hasCheckedInitialConceptRef = useRef<Set<string>>(new Set())
-  // Track which nodes have been laid out (for incremental layout)
-  const laidOutNodeIdsRef = useRef<Set<string>>(new Set())
-  // Track if we're currently centering on a concept (to prevent timeout cleanup)
-  const isCenteringRef = useRef(false)
   // Ref for the React Flow wrapper div (used for event handlers)
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null)
   
@@ -149,9 +151,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   
   // Reset laid-out nodes when switching maps
   useEffect(() => {
-    laidOutNodeIdsRef.current.clear()
-    isCenteringRef.current = false // Reset centering flag when switching maps
-  }, [currentMapId])
+    clearLaidOutNodeIds()
+    setIsCentering(false) // Reset centering flag when switching maps
+  }, [currentMapId, clearLaidOutNodeIds, setIsCentering])
   
   // Check if user has write access to the current map
   const { hasWriteAccess } = useMapPermissions()
@@ -184,10 +186,21 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   
   const concepts = isEditingPerspective ? allConcepts : filteredConcepts
   const relationships = isEditingPerspective ? allRelationships : filteredRelationships
-  const { updateConcept, deleteConcept } = useConceptActions()
-  const { createRelationship, deleteRelationship } = useRelationshipActions()
-  const { deleteComment, updateComment, createComment, linkCommentToConcept, unlinkCommentFromConcept } = useCommentActions()
-  const { recordDeletion, startOperation, endOperation } = useUndo()
+  
+  // Use centralized mutation hook with undo tracking
+  const {
+    updateConcept,
+    deleteConcept,
+    createRelationship,
+    deleteRelationship,
+    deleteComment,
+    updateComment,
+    createComment,
+    linkCommentToConcept,
+    unlinkCommentFromConcept,
+    startOperation,
+    endOperation,
+  } = useCanvasMutations()
   const { 
     setSelectedConceptId, 
     setSelectedRelationshipId,
@@ -266,16 +279,15 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     setEditingEdge(selectedRelationshipId)
   }, [selectedRelationshipId, setEditingEdge])
 
-  const [connectionStart, setConnectionStart] = useState<{
-    sourceId: string
-    position: { x: number; y: number }
-  } | null>(null)
-
-  // Track pending concept creation for relationship creation
-  const pendingConceptRef = useRef<{
-    sourceId: string
-    position: { x: number; y: number }
-  } | null>(null)
+  // Connection state from store
+  const {
+    connectionStart,
+    setConnectionStart,
+    connectionMade,
+    setConnectionMade,
+    pendingConcept,
+    setPendingConcept,
+  } = useCanvasStore()
 
   // Convert InstantDB data to React Flow format
   const newNodes = useMemo(
@@ -341,9 +353,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   // Update newly created relationship edges to start in edit mode
   // Watch for when the relationship appears in the relationships array and update the corresponding edge
   useEffect(() => {
-    const relationshipIdsToUpdate = Array.from(
-      newlyCreatedRelationshipIdsRef.current.values()
-    )
+    const relationshipIdsToUpdate = Array.from(newlyCreatedRelationshipIds.values())
     if (relationshipIdsToUpdate.length === 0) return
     
     // Use the same relationships array that's used to create edges
@@ -362,9 +372,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
           if (relationshipId && !edge.data?.shouldStartEditing) {
             // Remove from tracking map immediately to prevent re-triggering
             // Find and remove the entry for this relationship
-            for (const [conceptId, relId] of newlyCreatedRelationshipIdsRef.current.entries()) {
+            for (const [conceptId, relId] of newlyCreatedRelationshipIds.entries()) {
               if (relId === relationshipId) {
-                newlyCreatedRelationshipIdsRef.current.delete(conceptId)
+                removeNewlyCreatedRelationship(conceptId)
                 break
               }
             }
@@ -386,7 +396,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         }
       })
     }
-  }, [filteredRelationships, allRelationships, isEditingPerspective, edges, setEdges])
+  }, [filteredRelationships, allRelationships, isEditingPerspective, edges, setEdges, newlyCreatedRelationshipIds, removeNewlyCreatedRelationship])
 
   // Clear shouldStartEditing flag after it's been used (to prevent re-triggering)
   useEffect(() => {
@@ -471,12 +481,12 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     }
     
     // Check if we're already centering (prevent duplicate calls)
-    if (isCenteringRef.current) {
+    if (isCentering) {
       return
     }
     
     // Mark that we're centering
-    isCenteringRef.current = true
+    setIsCentering(true)
     
     // Select the concept FIRST (before clearing flag)
     setSelectedConceptId(currentConceptId)
@@ -512,17 +522,17 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         // Clear currentConceptId from store after handling to prevent interference with normal selection
         setCurrentConceptId(null)
         // Reset centering flag
-        isCenteringRef.current = false
+        setIsCentering(false)
       }, 350)
     }, 100)
     
     // Only clear timeout if we're not currently centering (prevent cleanup from canceling the operation)
     return () => {
-      if (!isCenteringRef.current) {
+      if (!isCentering) {
         clearTimeout(timeoutId)
       }
     }
-  }, [shouldAutoCenterConcept, currentConceptId, concepts, nodes, setSelectedConceptId, setNodes, fitView, getNode, setCenter, getViewport, setCurrentConceptId, setShouldAutoCenterConcept])
+  }, [shouldAutoCenterConcept, currentConceptId, concepts, nodes, setSelectedConceptId, setNodes, fitView, getNode, setCenter, getViewport, setCurrentConceptId, setShouldAutoCenterConcept, isCentering, setIsCentering])
 
   // Wrap onNodesChange to intercept deletions and delete from database
   const onNodesChange = useCallback(
@@ -574,7 +584,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
             // Delete relationships connected to deleted concepts (before deleting concepts)
             // This ensures relationships are deleted and recorded before concepts
             const relationshipDeletePromises = connectedRelationships.map((rel) => {
-              recordDeletion('relationship', rel.id)
+              // Deletion is automatically recorded by useCanvasMutations
               return deleteRelationship(rel.id)
             })
             
@@ -584,12 +594,10 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
                 // Only delete if it's a concept node (not text-view node)
                 const node = nodes.find((n) => n.id === change.id)
                 if (node && node.type === 'concept') {
-                  // Record deletion for undo
-                  recordDeletion('concept', change.id)
+                  // Deletion is automatically recorded by useCanvasMutations
                   return deleteConcept(change.id)
                 } else if (node && node.type === 'comment') {
-                  // Record deletion for undo
-                  recordDeletion('comment', change.id)
+                  // Deletion is automatically recorded by useCanvasMutations
                   return deleteComment(change.id)
                 }
               }
@@ -613,7 +621,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       // Always call the base handler to update React Flow state
       onNodesChangeBase(changes)
     },
-    [hasWriteAccess, currentMapId, deleteConcept, deleteRelationship, deleteComment, nodes, relationships, onNodesChangeBase, selectedConceptId, selectedCommentId, setSelectedConceptId, setSelectedCommentId, setConceptEditorOpen, recordDeletion, startOperation, endOperation]
+    [hasWriteAccess, currentMapId, deleteConcept, deleteRelationship, deleteComment, nodes, relationships, onNodesChangeBase, selectedConceptId, selectedCommentId, setSelectedConceptId, setSelectedCommentId, setConceptEditorOpen, startOperation, endOperation]
   )
 
   // Wrap onEdgesChange to intercept deletions and delete from database
@@ -665,8 +673,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
                     return unlinkCommentFromConcept(edge.source, edge.target)
                   }
                 } else {
-                  // Record deletion for undo and delete relationship
-                  recordDeletion('relationship', change.id)
+                  // Deletion is automatically recorded by useCanvasMutations
                   return deleteRelationship(change.id)
                 }
               }
@@ -688,7 +695,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       // Always call the base handler to update React Flow state
       onEdgesChangeBase(changes)
     },
-    [hasWriteAccess, currentMapId, deleteRelationship, unlinkCommentFromConcept, onEdgesChangeBase, selectedRelationshipId, setSelectedRelationshipId, setRelationshipEditorOpen, recordDeletion, startOperation, endOperation, edges]
+    [hasWriteAccess, currentMapId, deleteRelationship, unlinkCommentFromConcept, onEdgesChangeBase, selectedRelationshipId, setSelectedRelationshipId, setRelationshipEditorOpen, startOperation, endOperation, edges]
   )
 
   // Expose layout handler via ref (must be after nodes/edges are initialized)
@@ -751,8 +758,8 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         )
         await db.transact(updates)
         
-        // Mark all nodes as laid out (full layout via ref)
-        laidOutNodeIdsRef.current = new Set(conceptNodesArray.map(n => n.id))
+        // Mark all nodes as laid out (full layout)
+        setLaidOutNodeIds(new Set(conceptNodesArray.map(n => n.id)))
         
         // Fit view to show all nodes after layout
         setTimeout(() => {
@@ -773,11 +780,11 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     if (!currentMapId || !hasWriteAccess) return
     
     // Check if we've already handled this map
-    if (hasCheckedInitialConceptRef.current.has(currentMapId)) return
+    if (isInitialConceptChecked(currentMapId)) return
     
     // Check if map has no concepts
     if (concepts.length === 0) {
-      hasCheckedInitialConceptRef.current.add(currentMapId)
+      markInitialConceptChecked(currentMapId)
       
       // Create initial concept at center of viewport (0, 0 in flow coordinates)
       const initialPosition = {
@@ -845,9 +852,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       setTimeout(createInitialConcept, 300)
     } else {
       // Map has concepts, mark as checked
-      hasCheckedInitialConceptRef.current.add(currentMapId)
+      markInitialConceptChecked(currentMapId)
     }
-  }, [currentMapId, concepts.length, hasWriteAccess, getNodes, setNodes])
+  }, [currentMapId, concepts.length, hasWriteAccess, getNodes, setNodes, isInitialConceptChecked, markInitialConceptChecked])
   
   // Layout handler function for buttons
   const handleApplyLayout = useCallback(
@@ -863,10 +870,10 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
 
       // For incremental layout, identify new nodes
       const newConceptIds = incremental 
-        ? new Set(conceptNodesArray.filter(n => !laidOutNodeIdsRef.current.has(n.id)).map(n => n.id))
+        ? new Set(conceptNodesArray.filter(n => !laidOutNodeIds.has(n.id)).map(n => n.id))
         : undefined
-      const fixedNodeIds = incremental && laidOutNodeIdsRef.current.size > 0
-        ? laidOutNodeIdsRef.current
+      const fixedNodeIds = incremental && laidOutNodeIds.size > 0
+        ? laidOutNodeIds
         : undefined
 
       let layoutNodes: Node[]
@@ -936,10 +943,10 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         
         // Update laid-out nodes tracking
         if (incremental && newConceptIds) {
-          newConceptIds.forEach(id => laidOutNodeIdsRef.current.add(id))
+          addLaidOutNodeIds(Array.from(newConceptIds))
         } else {
           // Full layout - mark all nodes as laid out
-          laidOutNodeIdsRef.current = new Set(conceptNodesArray.map(n => n.id))
+          setLaidOutNodeIds(new Set(conceptNodesArray.map(n => n.id)))
         }
         
         // Fit view to show all nodes after layout (only for full layouts)
@@ -953,18 +960,19 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         alert('Failed to apply layout. Please try again.')
       }
     },
-    [currentMapId, getNodes, getEdges, fitView, setSelectedLayout]
+    [currentMapId, getNodes, getEdges, fitView, setSelectedLayout, laidOutNodeIds, addLaidOutNodeIds, setLaidOutNodeIds]
   )
   
   // Track previous concept IDs to detect new nodes (more reliable than count)
-  const prevConceptIdsRef = useRef<Set<string>>(new Set())
+  const prevConceptIds = useCanvasStore((state) => state.prevConceptIds)
+  const setPrevConceptIds = useCanvasStore((state) => state.setPrevConceptIds)
   
   // Initialize ref on first render
   useEffect(() => {
-    if (prevConceptIdsRef.current.size === 0) {
-      prevConceptIdsRef.current = new Set(concepts.map(c => c.id))
+    if (prevConceptIds.size === 0) {
+      setPrevConceptIds(new Set(concepts.map(c => c.id)))
     }
-  }, [])
+  }, [concepts, prevConceptIds.size, setPrevConceptIds])
   
   // Create a stable string representation of concept IDs for dependency tracking
   const conceptIdsString = useMemo(
@@ -976,12 +984,12 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   useEffect(() => {
     if (!activeLayout) {
       // Update ref even if no active layout
-      prevConceptIdsRef.current = new Set(concepts.map(c => c.id))
+      setPrevConceptIds(new Set(concepts.map(c => c.id)))
       return
     }
     
     const currentConceptIds = new Set(concepts.map(c => c.id))
-    const previousConceptIds = prevConceptIdsRef.current
+    const previousConceptIds = prevConceptIds
     
     // Check if any new concepts were added (not just count change)
     const newConceptIds = Array.from(currentConceptIds).filter(id => !previousConceptIds.has(id))
@@ -991,22 +999,22 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       // Small delay to ensure the new node is fully created and edges are updated
       const timeoutId = setTimeout(() => {
         // Use incremental layout for force-directed, full layout for others
-        const useIncremental = activeLayout === 'force-directed' && laidOutNodeIdsRef.current.size > 0
+        const useIncremental = activeLayout === 'force-directed' && laidOutNodeIds.size > 0
         handleApplyLayout(activeLayout, true, useIncremental).catch((error) => {
           console.error('Failed to auto-apply layout:', error)
         })
       }, 300)
       
       // Update ref for next comparison
-      prevConceptIdsRef.current = currentConceptIds
+      setPrevConceptIds(currentConceptIds)
       
       return () => clearTimeout(timeoutId)
     }
     
     // Update ref even if no new nodes (in case nodes were deleted)
-    prevConceptIdsRef.current = currentConceptIds
+    setPrevConceptIds(currentConceptIds)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conceptIdsString, activeLayout, handleApplyLayout])
+  }, [conceptIdsString, activeLayout, handleApplyLayout, prevConceptIds, setPrevConceptIds, laidOutNodeIds])
   
   // Memoize concept nodes to avoid recreating the filter on every render
   const conceptNodes = useMemo(() => nodes.filter(n => n.type === 'concept'), [nodes])
@@ -1106,9 +1114,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
 
   // When a new concept appears, check if we need to create a relationship
   useEffect(() => {
-    if (!pendingConceptRef.current || !currentMapId) return
+    if (!pendingConcept || !currentMapId) return
 
-    const { sourceId, position } = pendingConceptRef.current
+    const { sourceId, position } = pendingConcept
 
     // Find the concept we just created (by position)
     const createdConcept = concepts.find(
@@ -1131,9 +1139,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       })
 
       // Clear pending
-      pendingConceptRef.current = null
+      setPendingConcept(null)
     }
-  }, [concepts, currentMapId, createRelationship])
+  }, [concepts, currentMapId, createRelationship, pendingConcept, setPendingConcept])
 
   // Handle connection start - track source node for drag-to-create
   const onConnectStart = useCallback<OnConnectStart>(
@@ -1158,8 +1166,8 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const onConnectEnd = useCallback(
     async (event: MouseEvent | TouchEvent) => {
       // Reset connection made flag for next connection
-      const wasConnectionMade = connectionMadeRef.current
-      connectionMadeRef.current = false
+      const wasConnectionMade = connectionMade
+      setConnectionMade(false)
       
       if (!currentMapId || !connectionStart) {
         setConnectionStart(null)
@@ -1324,7 +1332,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         
         // Track the relationship to start in edit mode (not the node)
         // The relationship will be edited first, then Tab/Enter will move to the node
-        newlyCreatedRelationshipIdsRef.current.set(newConceptId, newRelationshipId)
+        addNewlyCreatedRelationship(newConceptId, newRelationshipId)
       } catch (error) {
         console.error('Failed to create concept and relationship from connection:', error)
       }
@@ -1338,11 +1346,14 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       createRelationship,
       linkCommentToConcept,
       nodes,
+      connectionMade,
+      setConnectionMade,
+      addNewlyCreatedRelationship,
     ]
   )
 
-  // Track last update time for each node to throttle updates
-  const lastUpdateTimeRef = useRef<Map<string, number>>(new Map())
+  // Throttling state from store
+  const { updateLastUpdateTime, getLastUpdateTime } = useCanvasStore()
   const THROTTLE_MS = 100 // Update every 100ms maximum
 
   // Handle node drag - update position in database with throttling
@@ -1370,12 +1381,12 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
 
       // Check if enough time has passed since last update
       const now = Date.now()
-      const lastUpdate = lastUpdateTimeRef.current.get(node.id) || 0
+      const lastUpdate = getLastUpdateTime(node.id)
       const timeSinceLastUpdate = now - lastUpdate
 
       // Only update if throttle interval has passed
       if (timeSinceLastUpdate >= THROTTLE_MS) {
-        lastUpdateTimeRef.current.set(node.id, now)
+        updateLastUpdateTime(node.id, now)
         
         try {
           if (concept) {
@@ -1392,7 +1403,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         }
       }
     },
-    [currentMapId, concepts, comments, updateConcept, updateComment, setTextViewPosition, screenToFlowPosition, setCursor, hasWriteAccess]
+    [currentMapId, concepts, comments, updateConcept, updateComment, setTextViewPosition, screenToFlowPosition, setCursor, hasWriteAccess, updateLastUpdateTime, getLastUpdateTime]
   )
 
   // Handle node drag end - ensure final position is saved
@@ -1429,7 +1440,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
               position: { x: node.position.x, y: node.position.y },
             })
             // Update last update time so we don't trigger another update unnecessarily
-            lastUpdateTimeRef.current.set(node.id, Date.now())
+            updateLastUpdateTime(node.id, Date.now())
           } catch (error) {
             console.error('Failed to update concept position:', error)
           }
@@ -1444,14 +1455,14 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
               position: { x: node.position.x, y: node.position.y },
             })
             // Update last update time so we don't trigger another update unnecessarily
-            lastUpdateTimeRef.current.set(node.id, Date.now())
+            updateLastUpdateTime(node.id, Date.now())
           } catch (error) {
             console.error('Failed to update comment position:', error)
           }
         }
       }
     },
-    [concepts, comments, currentMapId, updateConcept, updateComment, setTextViewPosition, screenToFlowPosition, setCursor, hasWriteAccess]
+    [concepts, comments, currentMapId, updateConcept, updateComment, setTextViewPosition, screenToFlowPosition, setCursor, hasWriteAccess, updateLastUpdateTime]
   )
 
   // Handle node click - let ConceptNode handle clicks (to distinguish single vs double-click)
@@ -1483,9 +1494,6 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   )
 
   // Handle connection creation - create new relationship between existing nodes
-  // Track if a connection was successfully made to an existing node
-  const connectionMadeRef = useRef(false)
-  
   const onConnectHandler = useCallback(
     (connection: Connection) => {
       if (!currentMapId || !hasWriteAccess || !connection.source || !connection.target) {
@@ -1493,7 +1501,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       }
 
       // Mark that a connection was made to an existing node
-      connectionMadeRef.current = true
+      setConnectionMade(true)
       setConnectionStart(null)
 
       void (async () => {
@@ -1520,7 +1528,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         }
       })()
     },
-    [currentMapId, hasWriteAccess, createRelationship, linkCommentToConcept, nodes]
+    [currentMapId, hasWriteAccess, createRelationship, linkCommentToConcept, nodes, setConnectionMade]
   )
 
   // Handle pane click - deselect and close context menu and toolbar
@@ -1541,9 +1549,13 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     setRelationshipEditorOpen,
   ])
 
-  // Context menu state
-  const [contextMenuVisible, setContextMenuVisible] = useState(false)
-  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null)
+  // Context menu state from store
+  const {
+    contextMenuVisible,
+    setContextMenuVisible,
+    contextMenuPosition,
+    setContextMenuPosition,
+  } = useCanvasStore()
   const contextMenuPositionRef = useRef<{ x: number; y: number } | null>(null)
 
   // Helper function to create a concept at a position
