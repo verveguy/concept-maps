@@ -133,12 +133,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const addLaidOutNodeIds = useCanvasStore((state) => state.addLaidOutNodeIds)
   const clearLaidOutNodeIds = useCanvasStore((state) => state.clearLaidOutNodeIds)
   const setLaidOutNodeIds = useCanvasStore((state) => state.setLaidOutNodeIds)
-  // Use a stable string representation for comparison to avoid infinite loops
-  const newlyCreatedRelationshipIdsKey = useCanvasStore((state) => Array.from(state.newlyCreatedRelationshipIds.values()).join(','))
-  const newlyCreatedRelationshipIdsArray = useMemo(
-    () => newlyCreatedRelationshipIdsKey.split(',').filter(Boolean),
-    [newlyCreatedRelationshipIdsKey]
-  )
+  
   const addNewlyCreatedRelationship = useCanvasStore((state) => state.addNewlyCreatedRelationship)
   const removeNewlyCreatedRelationship = useCanvasStore((state) => state.removeNewlyCreatedRelationship)
   const markInitialConceptChecked = useCanvasStore((state) => state.markInitialConceptChecked)
@@ -190,6 +185,8 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   
   const concepts = isEditingPerspective ? allConcepts : filteredConcepts
   const relationships = isEditingPerspective ? allRelationships : filteredRelationships
+  
+  // Remove the problematic effect that runs on every render - we'll read directly from store when needed
   
   // Use centralized mutation hook with undo tracking
   const {
@@ -356,17 +353,11 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
 
   // Update newly created relationship edges to start in edit mode
   // Watch for when the relationship appears in the relationships array and update the corresponding edge
-  // Use a ref to track the map to avoid infinite loops from Map reference changes
-  const newlyCreatedRelationshipIdsRef = useRef<Map<string, string>>(new Map())
-  
-  // Sync ref with store
+  // Read directly from store to avoid infinite loops from Map reference changes
   useEffect(() => {
-    newlyCreatedRelationshipIdsRef.current = useCanvasStore.getState().newlyCreatedRelationshipIds
-  }, [newlyCreatedRelationshipIdsKey]) // Only update when contents change
-  
-  useEffect(() => {
-    // Use array from store selector to avoid infinite loops
-    const relationshipIdsToUpdate = newlyCreatedRelationshipIdsArray
+    // Read directly from store to get current value (doesn't subscribe, avoids loops)
+    const currentMap = useCanvasStore.getState().newlyCreatedRelationshipIds
+    const relationshipIdsToUpdate = Array.from(currentMap.values())
     if (relationshipIdsToUpdate.length === 0) return
     
     // Use the same relationships array that's used to create edges
@@ -385,7 +376,8 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
           if (relationshipId && !edge.data?.shouldStartEditing) {
             // Remove from tracking map immediately to prevent re-triggering
             // Find and remove the entry for this relationship
-            for (const [conceptId, relId] of newlyCreatedRelationshipIdsRef.current.entries()) {
+            const currentMapForRemoval = useCanvasStore.getState().newlyCreatedRelationshipIds
+            for (const [conceptId, relId] of currentMapForRemoval.entries()) {
               if (relId === relationshipId) {
                 removeNewlyCreatedRelationship(conceptId)
                 break
@@ -409,7 +401,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         }
       })
     }
-  }, [filteredRelationships, allRelationships, isEditingPerspective, edges, setEdges, newlyCreatedRelationshipIdsArray, removeNewlyCreatedRelationship])
+    // Only depend on relationships data, not the Map itself
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredRelationships.length, allRelationships.length, isEditingPerspective, edges.length, setEdges, removeNewlyCreatedRelationship])
 
   // Clear shouldStartEditing flag after it's been used (to prevent re-triggering)
   useEffect(() => {
