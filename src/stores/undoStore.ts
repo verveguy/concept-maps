@@ -1,9 +1,156 @@
 /**
- * Undo store for managing deletion history.
+ * Undo store for managing deletion history and mutation tracking.
  * Uses Zustand for shared state management across components.
  */
 
 import { create } from 'zustand'
+import type {
+  CreateConceptData,
+  UpdateConceptData,
+} from '@/hooks/useConceptActions'
+import type {
+  CreateRelationshipData,
+  UpdateRelationshipData,
+} from '@/hooks/useRelationshipActions'
+import type {
+  CreateCommentData,
+  UpdateCommentData,
+} from '@/hooks/useCommentActions'
+
+/**
+ * Mutation command type.
+ * Represents a single mutation operation that can be executed and undone.
+ */
+export type MutationType =
+  | 'createConcept'
+  | 'updateConcept'
+  | 'deleteConcept'
+  | 'createRelationship'
+  | 'updateRelationship'
+  | 'deleteRelationship'
+  | 'createComment'
+  | 'updateComment'
+  | 'deleteComment'
+  | 'linkCommentToConcept'
+  | 'unlinkCommentFromConcept'
+
+/**
+ * Base mutation command interface.
+ */
+export interface MutationCommand {
+  /** Type of mutation */
+  type: MutationType
+  /** Unique command ID */
+  id: string
+  /** Timestamp when mutation was executed */
+  timestamp: number
+  /** Operation ID to group related mutations */
+  operationId: string
+}
+
+/**
+ * Concept mutation commands.
+ */
+export interface CreateConceptCommand extends MutationCommand {
+  type: 'createConcept'
+  data: CreateConceptData
+  conceptId: string
+}
+
+export interface UpdateConceptCommand extends MutationCommand {
+  type: 'updateConcept'
+  conceptId: string
+  updates: UpdateConceptData
+  previousState?: {
+    label?: string
+    position?: { x: number; y: number }
+    notes?: string
+    metadata?: Record<string, unknown>
+  }
+}
+
+export interface DeleteConceptCommand extends MutationCommand {
+  type: 'deleteConcept'
+  conceptId: string
+}
+
+/**
+ * Relationship mutation commands.
+ */
+export interface CreateRelationshipCommand extends MutationCommand {
+  type: 'createRelationship'
+  data: CreateRelationshipData
+  relationshipId: string
+}
+
+export interface UpdateRelationshipCommand extends MutationCommand {
+  type: 'updateRelationship'
+  relationshipId: string
+  updates: UpdateRelationshipData
+  previousState?: {
+    primaryLabel?: string
+    reverseLabel?: string
+    notes?: string
+    metadata?: Record<string, unknown>
+  }
+}
+
+export interface DeleteRelationshipCommand extends MutationCommand {
+  type: 'deleteRelationship'
+  relationshipId: string
+}
+
+/**
+ * Comment mutation commands.
+ */
+export interface CreateCommentCommand extends MutationCommand {
+  type: 'createComment'
+  data: CreateCommentData
+  commentId: string
+}
+
+export interface UpdateCommentCommand extends MutationCommand {
+  type: 'updateComment'
+  commentId: string
+  updates: UpdateCommentData
+  previousState?: {
+    text?: string
+    position?: { x: number; y: number }
+  }
+}
+
+export interface DeleteCommentCommand extends MutationCommand {
+  type: 'deleteComment'
+  commentId: string
+}
+
+export interface LinkCommentToConceptCommand extends MutationCommand {
+  type: 'linkCommentToConcept'
+  commentId: string
+  conceptId: string
+}
+
+export interface UnlinkCommentFromConceptCommand extends MutationCommand {
+  type: 'unlinkCommentFromConcept'
+  commentId: string
+  conceptId: string
+}
+
+/**
+ * Union type of all mutation commands.
+ */
+export type MutationCommandUnion =
+  | CreateConceptCommand
+  | UpdateConceptCommand
+  | DeleteConceptCommand
+  | CreateRelationshipCommand
+  | UpdateRelationshipCommand
+  | DeleteRelationshipCommand
+  | CreateCommentCommand
+  | UpdateCommentCommand
+  | DeleteCommentCommand
+  | LinkCommentToConceptCommand
+  | UnlinkCommentFromConceptCommand
 
 /**
  * Represents a deletion entry in the undo history.
@@ -25,6 +172,11 @@ export interface DeletionEntry {
 const MAX_HISTORY_SIZE = 50
 
 /**
+ * Maximum number of mutation commands to keep in history.
+ */
+const MAX_MUTATION_HISTORY_SIZE = 100
+
+/**
  * Time window in milliseconds to group deletions into the same operation.
  * Deletions within this window are considered part of the same operation.
  */
@@ -34,14 +186,18 @@ const OPERATION_TIME_WINDOW_MS = 1000 // 1 second
  * State interface for undo history.
  */
 export interface UndoState {
-  /** Deletion history array */
+  /** Deletion history array (for backward compatibility) */
   deletionHistory: DeletionEntry[]
+  /** Mutation command history (all mutations) */
+  mutationHistory: MutationCommandUnion[]
   /** Current operation ID for grouping deletions */
   currentOperationId: string | null
   /** Timestamp when current operation started */
   currentOperationStartTime: number | null
-  /** Record a deletion */
+  /** Record a deletion (for backward compatibility) */
   recordDeletion: (type: 'concept' | 'relationship' | 'comment', id: string) => void
+  /** Record a mutation command */
+  recordMutation: (command: MutationCommandUnion) => void
   /** Start a new deletion operation */
   startOperation: () => void
   /** End the current deletion operation */
@@ -50,10 +206,16 @@ export interface UndoState {
   getHistory: () => DeletionEntry[]
   /** Get all deletions in the most recent operation */
   getMostRecentOperation: () => DeletionEntry[]
+  /** Get all mutations in the most recent operation */
+  getMostRecentMutationOperation: () => MutationCommandUnion[]
   /** Clear the deletion history */
   clearHistory: () => void
+  /** Clear the mutation history */
+  clearMutationHistory: () => void
   /** Remove deletions from the most recent operation */
   removeMostRecentOperation: () => void
+  /** Remove mutations from the most recent operation */
+  removeMostRecentMutationOperation: () => void
 }
 
 /**
@@ -62,6 +224,7 @@ export interface UndoState {
  */
 export const useUndoStore = create<UndoState>((set, get) => ({
   deletionHistory: [],
+  mutationHistory: [],
   currentOperationId: null,
   currentOperationStartTime: null,
   
@@ -133,6 +296,19 @@ export const useUndoStore = create<UndoState>((set, get) => ({
     })
   },
   
+  recordMutation: (command) => {
+    set((state) => {
+      const newHistory = [command, ...state.mutationHistory]
+      
+      // Trim history if it exceeds max size
+      if (newHistory.length > MAX_MUTATION_HISTORY_SIZE) {
+        return { mutationHistory: newHistory.slice(0, MAX_MUTATION_HISTORY_SIZE) }
+      }
+      
+      return { mutationHistory: newHistory }
+    })
+  },
+  
   getHistory: () => {
     return [...get().deletionHistory]
   },
@@ -150,8 +326,25 @@ export const useUndoStore = create<UndoState>((set, get) => ({
     return history.filter((entry) => entry.operationId === mostRecentOperationId)
   },
   
+  getMostRecentMutationOperation: () => {
+    const history = get().mutationHistory
+    if (history.length === 0) {
+      return []
+    }
+    
+    // Get the operation ID of the most recent mutation
+    const mostRecentOperationId = history[0].operationId
+    
+    // Return all mutations with the same operation ID
+    return history.filter((command) => command.operationId === mostRecentOperationId)
+  },
+  
   clearHistory: () => {
     set({ deletionHistory: [] })
+  },
+  
+  clearMutationHistory: () => {
+    set({ mutationHistory: [] })
   },
   
   removeMostRecentOperation: () => {
@@ -169,6 +362,24 @@ export const useUndoStore = create<UndoState>((set, get) => ({
       )
       
       return { deletionHistory: remainingHistory }
+    })
+  },
+  
+  removeMostRecentMutationOperation: () => {
+    set((state) => {
+      if (state.mutationHistory.length === 0) {
+        return state
+      }
+      
+      // Get the operation ID of the most recent mutation
+      const mostRecentOperationId = state.mutationHistory[0].operationId
+      
+      // Remove all mutations with the same operation ID
+      const remainingHistory = state.mutationHistory.filter(
+        (command) => command.operationId !== mostRecentOperationId
+      )
+      
+      return { mutationHistory: remainingHistory }
     })
   },
 }))

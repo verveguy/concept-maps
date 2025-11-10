@@ -17,4 +17,11 @@ export default defineConfig({
   },
   // GitHub Pages deployment configuration
   base: process.env.NODE_ENV === 'production' ? '/concept-maps/app/' : '/',
+  // Vitest configuration
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    css: true,
+  },
 })
