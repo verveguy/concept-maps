@@ -100,7 +100,7 @@ function estimateTextWidth(text: string, fontSize: number = 12, padding: number 
  * Style properties are stored in metadata:
  * - `edgeType`: 'bezier' | 'smoothstep' | 'straight'
  * - `edgeColor`: Edge color (default: gray)
- * - `edgeStyle`: Edge style ('solid', 'dashed', 'dotted')
+ * - `edgeStyle`: Edge style ('solid', 'dashed', 'dotted', 'long-dash')
  * 
  * **Label Display:**
  * Shows the primary label (from → to direction) by default. The reverse label
@@ -156,6 +156,8 @@ import {
 } from 'reactflow'
 import type { RelationshipEdgeData } from '@/lib/reactFlowTypes'
 import { useRelationshipActions } from '@/hooks/useRelationshipActions'
+import { useUIStore } from '@/stores/uiStore'
+import { EdgeToolbar } from '@/components/toolbar/EdgeToolbar'
 
 /**
  * Calculate control point offset based on source/target positions.
@@ -1302,12 +1304,14 @@ export const RelationshipEdge = memo(
     selected,
   }: EdgeProps<RelationshipEdgeData>) => {
     const { updateRelationship } = useRelationshipActions()
-    const { getNode, setNodes } = useReactFlow()
+    const { getNode, setNodes, flowToScreenPosition } = useReactFlow()
     const nodes = useNodes()
     const relationship = data?.relationship
     const label = relationship?.primaryLabel || ''
     const isEditingPerspective = data?.isEditingPerspective ?? false
     const isInPerspective = data?.isInPerspective ?? true
+    const selectedRelationshipId = useUIStore((state) => state.selectedRelationshipId)
+    const setSelectedRelationshipId = useUIStore((state) => state.setSelectedRelationshipId)
     
     // Track dark mode state for theme-aware defaults
     const [isDarkMode, setIsDarkMode] = useState(() => 
@@ -1349,7 +1353,8 @@ export const RelationshipEdge = memo(
       return {
         type: (metadata.edgeType as 'bezier' | 'smoothstep' | 'step' | 'straight') || 'bezier',
         color,
-        style: (metadata.edgeStyle as 'solid' | 'dashed') || 'solid',
+        style: (metadata.edgeStyle as 'solid' | 'dashed' | 'dotted' | 'long-dash') || 'solid',
+        thickness: (metadata.edgeThickness as number) || 2,
         opacity: isGreyedOut ? 0.3 : 1,
       }
     }, [metadataKey, selected, isEditingPerspective, isInPerspective, isDarkMode])
@@ -1387,6 +1392,14 @@ export const RelationshipEdge = memo(
         inputRef.current.select()
       }
     }, [isEditing])
+
+    // Calculate edge midpoint in screen coordinates for toolbar positioning
+    const midpoint = useMemo(() => {
+      const midX = (sourceX + targetX) / 2
+      const midY = (sourceY + targetY) / 2
+      // Convert flow coordinates to screen coordinates
+      return flowToScreenPosition({ x: midX, y: midY })
+    }, [sourceX, sourceY, targetX, targetY, flowToScreenPosition])
 
     // Calculate edge path - keep original path ending at center
     // Arrowhead will be rendered separately at boundary intersection
@@ -1709,12 +1722,24 @@ export const RelationshipEdge = memo(
           markerEnd={undefined}
           style={{
             stroke: edgeStyle.color,
-            strokeWidth: selected ? 3 : 2,
-            // If we have a trimLength (for bezier), draw only up to that length
+            strokeWidth: selected ? Math.max(edgeStyle.thickness, 3) : edgeStyle.thickness,
+            // Apply line style if set, otherwise use trimLength for bezier edge trimming
             strokeDasharray:
-              (typeof trimLength === 'number' && trimLength > 0)
-                ? `${trimLength}px 100000px`
-                : (edgeStyle.style === 'dashed' ? '5,5' : undefined),
+              edgeStyle.style === 'dashed'
+                ? '5,5'
+                : edgeStyle.style === 'dotted'
+                  ? (() => {
+                      const t = selected ? Math.max(edgeStyle.thickness, 3) : edgeStyle.thickness
+                      // Pattern: filled dot (0), gap for empty dot (t * 2 to ensure visible gap)
+                      // The gap needs to be larger than the dot diameter to create visible space
+                      return `0 ${t * 2}`
+                    })()
+                  : edgeStyle.style === 'long-dash'
+                    ? '10,4'
+                    : (typeof trimLength === 'number' && trimLength > 0)
+                      ? `${trimLength}px 100000px`
+                      : undefined,
+            strokeLinecap: edgeStyle.style === 'dotted' ? 'round' : undefined,
             strokeDashoffset: 0,
             opacity: edgeStyle.opacity,
           }}
@@ -1781,6 +1806,16 @@ export const RelationshipEdge = memo(
             )}
           </div>
         </EdgeLabelRenderer>
+        {relationship && selectedRelationshipId === relationship.id && (
+          <EdgeToolbar
+            midpoint={midpoint}
+            visible={true}
+            relationship={relationship}
+            onEdit={() => {
+              // Edge toolbar will handle opening editor
+            }}
+          />
+        )}
       </>
     )
   }

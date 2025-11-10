@@ -159,12 +159,15 @@ export function useSharing(mapId: string | null) {
       const userId = s.user?.id || ''
       // Get email from user object if available, otherwise from linked invitation
       const userEmail = s.user?.email || s.invitation?.invitedEmail || null
+      // Get image URL from user object if available
+      const userImageURL = s.user?.imageURL || null
 
       return {
         id: s.id,
         mapId: s.map?.id || mapId || '',
         userId,
         userEmail,
+        userImageURL,
         permission: s.permission as 'view' | 'edit',
         createdAt: new Date(s.createdAt),
         acceptedAt: s.acceptedAt ? new Date(s.acceptedAt) : null,

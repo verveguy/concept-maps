@@ -23,10 +23,13 @@ import { memo, useState, useRef, useEffect } from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { Check } from 'lucide-react'
 import { useCommentActions } from '@/hooks/useCommentActions'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
+import { useUIStore } from '@/stores/uiStore'
 import { getAvatarUrl } from '@/lib/avatar'
 import type { Comment } from '@/lib/schema'
+import { NodeToolbar } from '@/components/toolbar/NodeToolbar'
 
 /**
  * Node data type for Comment nodes in React Flow.
@@ -58,11 +61,16 @@ function getInitials(userId: string): string {
 export const CommentNode = memo(({ data, selected, id: nodeId }: NodeProps<CommentNodeData>) => {
   const { updateComment } = useCommentActions()
   const { hasWriteAccess } = useMapPermissions()
+  const setSelectedCommentId = useUIStore((state) => state.setSelectedCommentId)
+  const setSelectedConceptId = useUIStore((state) => state.setSelectedConceptId)
+  const setSelectedRelationshipId = useUIStore((state) => state.setSelectedRelationshipId)
+  const selectedCommentId = useUIStore((state) => state.selectedCommentId)
   const [isEditing, setIsEditing] = useState(false)
   const [editText, setEditText] = useState(data.comment.text)
   const [isHovered, setIsHovered] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const hasTriggeredEditRef = useRef(false)
+  const nodeRef = useRef<HTMLDivElement>(null)
 
   // Inject curled corner CSS
   useEffect(() => {
@@ -152,6 +160,14 @@ export const CommentNode = memo(({ data, selected, id: nodeId }: NodeProps<Comme
     }
   }, [isEditing])
 
+  const handleClick = (e: React.MouseEvent) => {
+    // Clear other selections
+    setSelectedConceptId(null)
+    setSelectedRelationshipId(null)
+    // Set this comment as selected
+    setSelectedCommentId(data.comment.id)
+  }
+
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     
@@ -211,12 +227,21 @@ export const CommentNode = memo(({ data, selected, id: nodeId }: NodeProps<Comme
   const selectedColor = selected ? '#fff59d' : stickyNoteColor
 
   return (
-    <div
-      className="relative group"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      onDoubleClick={handleDoubleClick}
-    >
+    <>
+      <div
+        ref={nodeRef}
+        className="relative group"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+      >
+      {/* Resolved checkmark - positioned top-left outside the node */}
+      {data.comment.resolved && (
+        <div className="absolute -top-2 -left-2 z-20 flex items-center justify-center w-6 h-6 bg-green-500 rounded-full shadow-md">
+          <Check className="h-4 w-4 text-white" />
+        </div>
+      )}
       {/* Centered target handle */}
       <Handle
         type="target"
@@ -317,6 +342,18 @@ export const CommentNode = memo(({ data, selected, id: nodeId }: NodeProps<Comme
         }}
       />
     </div>
+    {selectedCommentId === data.comment.id && (
+      <NodeToolbar
+        nodeRef={nodeRef}
+        visible={true}
+        type="comment"
+        comment={{
+          id: data.comment.id,
+          resolved: data.comment.resolved,
+        }}
+      />
+    )}
+    </>
   )
 })
 

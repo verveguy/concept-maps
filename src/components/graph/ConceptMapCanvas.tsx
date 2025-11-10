@@ -140,6 +140,8 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const laidOutNodeIdsRef = useRef<Set<string>>(new Set())
   // Track if we're currently centering on a concept (to prevent timeout cleanup)
   const isCenteringRef = useRef(false)
+  // Ref for the React Flow wrapper div (used for event handlers)
+  const reactFlowWrapperRef = useRef<HTMLDivElement>(null)
   
   const currentMapId = useMapStore((state) => state.currentMapId)
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
@@ -188,7 +190,8 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const { recordDeletion, startOperation, endOperation } = useUndo()
   const { 
     setSelectedConceptId, 
-    setSelectedRelationshipId, 
+    setSelectedRelationshipId,
+    setSelectedCommentId,
     setConceptEditorOpen, 
     setRelationshipEditorOpen,
     textViewVisible,
@@ -196,7 +199,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     textViewPosition,
     setTextViewPosition,
   } = useUIStore()
-  const { screenToFlowPosition, fitView, getNode, setCenter, getViewport } = useReactFlow()
+  const { screenToFlowPosition, flowToScreenPosition, fitView, getNode, setCenter, getViewport } = useReactFlow()
   
   // Presence tracking - split into separate hooks to prevent unnecessary re-renders
   // Cursor setter: only updates cursor position, doesn't subscribe to peer cursors
@@ -206,6 +209,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   
   const selectedConceptId = useUIStore((state) => state.selectedConceptId)
   const selectedRelationshipId = useUIStore((state) => state.selectedRelationshipId)
+  const selectedCommentId = useUIStore((state) => state.selectedCommentId)
   const currentConceptId = useMapStore((state) => state.currentConceptId)
   const shouldAutoCenterConcept = useMapStore((state) => state.shouldAutoCenterConcept)
   const setCurrentConceptId = useMapStore((state) => state.setCurrentConceptId)
@@ -438,56 +442,36 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   // This must be after nodes is declared
   // Only triggers when shouldAutoCenterConcept is true (set during URL navigation)
   useEffect(() => {
-    console.log('[ConceptMapCanvas] Deep link effect triggered', {
-      shouldAutoCenterConcept,
-      currentConceptId,
-      conceptsCount: concepts.length,
-      nodesCount: nodes.length,
-    })
-    
     // Only trigger if auto-centering is enabled and we have a concept ID
     if (!shouldAutoCenterConcept || !currentConceptId) {
-      console.log('[ConceptMapCanvas] Early return: missing flag or concept ID')
       return
     }
     
     // Wait for concepts to be available (concepts are the source of truth, nodes are derived)
     if (!concepts.length) {
-      console.log('[ConceptMapCanvas] Waiting for concepts to load...')
       return
     }
     
     // Check if the concept exists in the concepts array
     const conceptExists = concepts.some((c) => c.id === currentConceptId)
-    console.log('[ConceptMapCanvas] Concept exists check', {
-      conceptExists,
-      conceptIds: concepts.map((c) => c.id),
-      lookingFor: currentConceptId,
-    })
     
     if (!conceptExists) {
-      console.log('[ConceptMapCanvas] Concept not found in concepts array')
       return
     }
     
     // Wait for nodes to be available as well
     if (!nodes.length) {
-      console.log('[ConceptMapCanvas] Waiting for nodes to be available...')
       return
     }
     
     // Find the concept node
     const conceptNode = nodes.find((node) => node.id === currentConceptId)
     if (!conceptNode) {
-      console.log('[ConceptMapCanvas] Concept node not found in nodes array')
       return
     }
     
-    console.log('[ConceptMapCanvas] Proceeding with auto-center', { conceptId: currentConceptId })
-    
     // Check if we're already centering (prevent duplicate calls)
     if (isCenteringRef.current) {
-      console.log('[ConceptMapCanvas] Already centering, skipping')
       return
     }
     
@@ -496,7 +480,6 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     
     // Select the concept FIRST (before clearing flag)
     setSelectedConceptId(currentConceptId)
-    console.log('[ConceptMapCanvas] Selected concept', { conceptId: currentConceptId })
     
     // Also select the node in React Flow by updating its selected property
     setNodes((currentNodes) => {
@@ -507,7 +490,6 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         return { ...node, selected: false }
       })
     })
-    console.log('[ConceptMapCanvas] Set node selected property in React Flow')
     
     // Disable auto-centering flag AFTER selection to prevent re-triggering
     setShouldAutoCenterConcept(false)
@@ -515,36 +497,28 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     // Center on the concept and fit view to show the whole map
     // Use setTimeout to ensure React Flow is ready
     const timeoutId = setTimeout(() => {
-      console.log('[ConceptMapCanvas] Starting fitView')
       // First fit view to show the whole map (this sets the zoom level)
       fitView({ padding: 0.1, duration: 300 })
       
       // After fitView completes, get the current viewport and center on the concept
       setTimeout(() => {
         const node = getNode(currentConceptId)
-        console.log('[ConceptMapCanvas] Getting node for centering', { node: node ? { id: node.id, position: node.position } : null })
         if (node) {
           // Get current viewport to preserve zoom level from fitView
           const viewport = getViewport()
-          console.log('[ConceptMapCanvas] Centering on concept', { position: node.position, zoom: viewport.zoom })
           // Center on the concept node while preserving the zoom from fitView
           setCenter(node.position.x, node.position.y, { zoom: viewport.zoom, duration: 300 })
-          console.log('[ConceptMapCanvas] Centered on concept', { position: node.position })
-        } else {
-          console.warn('[ConceptMapCanvas] Node not found when trying to center', { conceptId: currentConceptId })
         }
         // Clear currentConceptId from store after handling to prevent interference with normal selection
         setCurrentConceptId(null)
         // Reset centering flag
         isCenteringRef.current = false
-        console.log('[ConceptMapCanvas] Cleared currentConceptId from store and reset centering flag')
       }, 350)
     }, 100)
     
     // Only clear timeout if we're not currently centering (prevent cleanup from canceling the operation)
     return () => {
       if (!isCenteringRef.current) {
-        console.log('[ConceptMapCanvas] Cleaning up timeout')
         clearTimeout(timeoutId)
       }
     }
@@ -575,6 +549,11 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         if (selectedConceptId && deletedConceptIds.includes(selectedConceptId)) {
           setSelectedConceptId(null)
           setConceptEditorOpen(false)
+        }
+        
+        // Check if selected comment is being deleted
+        if (selectedCommentId && deletedConceptIds.includes(selectedCommentId)) {
+          setSelectedCommentId(null)
         }
 
         // Delete concepts from database
@@ -634,7 +613,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       // Always call the base handler to update React Flow state
       onNodesChangeBase(changes)
     },
-    [hasWriteAccess, currentMapId, deleteConcept, deleteRelationship, deleteComment, nodes, relationships, onNodesChangeBase, selectedConceptId, setSelectedConceptId, setConceptEditorOpen, recordDeletion, startOperation, endOperation]
+    [hasWriteAccess, currentMapId, deleteConcept, deleteRelationship, deleteComment, nodes, relationships, onNodesChangeBase, selectedConceptId, selectedCommentId, setSelectedConceptId, setSelectedCommentId, setConceptEditorOpen, recordDeletion, startOperation, endOperation]
   )
 
   // Wrap onEdgesChange to intercept deletions and delete from database
@@ -1484,18 +1463,23 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     []
   )
 
-  // Handle edge click - select relationship and open editor
+  // Handle edge click - select relationship and show toolbar (not comment edges)
   // Note: Double-click is handled by RelationshipEdge for inline editing
   const onEdgeClick = useCallback(
     (_event: React.MouseEvent, edge: Edge) => {
-      // Close concept editor and clear concept selection when selecting a relationship
+      // Only show toolbar for relationship edges, not comment edges
+      if (edge.type === 'comment-edge') {
+        return
+      }
+      
+      // Clear other selections
       setSelectedConceptId(null)
+      setSelectedCommentId(null)
       setConceptEditorOpen(false)
-      // Open relationship editor
+      // Set relationship selection (toolbar will appear)
       setSelectedRelationshipId(edge.id)
-      setRelationshipEditorOpen(true)
     },
-    [setSelectedConceptId, setConceptEditorOpen, setSelectedRelationshipId, setRelationshipEditorOpen]
+    [setSelectedConceptId, setSelectedCommentId, setConceptEditorOpen, setSelectedRelationshipId]
   )
 
   // Handle connection creation - create new relationship between existing nodes
@@ -1539,10 +1523,11 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     [currentMapId, hasWriteAccess, createRelationship, linkCommentToConcept, nodes]
   )
 
-  // Handle pane click - deselect and close context menu
+  // Handle pane click - deselect and close context menu and toolbar
   const onPaneClick = useCallback(() => {
     setSelectedConceptId(null)
     setSelectedRelationshipId(null)
+    setSelectedCommentId(null)
     setConceptEditorOpen(false)
     setRelationshipEditorOpen(false)
     setContextMenuVisible(false)
@@ -1551,6 +1536,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   }, [
     setSelectedConceptId,
     setSelectedRelationshipId,
+    setSelectedCommentId,
     setConceptEditorOpen,
     setRelationshipEditorOpen,
   ])
@@ -1676,7 +1662,6 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   )
 
   // Use a ref to attach double-click handler to the React Flow pane
-  const reactFlowWrapperRef = useRef<HTMLDivElement>(null)
   const handlerRef = useRef<((event: Event) => Promise<void>) | null>(null)
   
   useEffect(() => {
@@ -1828,6 +1813,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       />
       
       <ReactFlow
+        id="concept-map-canvas"
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypesRef.current}
@@ -1849,7 +1835,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         connectionLineComponent={CustomConnectionLine}
       >
         <Background />
-        <Controls className="!bg-white !border !border-gray-300 !rounded-md !shadow-md !overflow-visible">
+        <Controls className="!bg-card !border !border-border !rounded-md !shadow-md !overflow-visible">
           {/* Graph/Text toggle buttons */}
           <button
             onClick={() => {
@@ -1865,7 +1851,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
             <FileText className="h-4 w-4" />
           </button>
           {/* Layout selector with slide-out menu */}
-          <div className="h-px bg-gray-300" />
+          <div className="h-px bg-border" />
           <LayoutSelector
             activeLayout={activeLayout}
             selectedLayout={selectedLayout}
@@ -1874,7 +1860,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
             disabled={conceptNodes.length === 0}
           />
         </Controls>
-        <MiniMap className="!bg-white !border !border-gray-300 !rounded-md !shadow-md" />
+        <MiniMap className="!bg-card !border !border-border !rounded-md !shadow-md" />
       </ReactFlow>
     </div>
   )

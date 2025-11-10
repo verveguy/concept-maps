@@ -168,6 +168,7 @@ export interface Share {
   mapId: string
   userId: string
   userEmail: string | null // Email address of the user with whom the map is shared
+  userImageURL: string | null // User's avatar image URL (if available)
   permission: 'view' | 'edit'
   createdAt: Date
   acceptedAt: Date | null // Timestamp when user accepted the share
@@ -249,6 +250,7 @@ export interface Comment {
   createdBy: string // User ID of the creator
   creatorEmail?: string | null // Creator's email for avatar
   creatorImageURL?: string | null // Creator's image URL for avatar
+  resolved: boolean // Whether the comment has been resolved
   createdAt: Date
   updatedAt: Date
   deletedAt: Date | null // Timestamp when soft-deleted, null if not deleted

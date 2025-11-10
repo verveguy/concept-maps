@@ -17,6 +17,7 @@ import { db, tx, id } from '@/lib/instant'
 import { parseTripleText, stripLineBreaks } from '@/lib/textRepresentation'
 import { EditingHighlight } from '@/components/presence/EditingHighlight'
 import { PresenceAvatar } from '@/components/presence/PresenceAvatar'
+import { NodeToolbar } from '@/components/toolbar/NodeToolbar'
 
 /**
  * Style attribute keys that should be treated as built-in attributes, not metadata
@@ -95,9 +96,10 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   const { getEdges, setEdges, getNodes, setNodes, getNode, fitView } = useReactFlow()
   const currentMapId = useMapStore((state) => state.currentMapId)
   const setSelectedConceptId = useUIStore((state) => state.setSelectedConceptId)
-  const setConceptEditorOpen = useUIStore((state) => state.setConceptEditorOpen)
   const setSelectedRelationshipId = useUIStore((state) => state.setSelectedRelationshipId)
-  const setRelationshipEditorOpen = useUIStore((state) => state.setRelationshipEditorOpen)
+  const setSelectedCommentId = useUIStore((state) => state.setSelectedCommentId)
+  const selectedConceptId = useUIStore((state) => state.selectedConceptId)
+  const setConceptEditorOpen = useUIStore((state) => state.setConceptEditorOpen)
   const { updateConcept } = useConceptActions()
   const { toggleConceptInPerspective } = usePerspectiveActions()
   const { otherUsersPresence } = usePresence()
@@ -115,6 +117,7 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   const measureRef = useRef<HTMLSpanElement>(null)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasTriggeredEditRef = useRef(false)
+  const nodeRef = useRef<HTMLDivElement>(null)
   
   // Get users editing this node
   const editingUsers = otherUsersPresence
@@ -156,7 +159,8 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
     return {
       fillColor: selected ? selectedFillColor : ((metadata.fillColor as string) || defaultFillColor),
       borderColor: selected ? defaultPrimaryColor : ((metadata.borderColor as string) || defaultBorderColor),
-      borderStyle: (metadata.borderStyle as 'solid' | 'dashed' | 'dotted') || 'solid',
+      borderStyle: (metadata.borderStyle as 'solid' | 'dashed' | 'dotted' | 'long-dash') || 'solid',
+      borderThickness: (metadata.borderThickness as number) || 2,
       textColor: (metadata.textColor as string) || defaultTextColor,
     }
   }, [metadataKey, selected, isDarkMode])
@@ -243,18 +247,14 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
       clearTimeout(clickTimerRef.current)
     }
 
-    // Delay opening editor to allow double-click detection
-    clickTimerRef.current = setTimeout(() => {
-      if (!isEditing) {
-        // Close relationship editor and clear relationship selection when selecting a concept
-        setSelectedRelationshipId(null)
-        setRelationshipEditorOpen(false)
-        // Open concept editor
-        setSelectedConceptId(data.concept.id)
-        setConceptEditorOpen(true)
-      }
-      clickTimerRef.current = null
-    }, 300) // 300ms delay to distinguish from double-click
+    // Set selection (toolbar will appear, editor only opens via toolbar)
+    if (!isEditing) {
+      // Clear other selections
+      setSelectedRelationshipId(null)
+      setSelectedCommentId(null)
+      // Set this concept as selected
+      setSelectedConceptId(data.concept.id)
+    }
   }
 
   const handleDoubleClick = (e: React.MouseEvent) => {
@@ -563,20 +563,22 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   const nodeFilter = isGreyedOut ? 'grayscale(0.5)' : 'none'
 
   return (
-    <div
-      className="px-4 py-3 rounded-lg shadow-md cursor-pointer transition-all hover:shadow-lg min-w-[120px] relative"
-      style={{
-        backgroundColor: nodeStyle.fillColor,
-        borderWidth: '2px',
-        borderStyle: nodeStyle.borderStyle,
-        borderColor: nodeStyle.borderColor,
-        boxShadow: selected ? (isDarkMode ? '0 0 0 2px rgba(210, 250, 255, 0.2)' : '0 0 0 2px rgba(99, 102, 241, 0.2)') : undefined,
-        opacity: nodeOpacity,
-        filter: nodeFilter,
-      }}
-      onClick={handleClick}
-      onDoubleClick={handleDoubleClick}
-    >
+    <>
+      <div
+        ref={nodeRef}
+        className="px-4 py-3 rounded-lg shadow-md cursor-pointer transition-all hover:shadow-lg min-w-[120px] relative"
+        style={{
+          backgroundColor: nodeStyle.fillColor,
+          borderWidth: `${nodeStyle.borderThickness}px`,
+          borderStyle: nodeStyle.borderStyle === 'long-dash' ? 'dashed' : nodeStyle.borderStyle,
+          borderColor: nodeStyle.borderColor,
+          boxShadow: selected ? (isDarkMode ? '0 0 0 2px rgba(210, 250, 255, 0.2)' : '0 0 0 2px rgba(99, 102, 241, 0.2)') : undefined,
+          opacity: nodeOpacity,
+          filter: nodeFilter,
+        }}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+      >
       {/* Editing highlights from other users */}
       {editingUsers.map((presence) => (
         <EditingHighlight
@@ -749,6 +751,19 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
         }}
       />
     </div>
+    {selectedConceptId === data.concept.id && (
+      <NodeToolbar
+        nodeRef={nodeRef}
+        visible={true}
+        type="concept"
+        concept={data.concept}
+        onEdit={() => {
+          setConceptEditorOpen(true)
+          setSelectedConceptId(null)
+        }}
+      />
+    )}
+    </>
   )
 })
 

@@ -10,7 +10,7 @@ import { create } from 'zustand'
  */
 export interface DeletionEntry {
   /** Type of item deleted */
-  type: 'concept' | 'relationship'
+  type: 'concept' | 'relationship' | 'comment'
   /** ID of the deleted item */
   id: string
   /** Timestamp when deleted */
@@ -41,7 +41,7 @@ export interface UndoState {
   /** Timestamp when current operation started */
   currentOperationStartTime: number | null
   /** Record a deletion */
-  recordDeletion: (type: 'concept' | 'relationship', id: string) => void
+  recordDeletion: (type: 'concept' | 'relationship' | 'comment', id: string) => void
   /** Start a new deletion operation */
   startOperation: () => void
   /** End the current deletion operation */

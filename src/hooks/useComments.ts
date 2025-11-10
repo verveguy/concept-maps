@@ -93,6 +93,7 @@ export function useComments() {
       createdBy: c.creator?.id || '',
       creatorEmail: c.creator?.email || null,
       creatorImageURL: c.creator?.imageURL || null,
+      resolved: c.resolved || false,
       createdAt: new Date(c.createdAt),
       updatedAt: new Date(c.updatedAt),
       deletedAt: c.deletedAt ? new Date(c.deletedAt) : null,

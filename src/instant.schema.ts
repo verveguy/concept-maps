@@ -18,6 +18,7 @@ const _schema = i.schema({
       deletedAt: i.number().optional(),
       positionX: i.number(),
       positionY: i.number(),
+      resolved: i.boolean().optional(),
       text: i.string(),
       updatedAt: i.number().indexed(),
     }),

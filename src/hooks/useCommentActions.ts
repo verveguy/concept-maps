@@ -265,12 +265,106 @@ export function useCommentActions() {
     await db.transact([tx.comments[commentId].unlink({ concepts: conceptId })])
   }
 
+  /**
+   * Resolve a comment (mark as resolved).
+   * 
+   * Sets the `resolved` field to `true` for a comment. Resolved comments
+   * can be filtered out from views and are typically marked with a checkmark.
+   * 
+   * @param commentId - ID of the comment to resolve
+   * 
+   * @throws Error if the comment doesn't exist or the transaction fails
+   * 
+   * @example
+   * ```tsx
+   * const { resolveComment } = useCommentActions()
+   * 
+   * await resolveComment(commentId)
+   * ```
+   */
+  const resolveComment = async (commentId: string) => {
+    await db.transact([
+      tx.comments[commentId].update({
+        resolved: true,
+        updatedAt: Date.now(),
+      }),
+    ])
+  }
+
+  /**
+   * Unresolve a comment (mark as not resolved).
+   * 
+   * Sets the `resolved` field to `false` for a comment, making it active again.
+   * 
+   * @param commentId - ID of the comment to unresolve
+   * 
+   * @throws Error if the comment doesn't exist or the transaction fails
+   * 
+   * @example
+   * ```tsx
+   * const { unresolveComment } = useCommentActions()
+   * 
+   * await unresolveComment(commentId)
+   * ```
+   */
+  const unresolveComment = async (commentId: string) => {
+    await db.transact([
+      tx.comments[commentId].update({
+        resolved: false,
+        updatedAt: Date.now(),
+      }),
+    ])
+  }
+
+  /**
+   * Restore a soft-deleted comment.
+   * 
+   * Restores a comment that was previously soft-deleted by clearing the `deletedAt`
+   * timestamp. This allows the comment to appear in normal queries again.
+   * 
+   * **Restoration Behavior:**
+   * - Clears the `deletedAt` timestamp (sets to null)
+   * - Updates the `updatedAt` timestamp
+   * - Comment becomes visible in `useComments()` queries again
+   * 
+   * @param commentId - ID of the comment to restore
+   * 
+   * @throws Error if the comment doesn't exist or the transaction fails
+   * 
+   * @example
+   * ```tsx
+   * const { undeleteComment } = useCommentActions()
+   * 
+   * // Restore a deleted comment
+   * await undeleteComment(commentId)
+   * ```
+   */
+  const undeleteComment = async (commentId: string) => {
+    try {
+      // Use merge with null to remove the deletedAt property
+      // According to InstantDB docs: "Setting a key to null will remove the property"
+      await db.transact([
+        tx.comments[commentId].merge({
+          deletedAt: null,
+          updatedAt: Date.now(),
+        }),
+      ])
+      console.log('Successfully undeleted comment:', commentId)
+    } catch (error) {
+      console.error('Error undeleting comment:', commentId, error)
+      throw error
+    }
+  }
+
   return {
     createComment,
     updateComment,
     deleteComment,
     linkCommentToConcept,
     unlinkCommentFromConcept,
+    resolveComment,
+    unresolveComment,
+    undeleteComment,
   }
 }
 

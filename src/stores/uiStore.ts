@@ -33,10 +33,14 @@ export interface UIState {
   selectedConceptId: string | null
   /** Currently selected relationship ID */
   selectedRelationshipId: string | null
+  /** Currently selected comment ID */
+  selectedCommentId: string | null
   /** Set the selected concept ID */
   setSelectedConceptId: (id: string | null) => void
   /** Set the selected relationship ID */
   setSelectedRelationshipId: (id: string | null) => void
+  /** Set the selected comment ID */
+  setSelectedCommentId: (id: string | null) => void
 
   /** Whether the sidebar is open */
   sidebarOpen: boolean
@@ -51,6 +55,23 @@ export interface UIState {
   setConceptEditorOpen: (open: boolean) => void
   /** Set relationship editor open state */
   setRelationshipEditorOpen: (open: boolean) => void
+
+  /** Whether the floating toolbar is visible */
+  toolbarVisible: boolean
+  /** Set toolbar visibility */
+  setToolbarVisible: (visible: boolean) => void
+  /** Toolbar screen position */
+  toolbarPosition: { x: number; y: number } | null
+  /** Set toolbar position */
+  setToolbarPosition: (position: { x: number; y: number } | null) => void
+  /** Type of item the toolbar is for */
+  toolbarType: 'concept' | 'comment' | 'relationship' | null
+  /** Set toolbar type */
+  setToolbarType: (type: 'concept' | 'comment' | 'relationship' | null) => void
+  /** Whether toolbar appears above or below item */
+  toolbarPlacement: 'above' | 'below'
+  /** Set toolbar placement */
+  setToolbarPlacement: (placement: 'above' | 'below') => void
 }
 
 /**
@@ -86,8 +107,10 @@ export const useUIStore = create<UIState>((set) => ({
 
   selectedConceptId: null,
   selectedRelationshipId: null,
+  selectedCommentId: null,
   setSelectedConceptId: (id) => set({ selectedConceptId: id }),
   setSelectedRelationshipId: (id) => set({ selectedRelationshipId: id }),
+  setSelectedCommentId: (id) => set({ selectedCommentId: id }),
 
   sidebarOpen: true,
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
@@ -96,4 +119,13 @@ export const useUIStore = create<UIState>((set) => ({
   relationshipEditorOpen: false,
   setConceptEditorOpen: (open) => set({ conceptEditorOpen: open }),
   setRelationshipEditorOpen: (open) => set({ relationshipEditorOpen: open }),
+
+  toolbarVisible: false,
+  setToolbarVisible: (visible) => set({ toolbarVisible: visible }),
+  toolbarPosition: null,
+  setToolbarPosition: (position) => set({ toolbarPosition: position }),
+  toolbarType: null,
+  setToolbarType: (type) => set({ toolbarType: type }),
+  toolbarPlacement: 'above',
+  setToolbarPlacement: (placement) => set({ toolbarPlacement: placement }),
 }))

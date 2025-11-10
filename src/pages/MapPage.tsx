@@ -214,9 +214,9 @@ export function MapPage() {
 
         {/* Create Concept Dialog */}
         {showCreateDialog && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 shadow-xl">
-              <h2 className="text-xl font-semibold mb-4">Create New Concept</h2>
+          <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50">
+            <div className="bg-card text-card-foreground rounded-lg p-6 w-full max-w-md mx-4 shadow-xl border">
+              <h2 className="text-xl font-semibold mb-4 text-card-foreground">Create New Concept</h2>
               <form onSubmit={handleSubmitConcept} className="space-y-4">
                 <div>
                   <label htmlFor="concept-label" className="block text-sm font-medium mb-1">
@@ -228,7 +228,7 @@ export function MapPage() {
                     value={conceptLabel}
                     onChange={(e) => setConceptLabel(e.target.value)}
                     placeholder="Enter concept label..."
-                    className="w-full px-3 py-2 border rounded-md"
+                    className="w-full px-3 py-2 border border-input bg-background text-foreground rounded-md"
                     autoFocus
                     disabled={isCreatingConcept}
                   />
@@ -242,7 +242,7 @@ export function MapPage() {
                       setCreatePosition(null)
                     }}
                     disabled={isCreatingConcept}
-                    className="px-4 py-2 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 flex items-center gap-2"
+                    className="px-4 py-2 text-sm border border-input bg-background text-foreground rounded-md hover:bg-accent disabled:opacity-50 flex items-center gap-2"
                   >
                     <X className="h-4 w-4" />
                     Cancel
