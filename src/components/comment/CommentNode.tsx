@@ -76,11 +76,13 @@ function hashString(str: string): number {
 }
 
 /**
- * Generate a stable angle offset (-15 to +15 degrees) based on a comment ID.
+ * Generate a stable angle offset (-15 to +15 degrees) based on a comment ID and position.
  * This ensures each comment's tape has a very noticeably different angle that remains consistent.
+ * Position is included so the tape appearance changes when the comment is moved (like replacing the tape).
  */
-function getTapeAngleOffset(commentId: string): number {
-  const hash = hashString(commentId)
+function getTapeAngleOffset(commentId: string, position: { x: number; y: number }): number {
+  // Include position in hash so tape changes when comment is moved
+  const hash = hashString(`${commentId}-${position.x}-${position.y}`)
   // Use modulo to get a value 0-2999, then map to -15 to +15 range
   // This ensures good distribution across a much wider range for very visible variation
   const range = hash % 3000 // 0 to 2999
@@ -90,11 +92,13 @@ function getTapeAngleOffset(commentId: string): number {
 }
 
 /**
- * Generate a stable length multiplier (0.8 to 1.2) based on a comment ID.
+ * Generate a stable length multiplier (0.8 to 1.2) based on a comment ID and position.
  * This ensures each comment's tape has a slightly different length that remains consistent.
+ * Position is included so the tape appearance changes when the comment is moved (like replacing the tape).
  */
-function getTapeLengthMultiplier(commentId: string): number {
-  const hash = hashString(commentId + 'length') // Use different hash by appending 'length'
+function getTapeLengthMultiplier(commentId: string, position: { x: number; y: number }): number {
+  // Include position in hash so tape changes when comment is moved
+  const hash = hashString(`${commentId}-length-${position.x}-${position.y}`)
   // Use modulo to get a value 0-399, then map to 0.8 to 1.2 range
   const range = hash % 400 // 0 to 399
   const normalized = (range / 1000) + 0.8 // 0.8 to 1.199
@@ -103,11 +107,13 @@ function getTapeLengthMultiplier(commentId: string): number {
 }
 
 /**
- * Generate a stable position offset (-8 to +8 pixels) along the rotated axis based on a comment ID.
+ * Generate a stable position offset (-8 to +8 pixels) along the rotated axis based on a comment ID and position.
  * This ensures each comment's tape is positioned slightly differently along its rotation axis.
+ * Position is included so the tape appearance changes when the comment is moved (like replacing the tape).
  */
-function getTapePositionOffset(commentId: string): number {
-  const hash = hashString(commentId + 'position') // Use different hash by appending 'position'
+function getTapePositionOffset(commentId: string, position: { x: number; y: number }): number {
+  // Include position in hash so tape changes when comment is moved
+  const hash = hashString(`${commentId}-position-${position.x}-${position.y}`)
   // Use modulo to get a value 0-1599, then map to -8 to +8 range
   const range = hash % 1600 // 0 to 1599
   const normalized = (range / 100) - 8 // -8 to +7.99
@@ -125,9 +131,11 @@ export const CommentNode = memo(({ data, selected, id: nodeId }: NodeProps<Comme
   const [isEditing, setIsEditing] = useState(false)
   const [editText, setEditText] = useState(data.comment.text)
   const [isHovered, setIsHovered] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const hasTriggeredEditRef = useRef(false)
   const nodeRef = useRef<HTMLDivElement>(null)
+  const dragStartPositionRef = useRef<{ x: number; y: number } | null>(null)
   
   // Track dark mode state for theme-aware styling
   const [isDarkMode, setIsDarkMode] = useState(() => 
@@ -145,6 +153,50 @@ export const CommentNode = memo(({ data, selected, id: nodeId }: NodeProps<Comme
     })
     return () => observer.disconnect()
   }, [])
+
+  // Track dragging state - hide tape while dragging
+  useEffect(() => {
+    const handleMouseUp = () => {
+      // Clear dragging state when mouse is released anywhere
+      setIsDragging(false)
+      dragStartPositionRef.current = null
+    }
+    const handlePointerUp = () => {
+      // Clear dragging state when pointer is released anywhere
+      setIsDragging(false)
+      dragStartPositionRef.current = null
+    }
+    
+    if (isDragging) {
+      // Add global mouse and pointer up listeners when dragging starts
+      // React Flow uses pointer events, so we need both
+      // Use capture phase to catch events before React Flow handles them
+      document.addEventListener('mouseup', handleMouseUp, true)
+      document.addEventListener('pointerup', handlePointerUp, true)
+      return () => {
+        document.removeEventListener('mouseup', handleMouseUp, true)
+        document.removeEventListener('pointerup', handlePointerUp, true)
+      }
+    }
+  }, [isDragging])
+
+  // Watch for position changes after drag starts - when position stabilizes, drag ended
+  useEffect(() => {
+    if (isDragging && dragStartPositionRef.current) {
+      const currentPos = data.comment.position
+      const startPos = dragStartPositionRef.current
+      
+      // If position changed from start position, drag happened
+      if (currentPos.x !== startPos.x || currentPos.y !== startPos.y) {
+        // Position changed - wait a bit for it to stabilize, then clear dragging
+        const timeoutId = setTimeout(() => {
+          setIsDragging(false)
+          dragStartPositionRef.current = null
+        }, 150) // Small delay to ensure position update completed
+        return () => clearTimeout(timeoutId)
+      }
+    }
+  }, [data.comment.position.x, data.comment.position.y, isDragging])
 
   // Inject curled corner CSS with dark mode support
   useEffect(() => {
@@ -289,11 +341,12 @@ export const CommentNode = memo(({ data, selected, id: nodeId }: NodeProps<Comme
   const selectedStickyNoteColor = isDarkMode ? '#fcd34d' : '#fff59d' // Even brighter when selected (amber-300)
   const backgroundColor = selected ? selectedStickyNoteColor : stickyNoteColor
   
-  // Generate stable angle offset, length multiplier, and position offset for tape based on comment ID
-  const tapeAngleOffset = getTapeAngleOffset(data.comment.id)
+  // Generate stable angle offset, length multiplier, and position offset for tape based on comment ID and position
+  // Position is included so the tape appearance changes when the comment is moved (like replacing the tape)
+  const tapeAngleOffset = getTapeAngleOffset(data.comment.id, data.comment.position)
   const tapeRotation = -45 + tapeAngleOffset // Base -45 degrees plus stable offset
-  const tapeLengthMultiplier = getTapeLengthMultiplier(data.comment.id)
-  const tapePositionOffset = getTapePositionOffset(data.comment.id)
+  const tapeLengthMultiplier = getTapeLengthMultiplier(data.comment.id, data.comment.position)
+  const tapePositionOffset = getTapePositionOffset(data.comment.id, data.comment.position)
   const baseTapeLength = 32 // Longer dimension (length)
   const baseTapeWidth = 16 // Shorter dimension (width) - stays constant
   const tapeLength = baseTapeLength * tapeLengthMultiplier // Vary length (longer dimension)
@@ -329,13 +382,31 @@ export const CommentNode = memo(({ data, selected, id: nodeId }: NodeProps<Comme
           // Prevent node drag when editing
           if (isEditing) {
             e.stopPropagation()
+          } else {
+            // Track dragging start when not editing
+            dragStartPositionRef.current = { ...data.comment.position }
+            setIsDragging(true)
           }
+        }}
+        onMouseUp={() => {
+          // Clear dragging state when mouse is released
+          setIsDragging(false)
+          dragStartPositionRef.current = null
         }}
         onPointerDown={(e) => {
           // Prevent node drag when editing (React Flow uses pointer events)
           if (isEditing) {
             e.stopPropagation()
+          } else {
+            // Track dragging start when not editing
+            dragStartPositionRef.current = { ...data.comment.position }
+            setIsDragging(true)
           }
+        }}
+        onPointerUp={() => {
+          // Clear dragging state when pointer is released
+          setIsDragging(false)
+          dragStartPositionRef.current = null
         }}
       >
       {/* Resolved checkmark - positioned top-left outside the node */}
@@ -412,12 +483,14 @@ export const CommentNode = memo(({ data, selected, id: nodeId }: NodeProps<Comme
         }}
       >
         {/* Translucent grey tape piece in top-left corner - short rectangle rotated slightly */}
-        <div
-          className="absolute z-[3] pointer-events-none"
-          data-tape-rotation={tapeRotation}
-          data-tape-length={tapeLengthMultiplier}
-          style={{
-            top: `${tapeTop}px`, // Position adjusted along rotated axis
+        {/* Hide tape while dragging - it will reappear with new angle/length/position when dropped */}
+        {!isDragging && (
+          <div
+            className="absolute z-[3] pointer-events-none"
+            data-tape-rotation={tapeRotation}
+            data-tape-length={tapeLengthMultiplier}
+            style={{
+              top: `${tapeTop}px`, // Position adjusted along rotated axis
             left: `${tapeLeft}px`, // Position adjusted along rotated axis
             width: `${tapeLength}px`, // Length is the longer dimension (varies)
             height: `${tapeWidth}px`, // Width is the shorter dimension (constant)
@@ -436,6 +509,7 @@ export const CommentNode = memo(({ data, selected, id: nodeId }: NodeProps<Comme
               : '1px 1px 2px rgba(0, 0, 0, 0.2)',
           }}
         />
+        )}
         {/* Comment text content */}
         {isEditing ? (
           <textarea
