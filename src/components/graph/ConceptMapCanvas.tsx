@@ -203,6 +203,19 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const concepts = isEditingPerspective ? allConcepts : filteredConcepts
   const relationships = isEditingPerspective ? allRelationships : filteredRelationships
   
+  // Debug logging for data fetching
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('[ConceptMapCanvas] Data state:', {
+        conceptsCount: concepts.length,
+        relationshipsCount: relationships.length,
+        commentsCount: comments.length,
+        currentMapId,
+        isEditingPerspective,
+      })
+    }
+  }, [concepts.length, relationships.length, comments.length, currentMapId, isEditingPerspective])
+  
   // Remove the problematic effect that runs on every render - we'll read directly from store when needed
   
   // Use centralized mutation hook with undo tracking
@@ -365,8 +378,24 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const prevIsEditingPerspectiveRef = useRef(isEditingPerspective)
 
   // React Flow state management - initialize with data
+  // Ensure we always have the latest data, even on initial render
   const [nodes, setNodes, onNodesChangeBase] = useNodesState(allNodes)
   const [edges, setEdges, onEdgesChangeBase] = useEdgesState([...newEdges, ...commentEdges])
+  
+  // Force initial sync if nodes/edges are empty but we have data
+  useEffect(() => {
+    if (nodes.length === 0 && allNodes.length > 0) {
+      console.log('[ConceptMapCanvas] Force initializing nodes:', allNodes.length)
+      setNodes(allNodes)
+    }
+  }, []) // Only run once on mount
+  
+  useEffect(() => {
+    if (edges.length === 0 && (newEdges.length > 0 || commentEdges.length > 0)) {
+      console.log('[ConceptMapCanvas] Force initializing edges:', newEdges.length + commentEdges.length)
+      setEdges([...newEdges, ...commentEdges])
+    }
+  }, []) // Only run once on mount
 
   // Update newly created relationship edges to start in edit mode
   // Watch for when the relationship appears in the relationships array and update the corresponding edge
@@ -1048,34 +1077,39 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
 
   // Sync InstantDB data changes to React Flow only when data actually changes
   useEffect(() => {
-    // Only update if concepts actually changed (by ID, position, label, notes, or metadata)
-    const conceptsChanged = 
+    // Always update on initial load (when refs are empty)
+    const isInitialLoad = prevConceptsRef.current.length === 0 && concepts.length > 0
+    
+    // Only update if concepts actually changed (compare by ID, not index)
+    const conceptsChanged = isInitialLoad || 
       concepts.length !== prevConceptsRef.current.length ||
-      concepts.some((c, i) => {
-        const prev = prevConceptsRef.current[i]
-        if (!prev) return true
-        if (c.id !== prev.id) return true
+      concepts.some((c) => {
+        const prev = prevConceptsRef.current.find(p => p.id === c.id)
+        if (!prev) return true // New concept
         if (c.position.x !== prev.position.x) return true
         if (c.position.y !== prev.position.y) return true
         if (c.label !== prev.label) return true
-        // Check if notes changed
         if ((c.notes || '') !== (prev.notes || '')) return true
-        // Check if metadata changed (compare JSON strings)
         const metadataChanged = JSON.stringify(c.metadata || {}) !== JSON.stringify(prev.metadata || {})
         return metadataChanged
+      }) ||
+      prevConceptsRef.current.some((prev) => {
+        return !concepts.find(c => c.id === prev.id) // Concept was deleted
       })
 
-    // Check if comments changed
+    // Check if comments changed (compare by ID)
     const commentsChanged = 
       comments.length !== prevCommentsRef.current.length ||
-      comments.some((c, i) => {
-        const prev = prevCommentsRef.current[i]
+      comments.some((c) => {
+        const prev = prevCommentsRef.current.find(p => p.id === c.id)
         if (!prev) return true
-        if (c.id !== prev.id) return true
         if (c.position.x !== prev.position.x) return true
         if (c.position.y !== prev.position.y) return true
         if (c.text !== prev.text) return true
         return false
+      }) ||
+      prevCommentsRef.current.some((prev) => {
+        return !comments.find(c => c.id === prev.id)
       })
 
     // Check if perspective inclusion state changed
@@ -1085,6 +1119,16 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       isEditingPerspective !== prevIsEditingPerspectiveRef.current
 
     if (conceptsChanged || commentsChanged || perspectiveChanged || textViewVisible !== prevTextViewVisibleRef.current) {
+      if (import.meta.env.DEV) {
+        console.log('[ConceptMapCanvas] Updating nodes:', {
+          conceptsCount: concepts.length,
+          allNodesCount: allNodes.length,
+          conceptsChanged,
+          commentsChanged,
+          perspectiveChanged,
+          isInitialLoad,
+        })
+      }
       setNodes(allNodes)
       prevConceptsRef.current = concepts
       prevCommentsRef.current = comments
@@ -1095,20 +1139,24 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   }, [allNodes, concepts, comments, textViewVisible, perspectiveConceptIds, isEditingPerspective, setNodes])
 
   useEffect(() => {
-    // Only update if relationships actually changed
-    const relationshipsChanged = 
+    // Always update on initial load
+    const isInitialLoad = prevRelationshipsRef.current.length === 0 && relationships.length > 0
+    
+    // Only update if relationships actually changed (compare by ID)
+    const relationshipsChanged = isInitialLoad ||
       relationships.length !== prevRelationshipsRef.current.length ||
-      relationships.some((r, i) => {
-        const prev = prevRelationshipsRef.current[i]
-        if (!prev) return true
-        if (r.id !== prev.id) return true
+      relationships.some((r) => {
+        const prev = prevRelationshipsRef.current.find(p => p.id === r.id)
+        if (!prev) return true // New relationship
         if (r.fromConceptId !== prev.fromConceptId) return true
         if (r.toConceptId !== prev.toConceptId) return true
         if (r.primaryLabel !== prev.primaryLabel) return true
         if (r.reverseLabel !== prev.reverseLabel) return true
-        // Check if metadata changed (compare JSON strings)
         const metadataChanged = JSON.stringify(r.metadata || {}) !== JSON.stringify(prev.metadata || {})
         return metadataChanged
+      }) ||
+      prevRelationshipsRef.current.some((prev) => {
+        return !relationships.find(r => r.id === prev.id) // Relationship was deleted
       })
 
     // Check if perspective inclusion state changed for relationships
@@ -1117,19 +1165,32 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       currentPerspectiveRelationshipKey !== prevPerspectiveRelationshipIdsRef.current ||
       isEditingPerspective !== prevIsEditingPerspectiveRef.current
 
-    // Check if comment edges changed
+    // Check if comment edges changed (compare by ID)
     const commentEdgesChanged = 
       commentEdges.length !== prevCommentEdgesRef.current.length ||
-      commentEdges.some((edge, i) => {
-        const prev = prevCommentEdgesRef.current[i]
+      commentEdges.some((edge) => {
+        const prev = prevCommentEdgesRef.current.find(p => p.id === edge.id)
         if (!prev) return true
-        if (edge.id !== prev.id) return true
         if (edge.source !== prev.source) return true
         if (edge.target !== prev.target) return true
         return false
+      }) ||
+      prevCommentEdgesRef.current.some((prev) => {
+        return !commentEdges.find(e => e.id === prev.id)
       })
 
     if (relationshipsChanged || perspectiveRelationshipChanged || commentEdgesChanged) {
+      if (import.meta.env.DEV) {
+        console.log('[ConceptMapCanvas] Updating edges:', {
+          relationshipsCount: relationships.length,
+          newEdgesCount: newEdges.length,
+          commentEdgesCount: commentEdges.length,
+          relationshipsChanged,
+          perspectiveRelationshipChanged,
+          commentEdgesChanged,
+          isInitialLoad,
+        })
+      }
       setEdges([...newEdges, ...commentEdges])
       prevRelationshipsRef.current = relationships
       prevCommentsRef.current = comments
