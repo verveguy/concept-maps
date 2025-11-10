@@ -124,23 +124,27 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const edgeTypesRef = useRef(edgeTypes)
   
   // Canvas state from store
-  const {
-    activeLayout,
-    setActiveLayout,
-    selectedLayout,
-    setSelectedLayout,
-    laidOutNodeIds,
-    addLaidOutNodeIds,
-    clearLaidOutNodeIds,
-    setLaidOutNodeIds,
-    newlyCreatedRelationshipIds,
-    addNewlyCreatedRelationship,
-    removeNewlyCreatedRelationship,
-    markInitialConceptChecked,
-    isInitialConceptChecked,
-    isCentering,
-    setIsCentering,
-  } = useCanvasStore()
+  // Use selectors that return stable values to avoid infinite loops
+  const activeLayout = useCanvasStore((state) => state.activeLayout)
+  const setActiveLayout = useCanvasStore((state) => state.setActiveLayout)
+  const selectedLayout = useCanvasStore((state) => state.selectedLayout)
+  const setSelectedLayout = useCanvasStore((state) => state.setSelectedLayout)
+  const laidOutNodeIdsSize = useCanvasStore((state) => state.laidOutNodeIds.size)
+  const addLaidOutNodeIds = useCanvasStore((state) => state.addLaidOutNodeIds)
+  const clearLaidOutNodeIds = useCanvasStore((state) => state.clearLaidOutNodeIds)
+  const setLaidOutNodeIds = useCanvasStore((state) => state.setLaidOutNodeIds)
+  // Use a stable string representation for comparison to avoid infinite loops
+  const newlyCreatedRelationshipIdsKey = useCanvasStore((state) => Array.from(state.newlyCreatedRelationshipIds.values()).join(','))
+  const newlyCreatedRelationshipIdsArray = useMemo(
+    () => newlyCreatedRelationshipIdsKey.split(',').filter(Boolean),
+    [newlyCreatedRelationshipIdsKey]
+  )
+  const addNewlyCreatedRelationship = useCanvasStore((state) => state.addNewlyCreatedRelationship)
+  const removeNewlyCreatedRelationship = useCanvasStore((state) => state.removeNewlyCreatedRelationship)
+  const markInitialConceptChecked = useCanvasStore((state) => state.markInitialConceptChecked)
+  const isInitialConceptChecked = useCanvasStore((state) => state.isInitialConceptChecked)
+  const isCentering = useCanvasStore((state) => state.isCentering)
+  const setIsCentering = useCanvasStore((state) => state.setIsCentering)
   
   // Ref for the React Flow wrapper div (used for event handlers)
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null)
@@ -352,8 +356,17 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
 
   // Update newly created relationship edges to start in edit mode
   // Watch for when the relationship appears in the relationships array and update the corresponding edge
+  // Use a ref to track the map to avoid infinite loops from Map reference changes
+  const newlyCreatedRelationshipIdsRef = useRef<Map<string, string>>(new Map())
+  
+  // Sync ref with store
   useEffect(() => {
-    const relationshipIdsToUpdate = Array.from(newlyCreatedRelationshipIds.values())
+    newlyCreatedRelationshipIdsRef.current = useCanvasStore.getState().newlyCreatedRelationshipIds
+  }, [newlyCreatedRelationshipIdsKey]) // Only update when contents change
+  
+  useEffect(() => {
+    // Use array from store selector to avoid infinite loops
+    const relationshipIdsToUpdate = newlyCreatedRelationshipIdsArray
     if (relationshipIdsToUpdate.length === 0) return
     
     // Use the same relationships array that's used to create edges
@@ -372,7 +385,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
           if (relationshipId && !edge.data?.shouldStartEditing) {
             // Remove from tracking map immediately to prevent re-triggering
             // Find and remove the entry for this relationship
-            for (const [conceptId, relId] of newlyCreatedRelationshipIds.entries()) {
+            for (const [conceptId, relId] of newlyCreatedRelationshipIdsRef.current.entries()) {
               if (relId === relationshipId) {
                 removeNewlyCreatedRelationship(conceptId)
                 break
@@ -396,7 +409,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         }
       })
     }
-  }, [filteredRelationships, allRelationships, isEditingPerspective, edges, setEdges, newlyCreatedRelationshipIds, removeNewlyCreatedRelationship])
+  }, [filteredRelationships, allRelationships, isEditingPerspective, edges, setEdges, newlyCreatedRelationshipIdsArray, removeNewlyCreatedRelationship])
 
   // Clear shouldStartEditing flag after it's been used (to prevent re-triggering)
   useEffect(() => {
@@ -868,12 +881,15 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       const conceptNodesArray = currentNodes.filter(n => n.type === 'concept')
       if (conceptNodesArray.length === 0) return
 
+      // Get current laid out node IDs from store (read directly, not from dependency)
+      const currentLaidOutNodeIds = useCanvasStore.getState().laidOutNodeIds
+
       // For incremental layout, identify new nodes
       const newConceptIds = incremental 
-        ? new Set(conceptNodesArray.filter(n => !laidOutNodeIds.has(n.id)).map(n => n.id))
+        ? new Set(conceptNodesArray.filter(n => !currentLaidOutNodeIds.has(n.id)).map(n => n.id))
         : undefined
-      const fixedNodeIds = incremental && laidOutNodeIds.size > 0
-        ? laidOutNodeIds
+      const fixedNodeIds = incremental && currentLaidOutNodeIds.size > 0
+        ? currentLaidOutNodeIds
         : undefined
 
       let layoutNodes: Node[]
@@ -960,7 +976,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         alert('Failed to apply layout. Please try again.')
       }
     },
-    [currentMapId, getNodes, getEdges, fitView, setSelectedLayout, laidOutNodeIds, addLaidOutNodeIds, setLaidOutNodeIds]
+    [currentMapId, getNodes, getEdges, fitView, setSelectedLayout, laidOutNodeIdsSize, addLaidOutNodeIds, setLaidOutNodeIds]
   )
   
   // Track previous concept IDs to detect new nodes (more reliable than count)
@@ -999,7 +1015,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       // Small delay to ensure the new node is fully created and edges are updated
       const timeoutId = setTimeout(() => {
         // Use incremental layout for force-directed, full layout for others
-        const useIncremental = activeLayout === 'force-directed' && laidOutNodeIds.size > 0
+        const useIncremental = activeLayout === 'force-directed' && laidOutNodeIdsSize > 0
         handleApplyLayout(activeLayout, true, useIncremental).catch((error) => {
           console.error('Failed to auto-apply layout:', error)
         })
@@ -1014,7 +1030,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     // Update ref even if no new nodes (in case nodes were deleted)
     prevConceptIdsRef.current = currentConceptIds
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conceptIdsString, activeLayout, handleApplyLayout, laidOutNodeIds])
+  }, [conceptIdsString, activeLayout, handleApplyLayout, laidOutNodeIdsSize])
   
   // Memoize concept nodes to avoid recreating the filter on every render
   const conceptNodes = useMemo(() => nodes.filter(n => n.type === 'concept'), [nodes])
