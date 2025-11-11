@@ -5,8 +5,8 @@ on:
     branches: [main]
 
 jobs:
-  test:
-    name: Run Test Suite
+  typecheck-and-test:
+    name: Type Check & Test
     runs-on: ubuntu-latest
 
     steps:
@@ -25,11 +25,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build application
-        run: pnpm build
-
-      - name: Build documentation
-        run: pnpm build:docs
+      - name: Type check
+        run: pnpm exec tsc --noEmit
 
       - name: Run tests with coverage
         run: pnpm test:coverage
@@ -43,4 +40,36 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: unittests
           name: codecov-umbrella
+
+  build:
+    name: Build (${{ matrix.build-type }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build-type: [app, docs]
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build application
+        if: matrix.build-type == 'app'
+        run: pnpm build
+
+      - name: Build documentation
+        if: matrix.build-type == 'docs'
+        run: pnpm build:docs:full
 
