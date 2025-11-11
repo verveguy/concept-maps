@@ -366,7 +366,7 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
             <button
               onClick={handleAccept}
               disabled={isProcessing || invitation.status !== 'pending' || !!(auth.user && !emailsMatch)}
-              className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+              className="px-4 py-2 text-sm border-2 border-green-600 dark:border-green-500 bg-background text-green-700 dark:text-green-400 rounded-md hover:bg-green-50 dark:hover:bg-green-950/20 disabled:opacity-50"
             >
               {isProcessing ? 'Processing...' : 'Accept Invitation'}
             </button>
