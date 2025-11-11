@@ -31,6 +31,7 @@ import { useCallback, useMemo } from 'react'
  * **Permission Management:**
  * - `'view'`: Read-only access (readPermissions link)
  * - `'edit'`: Read-write access (writePermissions link)
+ * - `'manage'`: Manager access (writePermissions + managePermissions links)
  * - Permissions are updated atomically in transactions
  * 
  * **Email Validation:**
@@ -109,6 +110,7 @@ export function useSharing(mapId: string | null) {
             },
             writePermissions: {},
             readPermissions: {},
+            managePermissions: {},
           },
         }
       : null
@@ -141,7 +143,7 @@ export function useSharing(mapId: string | null) {
           mapId: inv.map?.id || mapId || '',
           invitedEmail: inv.invitedEmail,
           invitedUserId: inv.invitedUserId ?? null,
-          permission: inv.permission as 'view' | 'edit',
+          permission: inv.permission as 'view' | 'edit' | 'manage',
           token: inv.token,
           status: inv.status as ShareInvitation['status'],
           createdBy: inv.creator?.id || '',
@@ -168,7 +170,7 @@ export function useSharing(mapId: string | null) {
         userId,
         userEmail,
         userImageURL,
-        permission: s.permission as 'view' | 'edit',
+        permission: s.permission as 'view' | 'edit' | 'manage',
         createdAt: new Date(s.createdAt),
         acceptedAt: s.acceptedAt ? new Date(s.acceptedAt) : null,
         status: (s.status ?? 'pending') as Share['status'],
@@ -183,11 +185,11 @@ export function useSharing(mapId: string | null) {
    * Generates a secure token and stores the invitation for later acceptance.
    *
    * @param targetEmail - Email address (and expected user identifier) of the invitee
-   * @param permission - Requested permission level ('view' | 'edit')
+   * @param permission - Requested permission level ('view' | 'edit' | 'manage')
    * @returns The invitation token for sharing with the invitee
    */
   const createInvitation = useCallback(
-    async (targetEmail: string, permission: 'view' | 'edit'): Promise<string> => {
+    async (targetEmail: string, permission: 'view' | 'edit' | 'manage'): Promise<string> => {
       if (!mapId) throw new Error('Map ID is required')
       if (!currentUser?.id) throw new Error('Current user must be authenticated')
 
@@ -285,9 +287,17 @@ export function useSharing(mapId: string | null) {
             invitation: invitationId, // Link to the invitation that created this share
           }),
         // Create permission links based on the invitation permission
-        ...(invitation.permission === 'edit'
-          ? [tx.maps[invitation.mapId].link({ writePermissions: userId })]
-          : [tx.maps[invitation.mapId].link({ readPermissions: userId })]),
+        // For 'manage' permission, link to both writePermissions and managePermissions
+        // For 'edit' permission, link to writePermissions only
+        // For 'view' permission, link to readPermissions only
+        ...(invitation.permission === 'manage'
+          ? [
+              tx.maps[invitation.mapId].link({ writePermissions: userId }),
+              tx.maps[invitation.mapId].link({ managePermissions: userId }),
+            ]
+          : invitation.permission === 'edit'
+            ? [tx.maps[invitation.mapId].link({ writePermissions: userId })]
+            : [tx.maps[invitation.mapId].link({ readPermissions: userId })]),
       ])
     },
     [invitations, userId, data, currentUserEmail]
@@ -366,14 +376,22 @@ export function useSharing(mapId: string | null) {
           })
         )
 
-        // Remove permission links
+        // Remove permission links based on invitation permission
+        // For 'manage' permission, unlink from both writePermissions and managePermissions
+        // For 'edit' permission, unlink from writePermissions only
+        // For 'view' permission, unlink from readPermissions only
         const userId = associatedShare.user?.id || invitation.invitedUserId
         if (userId) {
-          operations.push(
-            ...(invitation.permission === 'edit'
-              ? [tx.maps[invitation.mapId].unlink({ writePermissions: userId })]
-              : [tx.maps[invitation.mapId].unlink({ readPermissions: userId })])
-          )
+          if (invitation.permission === 'manage') {
+            operations.push(
+              tx.maps[invitation.mapId].unlink({ writePermissions: userId }),
+              tx.maps[invitation.mapId].unlink({ managePermissions: userId })
+            )
+          } else if (invitation.permission === 'edit') {
+            operations.push(tx.maps[invitation.mapId].unlink({ writePermissions: userId }))
+          } else {
+            operations.push(tx.maps[invitation.mapId].unlink({ readPermissions: userId }))
+          }
         }
       }
 
@@ -383,15 +401,15 @@ export function useSharing(mapId: string | null) {
   )
 
   /**
-   * Update the permission level for an active share (owner action).
+   * Update the permission level for an active share (owner or manager action).
    * Updates the permission links accordingly. Operations are idempotent - always
-   * unlinks from both permission types before linking to the correct one.
+   * unlinks from all permission types before linking to the correct one(s).
    *
    * @param shareId - ID of the share to update
-   * @param permission - New permission level
+   * @param permission - New permission level ('view' | 'edit' | 'manage')
    */
   const updateSharePermission = useCallback(
-    async (shareId: string, permission: 'view' | 'edit') => {
+    async (shareId: string, permission: 'view' | 'edit' | 'manage') => {
       // Find the share in the raw query data to access the user link directly
       const sharesData = data?.maps?.[0]?.shares || []
       const shareRecord = sharesData.find((s: any) => s.id === shareId)
@@ -423,8 +441,49 @@ export function useSharing(mapId: string | null) {
         throw new Error('Share creator information is missing. Cannot update permission.')
       }
 
-      // Idempotent update: unlink from both permission types, then link to correct one
+      // Idempotent update: only unlink/link what's actually changing
       // Ensure map and creator links are maintained in transaction for permission checks
+      // For 'manage' permission, link to both writePermissions and managePermissions
+      // For 'edit' permission, link to writePermissions only
+      // For 'view' permission, link to readPermissions only
+      const unlinkOperations: any[] = []
+      const linkOperations: any[] = []
+
+      // Determine what needs to change based on old and new permissions
+      const oldPerm = share.permission
+      const newPerm = permission
+
+      if (oldPerm === 'view' && newPerm === 'edit') {
+        // View -> Edit: unlink readPermissions, link writePermissions
+        unlinkOperations.push(tx.maps[share.mapId].unlink({ readPermissions: userId }))
+        linkOperations.push(tx.maps[share.mapId].link({ writePermissions: userId }))
+      } else if (oldPerm === 'view' && newPerm === 'manage') {
+        // View -> Manage: unlink readPermissions, link writePermissions and managePermissions
+        unlinkOperations.push(tx.maps[share.mapId].unlink({ readPermissions: userId }))
+        linkOperations.push(
+          tx.maps[share.mapId].link({ writePermissions: userId }),
+          tx.maps[share.mapId].link({ managePermissions: userId })
+        )
+      } else if (oldPerm === 'edit' && newPerm === 'view') {
+        // Edit -> View: unlink writePermissions, link readPermissions
+        unlinkOperations.push(tx.maps[share.mapId].unlink({ writePermissions: userId }))
+        linkOperations.push(tx.maps[share.mapId].link({ readPermissions: userId }))
+      } else if (oldPerm === 'edit' && newPerm === 'manage') {
+        // Edit -> Manage: keep writePermissions, just link managePermissions
+        linkOperations.push(tx.maps[share.mapId].link({ managePermissions: userId }))
+      } else if (oldPerm === 'manage' && newPerm === 'view') {
+        // Manage -> View: unlink writePermissions and managePermissions, link readPermissions
+        unlinkOperations.push(
+          tx.maps[share.mapId].unlink({ writePermissions: userId }),
+          tx.maps[share.mapId].unlink({ managePermissions: userId })
+        )
+        linkOperations.push(tx.maps[share.mapId].link({ readPermissions: userId }))
+      } else if (oldPerm === 'manage' && newPerm === 'edit') {
+        // Manage -> Edit: unlink managePermissions only, keep writePermissions
+        unlinkOperations.push(tx.maps[share.mapId].unlink({ managePermissions: userId }))
+        // No link operation needed - writePermissions is already linked
+      }
+
       await db.transact([
         tx.shares[shareId]
           .update({
@@ -434,21 +493,15 @@ export function useSharing(mapId: string | null) {
             map: share.mapId,
             creator: creatorId, // Maintain creator link for permission evaluation
           }),
-        // Unlink from old permission type (idempotent - safe if already unlinked)
-        ...(share.permission === 'edit'
-          ? [tx.maps[share.mapId].unlink({ writePermissions: userId })]
-          : [tx.maps[share.mapId].unlink({ readPermissions: userId })]),
-        // Link to new permission type
-        ...(permission === 'edit'
-          ? [tx.maps[share.mapId].link({ writePermissions: userId })]
-          : [tx.maps[share.mapId].link({ readPermissions: userId })]),
+        ...unlinkOperations,
+        ...linkOperations,
       ])
     },
     [shares, data, invitations]
   )
 
   /**
-   * Revoke a share (owner action) and remove permission links.
+   * Revoke a share (owner or manager action) and remove permission links.
    * Also updates the linked invitation to 'revoked' status for audit purposes.
    *
    * @param shareId - ID of the share to revoke
@@ -493,11 +546,19 @@ export function useSharing(mapId: string | null) {
       }
 
       // Remove permission links based on current permission
-      operations.push(
-        ...(share.permission === 'edit'
-          ? [tx.maps[share.mapId].unlink({ writePermissions: userId })]
-          : [tx.maps[share.mapId].unlink({ readPermissions: userId })])
-      )
+      // For 'manage' permission, unlink from both writePermissions and managePermissions
+      // For 'edit' permission, unlink from writePermissions only
+      // For 'view' permission, unlink from readPermissions only
+      if (share.permission === 'manage') {
+        operations.push(
+          tx.maps[share.mapId].unlink({ writePermissions: userId }),
+          tx.maps[share.mapId].unlink({ managePermissions: userId })
+        )
+      } else if (share.permission === 'edit') {
+        operations.push(tx.maps[share.mapId].unlink({ writePermissions: userId }))
+      } else {
+        operations.push(tx.maps[share.mapId].unlink({ readPermissions: userId }))
+      }
 
       await db.transact(operations)
     },

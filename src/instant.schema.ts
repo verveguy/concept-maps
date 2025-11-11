@@ -147,6 +147,18 @@ const _schema = i.schema({
         label: 'createdMaps',
       },
     },
+    mapsManagePermissions: {
+      forward: {
+        on: 'maps',
+        has: 'many',
+        label: 'managePermissions',
+      },
+      reverse: {
+        on: '$users',
+        has: 'many',
+        label: 'manageAccessMaps',
+      },
+    },
     mapsReadPermissions: {
       forward: {
         on: 'maps',

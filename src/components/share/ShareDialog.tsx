@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { X, Copy, Mail, Trash2 } from 'lucide-react'
 import { useSharing, generateShareLink } from '@/hooks/useSharing'
 import { useMap } from '@/hooks/useMap'
+import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { format } from 'date-fns'
 import { getAvatarUrl } from '@/lib/avatar'
 
@@ -94,17 +95,18 @@ export interface ShareDialogProps {
  * **Permission Levels:**
  * - `'view'`: Read-only access - can view but not modify
  * - `'edit'`: Read-write access - can view and modify
+ * - `'manage'`: Manager access - can edit map and manage shares (invite others, update permissions, revoke shares)
  * 
  * **Invitation Flow:**
- * 1. Owner enters email and selects permission level
+ * 1. Owner or manager enters email and selects permission level
  * 2. Invitation is created with a secure token
  * 3. Shareable link is generated (can be copied/shared)
  * 4. Invitee clicks link and accepts invitation
  * 5. Share record is created and permissions are granted
  * 
  * **Access Control:**
- * Only map owners can manage shares. Users with edit access cannot share the map
- * with others (only owners can).
+ * Map owners and managers can manage shares. Users with edit access cannot share the map
+ * with others (only owners and managers can).
  * 
  * @param props - Component props
  * @param props.mapId - Map ID to share, or null if no map is selected
@@ -145,15 +147,19 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
     deleteInvitation,
   } = useSharing(mapId)
   const { map } = useMap()
+  const { hasManageAccess } = useMapPermissions()
   
   const [emailInput, setEmailInput] = useState('')
-  const [permissionInput, setPermissionInput] = useState<'view' | 'edit'>('edit')
+  const [permissionInput, setPermissionInput] = useState<'view' | 'edit' | 'manage'>('edit')
   const [isSharing, setIsSharing] = useState(false)
   const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null)
   const [emailError, setEmailError] = useState<string | null>(null)
 
   // Check if current user is the map owner
   const isOwner = map?.creator?.id === currentUser?.id
+  
+  // Check if current user can manage shares (owner or manager)
+  const canManageShares = isOwner || hasManageAccess
 
   // Invitations are already filtered in useSharing hook to exclude accepted ones with shares
   // So we can use invitations directly
@@ -228,7 +234,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
     }
   }
 
-  const handleUpdatePermission = async (shareId: string, permission: 'view' | 'edit') => {
+  const handleUpdatePermission = async (shareId: string, permission: 'view' | 'edit' | 'manage') => {
     try {
       await updateSharePermission(shareId, permission)
     } catch (error) {
@@ -290,7 +296,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Share with User Section */}
-          {isOwner && (
+          {canManageShares && (
             <div>
               <label className="block text-sm font-medium text-foreground mb-2">
                 Share with User
@@ -328,11 +334,12 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                   <div className="flex gap-2 items-start">
                     <select
                       value={permissionInput}
-                      onChange={(e) => setPermissionInput(e.target.value as 'view' | 'edit')}
+                      onChange={(e) => setPermissionInput(e.target.value as 'view' | 'edit' | 'manage')}
                       className="px-3 py-2 border border-input bg-background text-foreground rounded-md text-sm"
                     >
                       <option value="view">View</option>
                       <option value="edit">Edit</option>
+                      <option value="manage">Manage</option>
                     </select>
                     <button
                       type="submit"
@@ -387,7 +394,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                           <Copy className="h-3 w-3" />
                           {copiedInvitationId === invitation.id ? 'Copied' : 'Copy Link'}
                         </button>
-                        {isOwner && invitation.status !== 'revoked' && (
+                        {canManageShares && invitation.status !== 'revoked' && (
                           <button
                             onClick={() => handleRevokeInvitation(invitation.id)}
                             className="px-2 py-1 text-xs text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-950"
@@ -395,7 +402,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                             Revoke
                           </button>
                         )}
-                        {isOwner && invitation.status === 'revoked' && (
+                        {canManageShares && invitation.status === 'revoked' && (
                           <button
                             onClick={() => handleDeleteInvitation(invitation.id)}
                             className="px-2 py-1 text-xs text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-950 flex items-center gap-1"
@@ -459,14 +466,14 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                         </div>
                       </div>
                     </div>
-                    {isOwner && (
+                    {canManageShares && (
                       <div className="flex items-center gap-2">
                         <select
                           value={share.permission}
                           onChange={(e) =>
                             handleUpdatePermission(
                               share.id,
-                              e.target.value as 'view' | 'edit'
+                              e.target.value as 'view' | 'edit' | 'manage'
                             )
                           }
                           className="px-2 py-1 text-xs border border-input bg-background text-foreground rounded-md"
@@ -474,6 +481,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                         >
                           <option value="view">View</option>
                           <option value="edit">Edit</option>
+                          <option value="manage">Manage</option>
                         </select>
                         <button
                           onClick={() => handleRevokeShare(share.id)}
@@ -485,7 +493,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
                         </button>
                       </div>
                     )}
-                    {!isOwner && (
+                    {!canManageShares && (
                       <span className="text-xs text-muted-foreground capitalize">
                         {share.permission}
                       </span>
