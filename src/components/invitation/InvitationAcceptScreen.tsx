@@ -129,7 +129,7 @@ export function InvitationAcceptScreen({ invitation, mapId }: InvitationAcceptSc
     : false
 
   // Check if invitation is expired
-  const isExpired = invitation.expiresAt && invitation.expiresAt.getTime() < Date.now()
+  const isExpired = invitation.expiresAt ? invitation.expiresAt.getTime() < Date.now() : false
 
   // Determine permission description
   const permissionDescription =
