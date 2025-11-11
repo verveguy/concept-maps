@@ -191,7 +191,7 @@ function ConceptEditorContent({
   const [metadata, setMetadata] = useState<MetadataEntry[]>([])
   const [fillColor, setFillColor] = useState('#ffffff')
   const [borderColor, setBorderColor] = useState('#d1d5db')
-  const [borderStyle, setBorderStyle] = useState<'solid' | 'dashed' | 'dotted'>('solid')
+  const [borderStyle, setBorderStyle] = useState<'solid' | 'dashed' | 'dotted' | 'long-dash'>('solid')
   const [textColor, setTextColor] = useState('#111827')
   const [isDeleting, setIsDeleting] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -244,7 +244,7 @@ function ConceptEditorContent({
       const conceptMetadata = concept.metadata || {}
       setFillColor((conceptMetadata.fillColor as string) || '#ffffff')
       setBorderColor((conceptMetadata.borderColor as string) || '#d1d5db')
-      setBorderStyle((conceptMetadata.borderStyle as 'solid' | 'dashed' | 'dotted') || 'solid')
+      setBorderStyle((conceptMetadata.borderStyle as 'solid' | 'dashed' | 'dotted' | 'long-dash') || 'solid')
       setTextColor((conceptMetadata.textColor as string) || '#111827')
     }
   }, [concept])
@@ -286,7 +286,7 @@ function ConceptEditorContent({
   const buildCompleteMetadata = (styleOverrides?: {
     fillColor?: string
     borderColor?: string
-    borderStyle?: 'solid' | 'dashed' | 'dotted'
+    borderStyle?: 'solid' | 'dashed' | 'dotted' | 'long-dash'
     textColor?: string
   }): Record<string, unknown> => {
     // Get current style attributes from form state or overrides
@@ -348,7 +348,7 @@ function ConceptEditorContent({
   const handleSaveNodeStyle = async (overrideValues?: {
     fillColor?: string
     borderColor?: string
-    borderStyle?: 'solid' | 'dashed' | 'dotted'
+    borderStyle?: 'solid' | 'dashed' | 'dotted' | 'long-dash'
     textColor?: string
   }) => {
     if (!hasWriteAccess) return
@@ -603,7 +603,7 @@ function ConceptEditorContent({
                 value={borderStyle}
                 onChange={(e) => {
                   if (hasWriteAccess) {
-                    const style = e.target.value as 'solid' | 'dashed' | 'dotted'
+                    const style = e.target.value as 'solid' | 'dashed' | 'dotted' | 'long-dash'
                     setBorderStyle(style)
                     handleSaveNodeStyle({ borderStyle: style })
                   }
@@ -615,6 +615,7 @@ function ConceptEditorContent({
                 <option value="solid">Solid</option>
                 <option value="dashed">Dashed</option>
                 <option value="dotted">Dotted</option>
+                <option value="long-dash">Long Dash</option>
               </select>
             </div>
 
