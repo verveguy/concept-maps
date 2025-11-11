@@ -52,17 +52,11 @@
  * ```
  */
 
-import React, { useCallback, useMemo, useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
+import { useMemo, useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
 import ReactFlow, {
   Background,
   Controls,
   MiniMap,
-  type Node,
-  type Edge,
-  type Connection,
-  type OnConnectStart,
-  type NodeChange,
-  type EdgeChange,
   useNodesState,
   useEdgesState,
   ReactFlowProvider,
@@ -74,17 +68,21 @@ import { useConcepts, useAllConcepts } from '@/hooks/useConcepts'
 import { useRelationships, useAllRelationships } from '@/hooks/useRelationships'
 import { useComments } from '@/hooks/useComments'
 import { usePerspectives } from '@/hooks/usePerspectives'
-import { useCanvasMutations } from '@/hooks/useCanvasMutations'
+import { useCanvasNodeHandlers } from '@/hooks/useCanvasNodeHandlers'
+import { useCanvasEdgeHandlers } from '@/hooks/useCanvasEdgeHandlers'
+import { useCanvasConnectionHandlers } from '@/hooks/useCanvasConnectionHandlers'
+import { useCanvasPaneHandlers } from '@/hooks/useCanvasPaneHandlers'
+import { useCanvasLayout } from '@/hooks/useCanvasLayout'
+import { useCanvasDataSync } from '@/hooks/useCanvasDataSync'
+import { useCanvasCreation } from '@/hooks/useCanvasCreation'
+import { useCanvasDeepLinking } from '@/hooks/useCanvasDeepLinking'
+import { useCanvasPresence } from '@/hooks/useCanvasPresence'
+import type { LayoutType } from '@/lib/layouts'
 import { useUIStore } from '@/stores/uiStore'
 import { useMapStore } from '@/stores/mapStore'
 import { useCanvasStore } from '@/stores/canvasStore'
-import { db, tx } from '@/lib/instant'
 import { nodeTypes, edgeTypes } from './reactFlowTypes'
-import type { LayoutType } from '@/lib/layouts'
-import { applyForceDirectedLayout, applyHierarchicalLayout, applyCircularLayout, applyLayeredLayout, applyStressLayout } from '@/lib/layouts'
 import { FileText } from 'lucide-react'
-import { usePresenceEditing } from '@/hooks/usePresenceEditing'
-import { usePresenceCursorSetter } from '@/hooks/usePresenceCursorSetter'
 import { PeerCursors } from '@/components/presence/PeerCursors'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { LayoutSelector } from './LayoutSelector'
@@ -125,50 +123,26 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   
   // Canvas store state - centralized canvas-specific state management
   const {
-    activeLayout,
-    setActiveLayout,
-    selectedLayout,
-    setSelectedLayout,
-    laidOutNodeIds,
-    addLaidOutNodeId,
-    clearLaidOutNodeIds,
-    addNewlyCreatedRelationship,
-    hasCheckedInitialConceptForMap,
-    markInitialConceptChecked,
-    connectionStart,
-    setConnectionStart,
-    connectionMade,
-    setConnectionMade,
-    pendingConcept,
-    setPendingConcept,
     contextMenuVisible,
     setContextMenuVisible,
     contextMenuPosition,
     setContextMenuPosition,
-    getLastUpdateTime,
-    setLastUpdateTime,
-    prevConceptIds,
-    setPrevConceptIds,
     resetCanvasState,
+    clearLaidOutNodeIds,
   } = useCanvasStore()
   
   const currentMapId = useMapStore((state) => state.currentMapId)
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
   const isEditingPerspective = useMapStore((state) => state.isEditingPerspective)
   
-  // Track if we're currently centering on a concept (to prevent timeout cleanup)
-  const isCenteringRef = useRef(false)
   // Ref for the React Flow wrapper div (used for event handlers)
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null)
-  // Ref for context menu position (used for screen coordinates)
-  const contextMenuPositionRef = useRef<{ x: number; y: number } | null>(null)
   
   // Reset canvas state when switching maps
   useEffect(() => {
     if (!currentMapId) return
     
     clearLaidOutNodeIds()
-    isCenteringRef.current = false // Reset centering flag when switching maps
     resetCanvasState()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMapId]) // Only depend on currentMapId - store actions are stable
@@ -204,133 +178,23 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   
   const concepts = isEditingPerspective ? allConcepts : filteredConcepts
   const relationships = isEditingPerspective ? allRelationships : filteredRelationships
-  // Use canvas mutations hook for all database mutations (with undo tracking)
-  const {
-    createConcept,
-    updateConcept,
-    deleteConcept,
-    createRelationship,
-    deleteRelationship,
-    createComment,
-    updateComment,
-    deleteComment,
-    linkCommentToConcept,
-    unlinkCommentFromConcept,
-    startOperation,
-    endOperation,
-  } = useCanvasMutations()
   const { 
-    setSelectedConceptId, 
-    setSelectedRelationshipId,
-    setSelectedCommentId,
-    setConceptEditorOpen, 
-    setRelationshipEditorOpen,
     textViewVisible,
     setTextViewVisible,
     textViewPosition,
-    setTextViewPosition,
   } = useUIStore()
-  const { screenToFlowPosition, fitView, getNode, setCenter, getViewport } = useReactFlow()
+  const { screenToFlowPosition, fitView, getNode, setCenter, getViewport, getNodes: getNodesFromFlow, setNodes: setNodesFromFlow } = useReactFlow()
   
-  // Presence tracking - split into separate hooks to prevent unnecessary re-renders
-  // Cursor setter: only updates cursor position, doesn't subscribe to peer cursors
-  const { setCursor } = usePresenceCursorSetter()
-  // Editing hook: updates only when editing state changes
-  const { setEditingNode, setEditingEdge } = usePresenceEditing()
-  
-  const selectedConceptId = useUIStore((state) => state.selectedConceptId)
-  const selectedRelationshipId = useUIStore((state) => state.selectedRelationshipId)
-  const selectedCommentId = useUIStore((state) => state.selectedCommentId)
-  const currentConceptId = useMapStore((state) => state.currentConceptId)
-  const shouldAutoCenterConcept = useMapStore((state) => state.shouldAutoCenterConcept)
-  const setCurrentConceptId = useMapStore((state) => state.setCurrentConceptId)
-  const setShouldAutoCenterConcept = useMapStore((state) => state.setShouldAutoCenterConcept)
-  
-  // Track cursor movement on the React Flow pane
-  // Convert screen coordinates to flow coordinates for storage
-  useEffect(() => {
-    const reactFlowPane = document.querySelector<HTMLElement>('.react-flow')
-    if (!reactFlowPane) return
-    
-    const handleMouseMove = (event: MouseEvent) => {
-      // Get the React Flow pane bounds
-      const paneRect = reactFlowPane.getBoundingClientRect()
-      
-      // Check if mouse is within the pane
-      if (
-        event.clientX >= paneRect.left &&
-        event.clientX <= paneRect.right &&
-        event.clientY >= paneRect.top &&
-        event.clientY <= paneRect.bottom
-      ) {
-        // Convert screen coordinates to flow coordinates
-        const flowPosition = screenToFlowPosition({
-          x: event.clientX,
-          y: event.clientY,
-        })
-        setCursor(flowPosition)
-      } else {
-        // Mouse outside pane - clear cursor
-        setCursor(null)
-      }
-    }
-    
-    const handleMouseLeave = () => {
-      setCursor(null)
-    }
-    
-    reactFlowPane.addEventListener('mousemove', handleMouseMove)
-    reactFlowPane.addEventListener('mouseleave', handleMouseLeave)
-    
-    return () => {
-      reactFlowPane.removeEventListener('mousemove', handleMouseMove)
-      reactFlowPane.removeEventListener('mouseleave', handleMouseLeave)
-    }
-  }, [setCursor, screenToFlowPosition])
-  
-  // Track editing state
-  useEffect(() => {
-    setEditingNode(selectedConceptId)
-  }, [selectedConceptId, setEditingNode])
-  
-  useEffect(() => {
-    setEditingEdge(selectedRelationshipId)
-  }, [selectedRelationshipId, setEditingEdge])
+  // Presence hook - handles cursor tracking and editing state updates
+  useCanvasPresence({
+    screenToFlowPosition,
+  })
 
-  // Convert InstantDB data to React Flow format
-  const newNodes = useMemo(
-    () =>
-      conceptsToNodes(
-        concepts,
-        perspectiveConceptIds,
-        isEditingPerspective
-      ),
-    [concepts, perspectiveConceptIds, isEditingPerspective]
-  )
-  const newEdges = useMemo(
-    () =>
-      relationshipsToEdges(
-        relationships,
-        perspectiveRelationshipIds,
-        isEditingPerspective
-      ),
-    [relationships, perspectiveRelationshipIds, isEditingPerspective]
-  )
-
-  // Convert comments to nodes and edges
-  const commentNodes = useMemo(
-    () => commentsToNodes(comments, perspectiveConceptIds),
-    [comments, perspectiveConceptIds]
-  )
-  const commentEdges = useMemo(
-    () => commentsToEdges(comments, concepts, perspectiveConceptIds),
-    [comments, concepts, perspectiveConceptIds]
-  )
-
-
-  // Add text view node if visible, and merge comment nodes
-  const allNodes = useMemo(() => {
-    const nodes = [...newNodes, ...commentNodes]
+  // Transform InstantDB data to React Flow format (memoized)
+  const transformedNodes = useMemo(() => {
+    const conceptNodes = conceptsToNodes(concepts, perspectiveConceptIds, isEditingPerspective)
+    const commentNodesArray = commentsToNodes(comments, perspectiveConceptIds)
+    const nodes = [...conceptNodes, ...commentNodesArray]
     if (textViewVisible) {
       nodes.push({
         id: 'text-view-node',
@@ -342,21 +206,94 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       })
     }
     return nodes
-  }, [newNodes, commentNodes, textViewVisible, textViewPosition])
+  }, [concepts, comments, perspectiveConceptIds, isEditingPerspective, textViewVisible, textViewPosition])
 
-  // Track previous data to avoid unnecessary updates
-  const prevConceptsRef = useRef(concepts)
-  const prevRelationshipsRef = useRef(relationships)
-  const prevCommentsRef = useRef(comments)
-  const prevCommentEdgesRef = useRef(commentEdges)
-  const prevTextViewVisibleRef = useRef(textViewVisible)
-  const prevPerspectiveConceptIdsRef = useRef<string | undefined>(perspectiveConceptIds ? Array.from(perspectiveConceptIds).sort().join(',') : undefined)
-  const prevPerspectiveRelationshipIdsRef = useRef<string | undefined>(perspectiveRelationshipIds ? Array.from(perspectiveRelationshipIds).sort().join(',') : undefined)
-  const prevIsEditingPerspectiveRef = useRef(isEditingPerspective)
+  const transformedEdges = useMemo(() => {
+    const relationshipEdges = relationshipsToEdges(relationships, perspectiveRelationshipIds, isEditingPerspective)
+    const commentEdgesArray = commentsToEdges(comments, concepts, perspectiveConceptIds)
+    return [...relationshipEdges, ...commentEdgesArray]
+  }, [relationships, comments, concepts, perspectiveRelationshipIds, perspectiveConceptIds, isEditingPerspective])
 
-  // React Flow state management - initialize with data
-  const [nodes, setNodes, onNodesChangeBase] = useNodesState(allNodes)
-  const [edges, setEdges, onEdgesChangeBase] = useEdgesState([...newEdges, ...commentEdges])
+  // React Flow state management - initialize with transformed data
+  const [nodes, setNodes, onNodesChangeBase] = useNodesState(transformedNodes)
+  const [edges, setEdges, onEdgesChangeBase] = useEdgesState(transformedEdges)
+
+  // Data synchronization hook - syncs InstantDB changes to React Flow state
+  useCanvasDataSync({
+    transformedNodes,
+    transformedEdges,
+    concepts,
+    relationships,
+    comments,
+    perspectiveConceptIds,
+    perspectiveRelationshipIds,
+    isEditingPerspective,
+    textViewVisible,
+    setNodes,
+    setEdges,
+  })
+
+  // Node handlers hook - handles node changes, drag, and click events
+  const {
+    onNodesChange,
+    onNodeDrag,
+    onNodeDragStop,
+    onNodeClick,
+  } = useCanvasNodeHandlers({
+    concepts,
+    comments,
+    relationships,
+    nodes,
+    onNodesChangeBase,
+    screenToFlowPosition,
+  })
+
+  // Edge handlers hook - handles edge changes and click events
+  const {
+    onEdgesChange,
+    onEdgeClick,
+  } = useCanvasEdgeHandlers({
+    edges,
+    onEdgesChangeBase,
+  })
+
+  // Connection handlers hook - handles connection start, end, and connect events
+  const {
+    onConnectStart,
+    onConnectEnd,
+    onConnect,
+  } = useCanvasConnectionHandlers({
+    nodes,
+    screenToFlowPosition,
+  })
+
+  // Pane handlers hook - handles pane click, double-click, right-click, and context menu
+  const {
+    onPaneClick,
+    handleContextMenuAddConcept,
+    handleContextMenuAddComment,
+  } = useCanvasPaneHandlers({
+    reactFlowWrapperRef,
+    screenToFlowPosition,
+    getNodes: getNodesFromFlow,
+    setNodes: setNodesFromFlow,
+  })
+
+  // Layout hook - handles layout application, sticky layout, and auto-apply
+  const {
+    applyLayout: handleApplyLayout,
+    applyLayoutSimple,
+    activeLayout,
+    selectedLayout,
+    setSelectedLayout,
+  } = useCanvasLayout({
+    nodes,
+    edges,
+    conceptIds: concepts.map(c => c.id),
+    getNodes: getNodesFromFlow,
+    getEdges: () => edges,
+    fitView,
+  })
 
   // Update newly created relationship edges to start in edit mode
   // Watch for when the relationship appears in the relationships array and update the corresponding edge
@@ -461,1348 +398,31 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     }
   }, [edges, setEdges])
 
-  // Handle deep linking to concepts: select and center when concept ID is in URL
-  // This must be after nodes is declared
-  // Only triggers when shouldAutoCenterConcept is true (set during URL navigation)
-  useEffect(() => {
-    // Only trigger if auto-centering is enabled and we have a concept ID
-    if (!shouldAutoCenterConcept || !currentConceptId) {
-      return
-    }
-    
-    // Wait for concepts to be available (concepts are the source of truth, nodes are derived)
-    if (!concepts.length) {
-      return
-    }
-    
-    // Check if the concept exists in the concepts array
-    const conceptExists = concepts.some((c) => c.id === currentConceptId)
-    
-    if (!conceptExists) {
-      return
-    }
-    
-    // Wait for nodes to be available as well
-    if (!nodes.length) {
-      return
-    }
-    
-    // Find the concept node
-    const conceptNode = nodes.find((node) => node.id === currentConceptId)
-    if (!conceptNode) {
-      return
-    }
-    
-    // Check if we're already centering (prevent duplicate calls)
-    if (isCenteringRef.current) {
-      return
-    }
-    
-    // Mark that we're centering
-    isCenteringRef.current = true
-    
-    // Select the concept FIRST (before clearing flag)
-    setSelectedConceptId(currentConceptId)
-    
-    // Also select the node in React Flow by updating its selected property
-    setNodes((currentNodes) => {
-      return currentNodes.map((node) => {
-        if (node.id === currentConceptId) {
-          return { ...node, selected: true }
-        }
-        return { ...node, selected: false }
-      })
-    })
-    
-    // Disable auto-centering flag AFTER selection to prevent re-triggering
-    setShouldAutoCenterConcept(false)
-    
-    // Center on the concept and fit view to show the whole map
-    // Use setTimeout to ensure React Flow is ready
-    const timeoutId = setTimeout(() => {
-      // First fit view to show the whole map (this sets the zoom level)
-      fitView({ padding: 0.1, duration: 300 })
-      
-      // After fitView completes, get the current viewport and center on the concept
-      setTimeout(() => {
-        const node = getNode(currentConceptId)
-        if (node) {
-          // Get current viewport to preserve zoom level from fitView
-          const viewport = getViewport()
-          // Center on the concept node while preserving the zoom from fitView
-          setCenter(node.position.x, node.position.y, { zoom: viewport.zoom, duration: 300 })
-        }
-        // Clear currentConceptId from store after handling to prevent interference with normal selection
-        setCurrentConceptId(null)
-        // Reset centering flag
-        isCenteringRef.current = false
-      }, 350)
-    }, 100)
-    
-    // Only clear timeout if we're not currently centering (prevent cleanup from canceling the operation)
-    return () => {
-      if (!isCenteringRef.current) {
-        clearTimeout(timeoutId)
-      }
-    }
-  }, [shouldAutoCenterConcept, currentConceptId, concepts, nodes, setSelectedConceptId, setNodes, fitView, getNode, setCenter, getViewport, setCurrentConceptId, setShouldAutoCenterConcept])
+  // Creation hook - handles pending relationship creation (drag-to-create flow)
+  useCanvasCreation({
+    concepts,
+    getNodes: getNodesFromFlow,
+    setNodes: setNodesFromFlow,
+  })
 
-  // Wrap onNodesChange to intercept deletions and delete from database
-  const onNodesChange = useCallback(
-    (changes: NodeChange[]) => {
-      // Filter out remove actions for concept nodes and delete from database
-      const removeChanges = changes.filter(
-        (change) => change.type === 'remove' && change.id !== 'text-view-node'
-      )
-
-      // If user doesn't have write access, prevent deletions by filtering out remove changes
-      if (removeChanges.length > 0 && !hasWriteAccess) {
-        // Filter out remove changes before calling base handler
-        const filteredChanges = changes.filter((change) => change.type !== 'remove' || change.id === 'text-view-node')
-        onNodesChangeBase(filteredChanges)
-        return
-      }
-
-      if (removeChanges.length > 0 && hasWriteAccess && currentMapId) {
-        // Check if selected concept is being deleted
-        const deletedConceptIds = removeChanges
-          .map((change) => change.type === 'remove' ? change.id : undefined)
-          .filter((id): id is string => id !== undefined)
-        
-        if (selectedConceptId && deletedConceptIds.includes(selectedConceptId)) {
-          setSelectedConceptId(null)
-          setConceptEditorOpen(false)
-        }
-        
-        // Check if selected comment is being deleted
-        if (selectedCommentId && deletedConceptIds.includes(selectedCommentId)) {
-          setSelectedCommentId(null)
-        }
-
-        // Delete concepts from database
-        void (async () => {
-          try {
-            // Start a deletion operation to group related deletions
-            startOperation()
-            
-            // Find all relationships connected to deleted concepts
-            const deletedConceptIds = removeChanges
-              .map((change) => change.type === 'remove' ? change.id : undefined)
-              .filter((id): id is string => id !== undefined)
-            
-            const connectedRelationships = relationships.filter(
-              (r) => deletedConceptIds.includes(r.fromConceptId) || deletedConceptIds.includes(r.toConceptId)
-            )
-            
-            // Delete relationships connected to deleted concepts (before deleting concepts)
-            // This ensures relationships are deleted and recorded before concepts
-            const relationshipDeletePromises = connectedRelationships.map((rel) => {
-              return deleteRelationship(rel.id)
-            })
-            
-            // Delete concepts
-            const conceptDeletePromises = removeChanges.map((change) => {
-              if (change.type === 'remove' && change.id) {
-                // Only delete if it's a concept node (not text-view node)
-                const node = nodes.find((n) => n.id === change.id)
-                if (node && node.type === 'concept') {
-                  return deleteConcept(change.id)
-                } else if (node && node.type === 'comment') {
-                  return deleteComment(change.id)
-                }
-              }
-              return Promise.resolve()
-            })
-            
-            // Execute all deletions
-            await Promise.all([...relationshipDeletePromises, ...conceptDeletePromises])
-            
-            // End the deletion operation
-            endOperation()
-          } catch (error) {
-            console.error('Failed to delete concepts:', error)
-            alert('Failed to delete concepts. Please try again.')
-            // End operation even on error
-            endOperation()
-          }
-        })()
-      }
-
-      // Always call the base handler to update React Flow state
-      onNodesChangeBase(changes)
-    },
-    [hasWriteAccess, currentMapId, deleteConcept, deleteRelationship, deleteComment, nodes, relationships, onNodesChangeBase, selectedConceptId, selectedCommentId, setSelectedConceptId, setSelectedCommentId, setConceptEditorOpen, startOperation, endOperation]
-  )
-
-  // Wrap onEdgesChange to intercept deletions and delete from database
-  const onEdgesChange = useCallback(
-    (changes: EdgeChange[]) => {
-      // Filter out remove actions and delete from database
-      const removeChanges = changes.filter((change) => change.type === 'remove')
-
-      // If user doesn't have write access, prevent deletions by filtering out remove changes
-      if (removeChanges.length > 0 && !hasWriteAccess) {
-        // Filter out remove changes before calling base handler
-        const filteredChanges = changes.filter((change) => change.type !== 'remove')
-        onEdgesChangeBase(filteredChanges)
-        return
-      }
-
-      if (removeChanges.length > 0 && hasWriteAccess && currentMapId) {
-        // Check if selected relationship is being deleted
-        const deletedRelationshipIds = removeChanges
-          .map((change) => change.type === 'remove' ? change.id : undefined)
-          .filter((id): id is string => id !== undefined)
-        
-        if (selectedRelationshipId && deletedRelationshipIds.includes(selectedRelationshipId)) {
-          setSelectedRelationshipId(null)
-          setRelationshipEditorOpen(false)
-        }
-
-        // Separate comment edges from relationship edges
-        const currentEdges = edges
-        const commentEdgeIds = new Set(
-          currentEdges.filter((e) => e.type === 'comment-edge').map((e) => e.id)
-        )
-
-        // Delete relationships and unlink comments from database
-        void (async () => {
-          try {
-            // Start a deletion operation
-            startOperation()
-            
-            const deletePromises = removeChanges.map((change) => {
-              if (change.type === 'remove' && change.id) {
-                const isCommentEdge = commentEdgeIds.has(change.id)
-                
-                if (isCommentEdge) {
-                  // Find the edge to get source (comment) and target (concept)
-                  const edge = currentEdges.find((e) => e.id === change.id)
-                  if (edge && edge.source && edge.target) {
-                    // Unlink comment from concept
-                    return unlinkCommentFromConcept(edge.source, edge.target)
-                  }
-                } else {
-                  // Delete relationship (mutation hook handles undo tracking)
-                  return deleteRelationship(change.id)
-                }
-              }
-              return Promise.resolve()
-            })
-            await Promise.all(deletePromises)
-            
-            // End the deletion operation
-            endOperation()
-          } catch (error) {
-            console.error('Failed to delete edges:', error)
-            alert('Failed to delete edges. Please try again.')
-            // End operation even on error
-            endOperation()
-          }
-        })()
-      }
-
-      // Always call the base handler to update React Flow state
-      onEdgesChangeBase(changes)
-    },
-    [hasWriteAccess, currentMapId, deleteRelationship, unlinkCommentFromConcept, onEdgesChangeBase, selectedRelationshipId, setSelectedRelationshipId, setRelationshipEditorOpen, startOperation, endOperation, edges]
-  )
+  // Deep linking hook - handles concept centering from URL
+  useCanvasDeepLinking({
+    concepts,
+    nodes,
+    setNodes: setNodesFromFlow,
+    fitView,
+    getNode,
+    setCenter,
+    getViewport,
+  })
 
   // Expose layout handler via ref (must be after nodes/edges are initialized)
   useImperativeHandle(ref, () => ({
-    applyLayout: async (layoutType: LayoutType) => {
-      if (!currentMapId) return
-      
-      // Use getNodes/getEdges to get the latest state
-      const currentNodes = getNodes()
-      const currentEdges = getEdges()
-      
-      const conceptNodesArray = currentNodes.filter(n => n.type === 'concept')
-      if (conceptNodesArray.length === 0) return
-
-      let layoutNodes: Node[]
-      
-      if (layoutType === 'force-directed') {
-        layoutNodes = applyForceDirectedLayout(conceptNodesArray, currentEdges, {
-          width: 2000,
-          height: 2000,
-        })
-      } else if (layoutType === 'hierarchical') {
-        layoutNodes = applyHierarchicalLayout(conceptNodesArray, currentEdges, {
-          direction: 'TB',
-          nodeWidth: 150,
-          nodeHeight: 100,
-        })
-      } else if (layoutType === 'circular') {
-        layoutNodes = applyCircularLayout(conceptNodesArray, currentEdges, {
-          width: 2000,
-          height: 2000,
-        })
-      } else if (layoutType === 'layered') {
-        layoutNodes = await applyLayeredLayout(conceptNodesArray, currentEdges, {
-          width: 2000,
-          height: 2000,
-          direction: 'DOWN',
-        })
-      } else if (layoutType === 'stress') {
-        layoutNodes = await applyStressLayout(conceptNodesArray, currentEdges, {
-          width: 2000,
-          height: 2000,
-          nodeSpacing: 600, // Very generous spacing for less dense layout
-          edgeNodeSpacing: 150,
-        })
-      } else {
-        // Manual layout - clear active layout
-        setActiveLayout(null)
-        return
-      }
-
-      // Batch update all concept positions in InstantDB
-      try {
-        const updates = layoutNodes.map((node) =>
-          tx.concepts[node.id].update({
-            positionX: node.position.x,
-            positionY: node.position.y,
-            updatedAt: Date.now(),
-          })
-        )
-        await db.transact(updates)
-        
-        // Mark all nodes as laid out (full layout)
-        conceptNodesArray.forEach((node) => {
-          addLaidOutNodeId(node.id)
-        })
-        
-        // Fit view to show all nodes after layout
-        setTimeout(() => {
-          fitView({ padding: 0.1 })
-        }, 100)
-      } catch (error) {
-        console.error('Failed to apply layout:', error)
-        alert('Failed to apply layout. Please try again.')
-      }
-    },
-  }), [nodes, edges, currentMapId, fitView])
-
-  // Get React Flow instance for accessing latest nodes/edges
-  const { getNodes, getEdges } = useReactFlow()
-  
-  // Create initial concept if map is empty (new map)
-  useEffect(() => {
-    if (!currentMapId || !hasWriteAccess) return
-    
-    // Check if we've already handled this map
-    if (hasCheckedInitialConceptForMap(currentMapId)) return
-    
-    // Check if map has no concepts
-    if (concepts.length === 0) {
-      markInitialConceptChecked(currentMapId)
-      
-      // Create initial concept at center of viewport (0, 0 in flow coordinates)
-      const initialPosition = {
-        x: 0,
-        y: 0,
-      }
-      
-      // Estimate node dimensions to center it
-      const estimatedNodeWidth = 130
-      const estimatedNodeHeight = 50
-      
-      // Adjust position so node center is at origin
-      const position = {
-        x: initialPosition.x - estimatedNodeWidth / 2,
-        y: initialPosition.y - estimatedNodeHeight / 2,
-      }
-      
-      const createInitialConcept = async () => {
-        try {
-          // Create the new concept using mutation hook (handles undo tracking)
-          await createConcept({
-            mapId: currentMapId,
-            label: 'New Concept',
-            position,
-            notes: '',
-            metadata: {},
-          })
-          
-          // Track the concept to start in edit mode
-          // Find the newly created concept by matching position and label
-          setTimeout(() => {
-            const allNodes = getNodes()
-            const newNode = allNodes.find((node) => 
-              node.type === 'concept' &&
-              node.data?.label === 'New Concept' &&
-              Math.abs(node.position.x - position.x) < 1 &&
-              Math.abs(node.position.y - position.y) < 1
-            )
-            if (newNode) {
-              const updatedNodes = allNodes.map((node) => {
-                if (node.id === newNode.id) {
-                  return {
-                    ...node,
-                    data: {
-                      ...node.data,
-                      shouldStartEditing: true,
-                    },
-                  }
-                }
-                return node
-              })
-              setNodes(updatedNodes)
-            }
-          }, 200)
-        } catch (error) {
-          console.error('Failed to create initial concept:', error)
-        }
-      }
-      
-      // Small delay to ensure React Flow is ready
-      setTimeout(createInitialConcept, 300)
-    } else {
-      // Map has concepts, mark as checked
-      markInitialConceptChecked(currentMapId)
-    }
-  }, [currentMapId, concepts.length, hasWriteAccess, getNodes, setNodes, hasCheckedInitialConceptForMap, markInitialConceptChecked, createConcept])
-  
-  // Layout handler function for buttons
-  const handleApplyLayout = useCallback(
-    async (layoutType: LayoutType, makeSticky: boolean = false, incremental: boolean = false) => {
-      if (!currentMapId) return
-      
-      // Use getNodes/getEdges to get the latest state (important for auto-apply)
-      const currentNodes = getNodes()
-      const currentEdges = getEdges()
-      
-      const conceptNodesArray = currentNodes.filter(n => n.type === 'concept')
-      if (conceptNodesArray.length === 0) return
-
-      // For incremental layout, identify new nodes
-      const newConceptIds = incremental 
-        ? new Set(conceptNodesArray.filter(n => !laidOutNodeIds.has(n.id)).map(n => n.id))
-        : undefined
-      const fixedNodeIds = incremental && laidOutNodeIds.size > 0
-        ? laidOutNodeIds
-        : undefined
-
-      let layoutNodes: Node[]
-      
-      if (layoutType === 'force-directed') {
-        layoutNodes = applyForceDirectedLayout(conceptNodesArray, currentEdges, {
-          width: 2000,
-          height: 2000,
-          fixedNodeIds,
-          newNodeIds: newConceptIds,
-        })
-      } else if (layoutType === 'hierarchical') {
-        layoutNodes = applyHierarchicalLayout(conceptNodesArray, currentEdges, {
-          direction: 'TB',
-          nodeWidth: 150,
-          nodeHeight: 100,
-        })
-      } else if (layoutType === 'circular') {
-        layoutNodes = applyCircularLayout(conceptNodesArray, currentEdges, {
-          width: 2000,
-          height: 2000,
-        })
-      } else if (layoutType === 'layered') {
-        layoutNodes = await applyLayeredLayout(conceptNodesArray, currentEdges, {
-          width: 2000,
-          height: 2000,
-          direction: 'DOWN',
-        })
-      } else if (layoutType === 'stress') {
-        layoutNodes = await applyStressLayout(conceptNodesArray, currentEdges, {
-          width: 2000,
-          height: 2000,
-          nodeSpacing: 600, // Very generous spacing for less dense layout
-          edgeNodeSpacing: 150,
-        })
-      } else {
-        // Manual layout - clear active layout
-        setActiveLayout(null)
-        return
-      }
-
-      // Update selected layout to show on button
-      setSelectedLayout(layoutType)
-      
-      // Set active layout for sticky behavior only if makeSticky is true
-      if (makeSticky) {
-        setActiveLayout(layoutType)
-      } else {
-        setActiveLayout(null)
-      }
-
-      // Batch update all concept positions in InstantDB
-      try {
-        // For incremental layout, only update new nodes
-        const nodesToUpdate = incremental && newConceptIds
-          ? layoutNodes.filter(n => newConceptIds.has(n.id))
-          : layoutNodes
-        
-        const updates = nodesToUpdate.map((node) =>
-          tx.concepts[node.id].update({
-            positionX: node.position.x,
-            positionY: node.position.y,
-            updatedAt: Date.now(),
-          })
-        )
-        await db.transact(updates)
-        
-        // Update laid-out nodes tracking
-        if (incremental && newConceptIds) {
-          newConceptIds.forEach(id => addLaidOutNodeId(id))
-        } else {
-          // Full layout - mark all nodes as laid out
-          conceptNodesArray.forEach((node) => {
-            addLaidOutNodeId(node.id)
-          })
-        }
-        
-        // Fit view to show all nodes after layout (only for full layouts)
-        if (!incremental) {
-          setTimeout(() => {
-            fitView({ padding: 0.1 })
-          }, 100)
-        }
-      } catch (error) {
-        console.error('Failed to apply layout:', error)
-        alert('Failed to apply layout. Please try again.')
-      }
-    },
-    [currentMapId, getNodes, getEdges, fitView, setSelectedLayout, laidOutNodeIds, addLaidOutNodeId]
-  )
-  
-  // Initialize prevConceptIds on first render
-  useEffect(() => {
-    if (prevConceptIds.size === 0) {
-      setPrevConceptIds(new Set(concepts.map(c => c.id)))
-    }
-  }, [])
-  
-  // Create a stable string representation of concept IDs for dependency tracking
-  const conceptIdsString = useMemo(
-    () => concepts.map(c => c.id).sort().join(','),
-    [concepts]
-  )
-  
-  // Auto-apply active layout when new nodes are added
-  useEffect(() => {
-    // Get current store state inside effect to avoid dependency issues
-    const currentPrevConceptIds = useCanvasStore.getState().prevConceptIds
-    const currentLaidOutNodeIds = useCanvasStore.getState().laidOutNodeIds
-    
-    if (!activeLayout) {
-      // Update store even if no active layout
-      setPrevConceptIds(new Set(concepts.map(c => c.id)))
-      return
-    }
-    
-    const currentConceptIds = new Set(concepts.map(c => c.id))
-    const previousConceptIds = currentPrevConceptIds
-    
-    // Check if any new concepts were added (not just count change)
-    const newConceptIds = Array.from(currentConceptIds).filter(id => !previousConceptIds.has(id))
-    
-    // If new nodes were added and we have an active layout, re-apply it
-    if (newConceptIds.length > 0 && concepts.length > 0) {
-      // Small delay to ensure the new node is fully created and edges are updated
-      const timeoutId = setTimeout(() => {
-        // Use incremental layout for force-directed, full layout for others
-        const useIncremental = activeLayout === 'force-directed' && currentLaidOutNodeIds.size > 0
-        handleApplyLayout(activeLayout, true, useIncremental).catch((error) => {
-          console.error('Failed to auto-apply layout:', error)
-        })
-      }, 300)
-      
-      // Update store for next comparison
-      setPrevConceptIds(currentConceptIds)
-      
-      return () => clearTimeout(timeoutId)
-    }
-    
-    // Update store even if no new nodes (in case nodes were deleted)
-    setPrevConceptIds(currentConceptIds)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conceptIdsString, activeLayout, handleApplyLayout]) // Only depend on actual triggers
+    applyLayout: applyLayoutSimple,
+  }), [applyLayoutSimple])
   
   // Memoize concept nodes to avoid recreating the filter on every render
   const conceptNodes = useMemo(() => nodes.filter(n => n.type === 'concept'), [nodes])
-
-  // Sync InstantDB data changes to React Flow only when data actually changes
-  useEffect(() => {
-    // Only update if concepts actually changed (by ID, position, label, notes, or metadata)
-    const conceptsChanged = 
-      concepts.length !== prevConceptsRef.current.length ||
-      concepts.some((c, i) => {
-        const prev = prevConceptsRef.current[i]
-        if (!prev) return true
-        if (c.id !== prev.id) return true
-        if (c.position.x !== prev.position.x) return true
-        if (c.position.y !== prev.position.y) return true
-        if (c.label !== prev.label) return true
-        // Check if notes changed
-        if ((c.notes || '') !== (prev.notes || '')) return true
-        // Check if metadata changed (compare JSON strings)
-        const metadataChanged = JSON.stringify(c.metadata || {}) !== JSON.stringify(prev.metadata || {})
-        return metadataChanged
-      })
-
-    // Check if comments changed
-    const commentsChanged = 
-      comments.length !== prevCommentsRef.current.length ||
-      comments.some((c, i) => {
-        const prev = prevCommentsRef.current[i]
-        if (!prev) return true
-        if (c.id !== prev.id) return true
-        if (c.position.x !== prev.position.x) return true
-        if (c.position.y !== prev.position.y) return true
-        if (c.text !== prev.text) return true
-        return false
-      })
-
-    // Check if perspective inclusion state changed
-    const currentPerspectiveKey = perspectiveConceptIds ? Array.from(perspectiveConceptIds).sort().join(',') : undefined
-    const perspectiveChanged = 
-      currentPerspectiveKey !== prevPerspectiveConceptIdsRef.current ||
-      isEditingPerspective !== prevIsEditingPerspectiveRef.current
-
-    if (conceptsChanged || commentsChanged || perspectiveChanged || textViewVisible !== prevTextViewVisibleRef.current) {
-      setNodes(allNodes)
-      prevConceptsRef.current = concepts
-      prevCommentsRef.current = comments
-      prevTextViewVisibleRef.current = textViewVisible
-      prevPerspectiveConceptIdsRef.current = currentPerspectiveKey
-      prevIsEditingPerspectiveRef.current = isEditingPerspective
-    }
-  }, [allNodes, concepts, comments, textViewVisible, perspectiveConceptIds, isEditingPerspective, setNodes])
-
-  useEffect(() => {
-    // Only update if relationships actually changed
-    const relationshipsChanged = 
-      relationships.length !== prevRelationshipsRef.current.length ||
-      relationships.some((r, i) => {
-        const prev = prevRelationshipsRef.current[i]
-        if (!prev) return true
-        if (r.id !== prev.id) return true
-        if (r.fromConceptId !== prev.fromConceptId) return true
-        if (r.toConceptId !== prev.toConceptId) return true
-        if (r.primaryLabel !== prev.primaryLabel) return true
-        if (r.reverseLabel !== prev.reverseLabel) return true
-        // Check if metadata changed (compare JSON strings)
-        const metadataChanged = JSON.stringify(r.metadata || {}) !== JSON.stringify(prev.metadata || {})
-        return metadataChanged
-      })
-
-    // Check if perspective inclusion state changed for relationships
-    const currentPerspectiveRelationshipKey = perspectiveRelationshipIds ? Array.from(perspectiveRelationshipIds).sort().join(',') : undefined
-    const perspectiveRelationshipChanged = 
-      currentPerspectiveRelationshipKey !== prevPerspectiveRelationshipIdsRef.current ||
-      isEditingPerspective !== prevIsEditingPerspectiveRef.current
-
-    // Check if comment edges changed
-    const commentEdgesChanged = 
-      commentEdges.length !== prevCommentEdgesRef.current.length ||
-      commentEdges.some((edge, i) => {
-        const prev = prevCommentEdgesRef.current[i]
-        if (!prev) return true
-        if (edge.id !== prev.id) return true
-        if (edge.source !== prev.source) return true
-        if (edge.target !== prev.target) return true
-        return false
-      })
-
-    if (relationshipsChanged || perspectiveRelationshipChanged || commentEdgesChanged) {
-      setEdges([...newEdges, ...commentEdges])
-      prevRelationshipsRef.current = relationships
-      prevCommentsRef.current = comments
-      prevCommentEdgesRef.current = commentEdges
-      prevPerspectiveRelationshipIdsRef.current = currentPerspectiveRelationshipKey
-      prevIsEditingPerspectiveRef.current = isEditingPerspective
-    }
-  }, [newEdges, commentEdges, relationships, comments, perspectiveRelationshipIds, isEditingPerspective, setEdges])
-
-  // When a new concept appears, check if we need to create a relationship
-  useEffect(() => {
-    if (!pendingConcept || !currentMapId) return
-
-    const { sourceId, position } = pendingConcept
-
-    // Find the concept we just created (by position)
-    const createdConcept = concepts.find(
-      (c) =>
-        Math.abs(c.position.x - position.x) < 50 &&
-        Math.abs(c.position.y - position.y) < 50 &&
-        c.label === 'New Concept'
-    )
-
-    if (createdConcept) {
-      // Create the relationship
-      createRelationship({
-        mapId: currentMapId,
-        fromConceptId: sourceId,
-        toConceptId: createdConcept.id,
-        primaryLabel: 'related to',
-        reverseLabel: 'related from',
-      }).catch((error) => {
-        console.error('Failed to create relationship:', error)
-      })
-
-      // Clear pending
-      setPendingConcept(null)
-    }
-  }, [concepts, currentMapId, createRelationship, pendingConcept, setPendingConcept])
-
-  // Handle connection start - track source node for drag-to-create
-  const onConnectStart = useCallback<OnConnectStart>(
-    (_event, params) => {
-      const nodeId = params.nodeId
-      if (!nodeId) {
-        return
-      }
-
-      const node = nodes.find((n) => n.id === nodeId)
-      if (node) {
-        setConnectionStart({
-          sourceId: nodeId,
-          position: node.position,
-        })
-      }
-    },
-    [nodes]
-  )
-
-  // Handle connection end - create concept if dropped on empty space
-  const onConnectEnd = useCallback(
-    async (event: MouseEvent | TouchEvent) => {
-      // Reset connection made flag for next connection
-      const wasConnectionMade = connectionMade
-      setConnectionMade(false)
-      
-      if (!currentMapId || !connectionStart) {
-        setConnectionStart(null)
-        return
-      }
-
-      // Check if source is a comment node - comments don't create new concepts
-      const sourceNode = nodes.find((n) => n.id === connectionStart.sourceId)
-      const isCommentSource = sourceNode?.type === 'comment'
-
-      // If a connection was made to an existing node, don't create a new node
-      if (wasConnectionMade) {
-        setConnectionStart(null)
-        return
-      }
-
-      // Check if connection ended on a node (anywhere on the node, not just the handle)
-      const target = event.target as HTMLElement
-      const targetNodeElement = target.closest('.react-flow__node')
-      
-      // If we hit a node, create relationship or link comment
-      if (targetNodeElement) {
-        // Get the node ID from the id attribute (React Flow format: react-flow__node-{nodeId})
-        let targetId: string | null = null
-        
-        // Try to extract from id attribute
-        const nodeIdAttr = targetNodeElement.id
-        if (nodeIdAttr && nodeIdAttr.startsWith('react-flow__node-')) {
-          targetId = nodeIdAttr.replace('react-flow__node-', '')
-        }
-        
-        // Fallback: try data-id attribute
-        if (!targetId) {
-          targetId = targetNodeElement.getAttribute('data-id')
-        }
-        
-        // Fallback: use getNodes() and find node at position
-        if (!targetId) {
-          const pointer = 'clientX' in event ? event : event.touches?.[0]
-          if (pointer) {
-            const mousePosition = screenToFlowPosition({
-              x: pointer.clientX,
-              y: pointer.clientY,
-            })
-            
-            // Find the node that contains this position
-            const nodeAtPosition = nodes.find((node) => {
-              // Rough check: see if mouse is within node bounds
-              const nodeWidth = 130
-              const nodeHeight = 50
-              return (
-                mousePosition.x >= node.position.x &&
-                mousePosition.x <= node.position.x + nodeWidth &&
-                mousePosition.y >= node.position.y &&
-                mousePosition.y <= node.position.y + nodeHeight
-              )
-            })
-            
-            if (nodeAtPosition) {
-              targetId = nodeAtPosition.id
-            }
-          }
-        }
-        
-        if (targetId && targetId !== connectionStart.sourceId && targetId !== 'text-view-node') {
-          try {
-            if (isCommentSource) {
-              // Link comment to concept
-              await linkCommentToConcept(connectionStart.sourceId, targetId)
-            } else {
-              // Create relationship between concepts
-              await createRelationship({
-                mapId: currentMapId,
-                fromConceptId: connectionStart.sourceId,
-                toConceptId: targetId,
-                primaryLabel: 'related to',
-                reverseLabel: 'related from',
-              })
-            }
-          } catch (error) {
-            console.error('Failed to create connection from drag:', error)
-          }
-        }
-        
-        setConnectionStart(null)
-        return
-      }
-      
-      // Check if we hit a handle (this should have been handled by onConnect, but just in case)
-      const targetHandle = target.closest('.react-flow__handle')
-      if (targetHandle) {
-        setConnectionStart(null)
-        return
-      }
-
-      // Connection ended on empty space - only create new concept if source is a concept node
-      if (isCommentSource) {
-        // Comments don't create new concepts when dragged to empty space
-        setConnectionStart(null)
-        return
-      }
-
-      // Connection ended on empty space - create new concept and relationship
-      const pointer = 'clientX' in event ? event : event.touches?.[0]
-      if (!pointer) {
-        setConnectionStart(null)
-        return
-      }
-
-      const mousePosition = screenToFlowPosition({
-        x: pointer.clientX,
-        y: pointer.clientY,
-      })
-
-      // Estimate node dimensions to center it on the mouse position
-      // Node has min-w-[120px], px-4 (16px padding), py-3 (12px padding)
-      // For "New Concept" text, estimate ~130px width and ~50px height
-      const estimatedNodeWidth = 130
-      const estimatedNodeHeight = 50
-      
-      // Adjust position so node center is at mouse position
-      const position = {
-        x: mousePosition.x - estimatedNodeWidth / 2,
-        y: mousePosition.y - estimatedNodeHeight / 2,
-      }
-
-      try {
-        // Create concept and relationship using mutation hooks (handles undo tracking)
-        // Start operation to group these mutations together
-        startOperation()
-        
-        // Create the new concept
-        await createConcept({
-          mapId: currentMapId,
-          label: 'New Concept',
-          position,
-          notes: '',
-          metadata: {},
-        })
-        
-        // Find the newly created concept to get its ID for the relationship
-        // We'll need to wait a bit for the concept to appear in the data
-        await new Promise(resolve => setTimeout(resolve, 100))
-        const newConcept = concepts.find((c) => 
-          c.label === 'New Concept' &&
-          Math.abs(c.position.x - position.x) < 1 &&
-          Math.abs(c.position.y - position.y) < 1
-        )
-        
-        if (newConcept) {
-          // Create the relationship linking source to new concept
-          await createRelationship({
-            mapId: currentMapId,
-            fromConceptId: connectionStart.sourceId,
-            toConceptId: newConcept.id,
-            primaryLabel: 'related to',
-            reverseLabel: 'related from',
-          })
-          
-          // Track the relationship to start in edit mode (not the node)
-          // The relationship will be edited first, then Tab/Enter will move to the node
-          // Note: We track by concept ID since we don't have relationshipId immediately
-          addNewlyCreatedRelationship(newConcept.id, newConcept.id)
-        }
-        
-        endOperation()
-      } catch (error) {
-        console.error('Failed to create concept and relationship from connection:', error)
-        endOperation()
-      }
-
-      setConnectionStart(null)
-    },
-    [
-      currentMapId,
-      connectionStart,
-      screenToFlowPosition,
-      createConcept,
-      createRelationship,
-      addNewlyCreatedRelationship,
-      concepts,
-      startOperation,
-      endOperation,
-    ]
-  )
-
-  const THROTTLE_MS = 100 // Update every 100ms maximum
-
-  // Handle node drag - update position in database with throttling
-  const onNodeDrag = useCallback(
-    async (_event: React.MouseEvent, node: Node) => {
-      if (!currentMapId || !hasWriteAccess) return
-
-      // Handle text view node position update (no throttling needed for UI state)
-      if (node.id === 'text-view-node') {
-        setTextViewPosition(node.position)
-        return
-      }
-
-      const concept = concepts.find((c) => c.id === node.id)
-      const comment = comments.find((c) => c.id === node.id)
-      
-      if (!concept && !comment) return
-
-      // Update cursor position during drag to keep remote viewers' cursors in sync
-      const flowPosition = screenToFlowPosition({
-        x: _event.clientX,
-        y: _event.clientY,
-      })
-      setCursor(flowPosition)
-
-      // Check if enough time has passed since last update
-      const now = Date.now()
-      const lastUpdate = getLastUpdateTime(node.id) || 0
-      const timeSinceLastUpdate = now - lastUpdate
-
-      // Only update if throttle interval has passed
-      if (timeSinceLastUpdate >= THROTTLE_MS) {
-        setLastUpdateTime(node.id, now)
-        
-        try {
-          if (concept) {
-            await updateConcept(node.id, {
-              position: { x: node.position.x, y: node.position.y },
-            })
-          } else if (comment) {
-            await updateComment(node.id, {
-              position: { x: node.position.x, y: node.position.y },
-            })
-          }
-        } catch (error) {
-          console.error(`Failed to update node ${node.id} position:`, error)
-        }
-      }
-    },
-    [currentMapId, concepts, comments, updateConcept, updateComment, setTextViewPosition, screenToFlowPosition, setCursor, hasWriteAccess, getLastUpdateTime, setLastUpdateTime]
-  )
-
-  // Handle node drag end - ensure final position is saved
-  const onNodeDragStop = useCallback(
-    async (_event: React.MouseEvent, node: Node) => {
-      if (!currentMapId || !hasWriteAccess) return
-      
-      // Handle text view node position update
-      if (node.id === 'text-view-node') {
-        setTextViewPosition(node.position)
-        return
-      }
-
-      const concept = concepts.find((c) => c.id === node.id)
-      const comment = comments.find((c) => c.id === node.id)
-      
-      if (!concept && !comment) return
-
-      // Update cursor position to final position
-      const flowPosition = screenToFlowPosition({
-        x: _event.clientX,
-        y: _event.clientY,
-      })
-      setCursor(flowPosition)
-
-      // Always save final position immediately on drag stop
-      if (concept) {
-        if (
-          concept.position.x !== node.position.x ||
-          concept.position.y !== node.position.y
-        ) {
-          try {
-            await updateConcept(node.id, {
-              position: { x: node.position.x, y: node.position.y },
-            })
-            // Update last update time so we don't trigger another update unnecessarily
-            setLastUpdateTime(node.id, Date.now())
-          } catch (error) {
-            console.error('Failed to update concept position:', error)
-          }
-        }
-      } else if (comment) {
-        if (
-          comment.position.x !== node.position.x ||
-          comment.position.y !== node.position.y
-        ) {
-          try {
-            await updateComment(node.id, {
-              position: { x: node.position.x, y: node.position.y },
-            })
-            // Update last update time so we don't trigger another update unnecessarily
-            setLastUpdateTime(node.id, Date.now())
-          } catch (error) {
-            console.error('Failed to update comment position:', error)
-          }
-        }
-      }
-    },
-    [concepts, comments, currentMapId, updateConcept, updateComment, setTextViewPosition, screenToFlowPosition, setCursor, hasWriteAccess]
-  )
-
-  // Handle node click - let ConceptNode handle clicks (to distinguish single vs double-click)
-  const onNodeClick = useCallback(
-    (_event: React.MouseEvent, _node: Node) => {
-      // ConceptNode handles its own clicks to distinguish single vs double-click
-      // This handler is kept for selection tracking but ConceptNode opens editor
-    },
-    []
-  )
-
-  // Handle edge click - select relationship and show toolbar (not comment edges)
-  // Note: Double-click is handled by RelationshipEdge for inline editing
-  const onEdgeClick = useCallback(
-    (_event: React.MouseEvent, edge: Edge) => {
-      // Only show toolbar for relationship edges, not comment edges
-      if (edge.type === 'comment-edge') {
-        return
-      }
-      
-      // Clear other selections
-      setSelectedConceptId(null)
-      setSelectedCommentId(null)
-      setConceptEditorOpen(false)
-      // Set relationship selection (toolbar will appear)
-      setSelectedRelationshipId(edge.id)
-    },
-    [setSelectedConceptId, setSelectedCommentId, setConceptEditorOpen, setSelectedRelationshipId]
-  )
-
-  // Handle connection creation - create new relationship between existing nodes
-  const onConnectHandler = useCallback(
-    (connection: Connection) => {
-      if (!currentMapId || !hasWriteAccess || !connection.source || !connection.target) {
-        return
-      }
-
-      // Mark that a connection was made to an existing node
-      setConnectionMade(true)
-      setConnectionStart(null)
-
-      void (async () => {
-        try {
-          // Check if source is a comment node
-          const sourceNode = nodes.find((n) => n.id === connection.source)
-          const isCommentSource = sourceNode?.type === 'comment'
-
-          if (isCommentSource) {
-            // Link comment to concept
-            await linkCommentToConcept(connection.source!, connection.target!)
-          } else {
-            // Create relationship between concepts
-            await createRelationship({
-              mapId: currentMapId,
-              fromConceptId: connection.source!,
-              toConceptId: connection.target!,
-              primaryLabel: 'related to',
-              reverseLabel: 'related from',
-            })
-          }
-        } catch (error) {
-          console.error('Failed to create connection:', error)
-        }
-      })()
-    },
-    [currentMapId, hasWriteAccess, createRelationship, linkCommentToConcept, nodes, setConnectionMade]
-  )
-
-  // Handle pane click - deselect and close context menu and toolbar
-  const onPaneClick = useCallback(() => {
-    setSelectedConceptId(null)
-    setSelectedRelationshipId(null)
-    setSelectedCommentId(null)
-    setConceptEditorOpen(false)
-    setRelationshipEditorOpen(false)
-    setContextMenuVisible(false)
-    setContextMenuPosition(null)
-    contextMenuPositionRef.current = null
-  }, [
-    setSelectedConceptId,
-    setSelectedRelationshipId,
-    setSelectedCommentId,
-    setConceptEditorOpen,
-    setRelationshipEditorOpen,
-  ])
-
-  // Helper function to create a concept at a position
-  const handleCreateConceptAtPosition = useCallback(
-    async (flowPosition: { x: number; y: number }) => {
-      if (!currentMapId || !hasWriteAccess) return
-
-      // Estimate node dimensions to center it on the mouse position
-      const estimatedNodeWidth = 130
-      const estimatedNodeHeight = 50
-      
-      // Adjust position so node center is at mouse position
-      const position = {
-        x: flowPosition.x - estimatedNodeWidth / 2,
-        y: flowPosition.y - estimatedNodeHeight / 2,
-      }
-
-      try {
-        // Create the new concept using mutation hook (handles undo tracking)
-        await createConcept({
-          mapId: currentMapId,
-          label: 'New Concept',
-          position,
-          notes: '',
-          metadata: {},
-        })
-        
-        // Track the concept to start in edit mode
-        // Find the newly created concept by matching position and label
-        setTimeout(() => {
-          const allNodes = getNodes()
-          const newNode = allNodes.find((node) => 
-            node.type === 'concept' &&
-            node.data?.label === 'New Concept' &&
-            Math.abs(node.position.x - position.x) < 1 &&
-            Math.abs(node.position.y - position.y) < 1
-          )
-          if (newNode) {
-            const updatedNodes = allNodes.map((node) => {
-              if (node.id === newNode.id) {
-                return {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    shouldStartEditing: true,
-                  },
-                }
-              }
-              return node
-            })
-            setNodes(updatedNodes)
-          }
-        }, 100)
-      } catch (error) {
-        console.error('Failed to create concept:', error)
-      }
-    },
-    [currentMapId, hasWriteAccess, getNodes, setNodes, createConcept]
-  )
-
-  // Helper function to create a comment at a position
-  const handleCreateCommentAtPosition = useCallback(
-    async (flowPosition: { x: number; y: number }) => {
-      if (!currentMapId || !hasWriteAccess) return
-
-      // Estimate comment dimensions to center it on the mouse position
-      const estimatedCommentWidth = 150
-      const estimatedCommentHeight = 60
-      
-      // Adjust position so comment center is at mouse position
-      const position = {
-        x: flowPosition.x - estimatedCommentWidth / 2,
-        y: flowPosition.y - estimatedCommentHeight / 2,
-      }
-
-      try {
-        await createComment({
-          mapId: currentMapId,
-          text: 'New Comment',
-          position,
-        })
-        
-        // Track the comment to start in edit mode
-        setTimeout(() => {
-          const allNodes = getNodes()
-          // Find the most recently created comment (by checking if it has "New Comment" text)
-          const commentNodes = allNodes.filter((node) => node.type === 'comment')
-          const newCommentNode = commentNodes.find((node) => {
-            const commentData = node.data as any
-            return commentData?.comment?.text === 'New Comment'
-          })
-          
-          if (newCommentNode) {
-            const updatedNodes = allNodes.map((node) => {
-              if (node.id === newCommentNode.id) {
-                return {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    shouldStartEditing: true,
-                  },
-                }
-              }
-              return node
-            })
-            setNodes(updatedNodes)
-          }
-        }, 100)
-      } catch (error) {
-        console.error('Failed to create comment:', error)
-      }
-    },
-    [currentMapId, hasWriteAccess, createComment, getNodes, setNodes]
-  )
-
-  // Use a ref to attach double-click handler to the React Flow pane
-  const handlerRef = useRef<((event: Event) => Promise<void>) | null>(null)
-  
-  useEffect(() => {
-    // Wait a bit for React Flow to render the pane
-    const timeoutId = setTimeout(() => {
-      const reactFlowPane = reactFlowWrapperRef.current?.querySelector('.react-flow__pane')
-      if (!reactFlowPane) {
-        console.warn('React Flow pane not found for double-click handler')
-        return
-      }
-    
-      const handlePaneDoubleClick = async (event: Event) => {
-        const mouseEvent = event as MouseEvent
-        if (!currentMapId || !hasWriteAccess) return
-
-        // Check if clicking on the background (not on a node or edge)
-        const target = mouseEvent.target as HTMLElement
-        if (
-          target.closest('.react-flow__node') ||
-          target.closest('.react-flow__edge') ||
-          target.closest('.react-flow__controls') ||
-          target.closest('.react-flow__minimap')
-        ) {
-          return
-        }
-
-        // Get the position in flow coordinates
-        const mousePosition = screenToFlowPosition({
-          x: mouseEvent.clientX,
-          y: mouseEvent.clientY,
-        })
-
-        // Use helper function to create concept
-        await handleCreateConceptAtPosition(mousePosition)
-      }
-      
-      handlerRef.current = handlePaneDoubleClick
-      reactFlowPane.addEventListener('dblclick', handlePaneDoubleClick)
-    }, 100)
-    
-    return () => {
-      clearTimeout(timeoutId)
-      const reactFlowPane = reactFlowWrapperRef.current?.querySelector('.react-flow__pane')
-      if (reactFlowPane && handlerRef.current) {
-        reactFlowPane.removeEventListener('dblclick', handlerRef.current)
-        handlerRef.current = null
-      }
-    }
-  }, [currentMapId, screenToFlowPosition, hasWriteAccess, handleCreateConceptAtPosition])
-
-  // Use a ref to attach right-click handler to the React Flow pane
-  const rightClickHandlerRef = useRef<((event: Event) => void) | null>(null)
-  
-  useEffect(() => {
-    // Wait a bit for React Flow to render the pane
-    const timeoutId = setTimeout(() => {
-      const reactFlowPane = reactFlowWrapperRef.current?.querySelector('.react-flow__pane')
-      if (!reactFlowPane) {
-        console.warn('React Flow pane not found for right-click handler')
-        return
-      }
-    
-      const handlePaneRightClick = (event: Event) => {
-        const mouseEvent = event as MouseEvent
-        if (!currentMapId || !hasWriteAccess) return
-
-        // Prevent default browser context menu
-        mouseEvent.preventDefault()
-        mouseEvent.stopPropagation()
-
-        // Check if clicking on the background (not on a node or edge)
-        const target = mouseEvent.target as HTMLElement
-        if (
-          target.closest('.react-flow__node') ||
-          target.closest('.react-flow__edge') ||
-          target.closest('.react-flow__controls') ||
-          target.closest('.react-flow__minimap')
-        ) {
-          setContextMenuVisible(false)
-          return
-        }
-
-        // Store position for context menu
-        const screenPosition = {
-          x: mouseEvent.clientX,
-          y: mouseEvent.clientY,
-        }
-        setContextMenuPosition(screenPosition)
-        contextMenuPositionRef.current = screenPosition
-        setContextMenuVisible(true)
-      }
-      
-      rightClickHandlerRef.current = handlePaneRightClick
-      reactFlowPane.addEventListener('contextmenu', handlePaneRightClick)
-    }, 100)
-    
-    return () => {
-      clearTimeout(timeoutId)
-      const reactFlowPane = reactFlowWrapperRef.current?.querySelector('.react-flow__pane')
-      if (reactFlowPane && rightClickHandlerRef.current) {
-        reactFlowPane.removeEventListener('contextmenu', rightClickHandlerRef.current)
-        rightClickHandlerRef.current = null
-      }
-    }
-  }, [currentMapId, hasWriteAccess])
-
-  // Handle context menu item clicks
-  const handleContextMenuAddConcept = useCallback(() => {
-    if (!contextMenuPosition) return
-    
-    // Convert screen position to flow position
-    const flowPosition = screenToFlowPosition({
-      x: contextMenuPosition.x,
-      y: contextMenuPosition.y,
-    })
-    
-    handleCreateConceptAtPosition(flowPosition)
-  }, [screenToFlowPosition, handleCreateConceptAtPosition, contextMenuPosition])
-
-  const handleContextMenuAddComment = useCallback(() => {
-    if (!contextMenuPosition) return
-    
-    // Convert screen position to flow position
-    const flowPosition = screenToFlowPosition({
-      x: contextMenuPosition.x,
-      y: contextMenuPosition.y,
-    })
-    
-    handleCreateCommentAtPosition(flowPosition)
-  }, [screenToFlowPosition, handleCreateCommentAtPosition, contextMenuPosition])
 
   return (
     <div className="w-full h-full relative" ref={reactFlowWrapperRef}>
@@ -1816,7 +436,6 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         onClose={() => {
           setContextMenuVisible(false)
           setContextMenuPosition(null)
-          contextMenuPositionRef.current = null
         }}
         onAddConcept={handleContextMenuAddConcept}
         onAddComment={handleContextMenuAddComment}
@@ -1831,7 +450,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         edgeTypes={edgeTypesRef.current}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onConnect={hasWriteAccess ? onConnectHandler : undefined}
+        onConnect={hasWriteAccess ? onConnect : undefined}
         onConnectStart={hasWriteAccess ? onConnectStart : undefined}
         onConnectEnd={hasWriteAccess ? onConnectEnd : undefined}
         onNodeDrag={onNodeDrag}

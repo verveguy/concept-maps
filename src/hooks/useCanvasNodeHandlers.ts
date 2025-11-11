@@ -17,7 +17,7 @@ import { useCanvasStore } from '@/stores/canvasStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useMapStore } from '@/stores/mapStore'
 import { useMapPermissions } from './useMapPermissions'
-import { usePresenceCursorSetter } from './usePresenceEditing'
+import { usePresenceCursorSetter } from './usePresenceCursorSetter'
 import type { Concept, Comment, Relationship } from '@/lib/schema'
 
 const THROTTLE_MS = 100 // Update every 100ms maximum
