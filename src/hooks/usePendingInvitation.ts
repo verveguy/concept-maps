@@ -14,18 +14,21 @@ import type { ShareInvitation } from '@/lib/schema'
  * Queries shareInvitations filtered by:
  * - mapId matches the provided mapId
  * - invitedEmail matches the current user's email (case-insensitive)
- * - status is 'pending'
+ * 
+ * Returns pending invitations if available, otherwise returns accepted invitations
+ * (to handle the case where invitation was just accepted but permissions haven't propagated yet).
  * 
  * **Use Case:**
  * When a user views a map they don't have permissions for yet, this hook
- * checks if there's a pending invitation they can accept.
+ * checks if there's a pending invitation they can accept, or a recently accepted
+ * invitation while permissions are being set up.
  * 
  * **Real-time Updates:**
  * Uses InstantDB `useQuery()` for real-time updates. The returned invitation
  * will automatically update when the invitation status changes.
  * 
  * @param mapId - ID of the map to check for pending invitations, or null
- * @returns The pending invitation object, or null if none exists
+ * @returns The pending invitation object (or accepted if no pending exists), or null if none exists
  * 
  * @example
  * ```tsx
@@ -84,8 +87,25 @@ export function usePendingInvitation(mapId: string | null) {
 
     const rawInvitations = invitationsData.maps[0].shareInvitations
     
+    // Type for raw invitation data from InstantDB query
+    // Note: InstantDB returns optional fields as `| undefined`, not `| null`
+    type RawInvitation = {
+      id: string
+      invitedEmail: string
+      invitedUserId?: string | undefined
+      permission: string
+      token: string
+      status: string
+      createdAt: number
+      expiresAt?: number | undefined
+      respondedAt?: number | undefined
+      revokedAt?: number | undefined
+      creator?: { id: string } | undefined
+      map?: { id: string; name: string; creator?: { id: string } | undefined } | undefined
+    }
+    
     // Find all invitations where invitedEmail matches current user's email (case-insensitive)
-    const matchingInvitations = rawInvitations.filter((inv: any) => {
+    const matchingInvitations = rawInvitations.filter((inv: RawInvitation) => {
       const invitedEmailLower = inv.invitedEmail?.toLowerCase() || ''
       const currentEmailLower = currentUserEmail.toLowerCase()
       return invitedEmailLower === currentEmailLower
@@ -95,8 +115,8 @@ export function usePendingInvitation(mapId: string | null) {
 
     // Prefer pending invitation, but also return accepted invitation if no pending one exists
     // This helps handle the case where invitation was just accepted but permissions haven't propagated yet
-    const pendingInv = matchingInvitations.find((inv: any) => inv.status === 'pending')
-    const acceptedInv = matchingInvitations.find((inv: any) => inv.status === 'accepted')
+    const pendingInv = matchingInvitations.find((inv: RawInvitation) => inv.status === 'pending')
+    const acceptedInv = matchingInvitations.find((inv: RawInvitation) => inv.status === 'accepted')
     const matchingInvitation = pendingInv || acceptedInv
 
     if (!matchingInvitation) return null

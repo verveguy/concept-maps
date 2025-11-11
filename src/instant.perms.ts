@@ -48,7 +48,7 @@ const rules = {
       'data.status == "active"',
       'isEditShare',
       'data.permission == "edit"',
-      'mapOwnerOrShareRecipient',
+      'canViewShares',
       'isOwnerOrManager || (shareRecipient && isActiveShare)',
       'shareRecipientWithEdit',
       'shareRecipient && isActiveShare && isEditShare',
@@ -64,7 +64,7 @@ const rules = {
       'isOwnerOrManager || hasInvitationForMap || canUpdateLinkedInvitation',
     ],
     allow: {
-      view: 'mapOwnerOrShareRecipient',
+      view: 'canViewShares',
       create: 'ownerOrInvitee',
       delete: 'isOwnerOrManager',
       update: 'isOwnerOrManager',
