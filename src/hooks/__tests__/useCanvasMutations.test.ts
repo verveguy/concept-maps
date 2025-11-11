@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { renderHook } from '@testing-library/react'
+import { renderHook, act } from '@testing-library/react'
 import { useCanvasMutations } from '../useCanvasMutations'
 import { useUndoStore } from '../../stores/undoStore'
 
@@ -71,7 +71,9 @@ describe('useCanvasMutations', () => {
         metadata: { category: 'test' },
       }
 
-      await result.current.createConcept(conceptData)
+      await act(async () => {
+        await result.current.createConcept(conceptData)
+      })
 
       // Verify action was called
       expect(mockCreateConcept).toHaveBeenCalledWith(conceptData)
@@ -91,7 +93,9 @@ describe('useCanvasMutations', () => {
         position: { x: 150, y: 250 },
       }
 
-      await result.current.updateConcept('concept-1', updates)
+      await act(async () => {
+        await result.current.updateConcept('concept-1', updates)
+      })
 
       // Verify action was called
       expect(mockUpdateConcept).toHaveBeenCalledWith('concept-1', updates)
@@ -107,7 +111,9 @@ describe('useCanvasMutations', () => {
     it('should delete a concept and record mutation', async () => {
       const { result } = renderHook(() => useCanvasMutations())
 
-      await result.current.deleteConcept('concept-1')
+      await act(async () => {
+        await result.current.deleteConcept('concept-1')
+      })
 
       // Verify action was called
       expect(mockDeleteConcept).toHaveBeenCalledWith('concept-1')
@@ -130,17 +136,25 @@ describe('useCanvasMutations', () => {
       const error = new Error('Failed to create concept')
       mockCreateConcept.mockRejectedValueOnce(error)
 
+      // Suppress console.error for this test
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
       const conceptData = {
         mapId: 'map-1',
         label: 'Test Concept',
         position: { x: 100, y: 200 },
       }
 
-      await expect(result.current.createConcept(conceptData)).rejects.toThrow('Failed to create concept')
+      await act(async () => {
+        await expect(result.current.createConcept(conceptData)).rejects.toThrow('Failed to create concept')
+      })
 
       // Verify mutation was NOT recorded on error
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(0)
+
+      // Restore console.error
+      consoleSpy.mockRestore()
     })
   })
 
@@ -156,7 +170,9 @@ describe('useCanvasMutations', () => {
         reverseLabel: 'explained by',
       }
 
-      await result.current.createRelationship(relationshipData)
+      await act(async () => {
+        await result.current.createRelationship(relationshipData)
+      })
 
       // Verify action was called
       expect(mockCreateRelationship).toHaveBeenCalledWith(relationshipData)
@@ -176,7 +192,9 @@ describe('useCanvasMutations', () => {
         reverseLabel: 'updated reverse',
       }
 
-      await result.current.updateRelationship('rel-1', updates)
+      await act(async () => {
+        await result.current.updateRelationship('rel-1', updates)
+      })
 
       // Verify action was called
       expect(mockUpdateRelationship).toHaveBeenCalledWith('rel-1', updates)
@@ -192,7 +210,9 @@ describe('useCanvasMutations', () => {
     it('should delete a relationship and record mutation', async () => {
       const { result } = renderHook(() => useCanvasMutations())
 
-      await result.current.deleteRelationship('rel-1')
+      await act(async () => {
+        await result.current.deleteRelationship('rel-1')
+      })
 
       // Verify action was called
       expect(mockDeleteRelationship).toHaveBeenCalledWith('rel-1')
@@ -222,7 +242,9 @@ describe('useCanvasMutations', () => {
         conceptIds: ['concept-1'],
       }
 
-      await result.current.createComment(commentData)
+      await act(async () => {
+        await result.current.createComment(commentData)
+      })
 
       // Verify action was called
       expect(mockCreateComment).toHaveBeenCalledWith(commentData)
@@ -242,7 +264,9 @@ describe('useCanvasMutations', () => {
         position: { x: 150, y: 250 },
       }
 
-      await result.current.updateComment('comment-1', updates)
+      await act(async () => {
+        await result.current.updateComment('comment-1', updates)
+      })
 
       // Verify action was called
       expect(mockUpdateComment).toHaveBeenCalledWith('comment-1', updates)
@@ -258,7 +282,9 @@ describe('useCanvasMutations', () => {
     it('should delete a comment and record mutation', async () => {
       const { result } = renderHook(() => useCanvasMutations())
 
-      await result.current.deleteComment('comment-1')
+      await act(async () => {
+        await result.current.deleteComment('comment-1')
+      })
 
       // Verify action was called
       expect(mockDeleteComment).toHaveBeenCalledWith('comment-1')
@@ -279,7 +305,9 @@ describe('useCanvasMutations', () => {
     it('should link comment to concept and record mutation', async () => {
       const { result } = renderHook(() => useCanvasMutations())
 
-      await result.current.linkCommentToConcept('comment-1', 'concept-1')
+      await act(async () => {
+        await result.current.linkCommentToConcept('comment-1', 'concept-1')
+      })
 
       // Verify action was called
       expect(mockLinkCommentToConcept).toHaveBeenCalledWith('comment-1', 'concept-1')
@@ -295,7 +323,9 @@ describe('useCanvasMutations', () => {
     it('should unlink comment from concept and record mutation', async () => {
       const { result } = renderHook(() => useCanvasMutations())
 
-      await result.current.unlinkCommentFromConcept('comment-1', 'concept-1')
+      await act(async () => {
+        await result.current.unlinkCommentFromConcept('comment-1', 'concept-1')
+      })
 
       // Verify action was called
       expect(mockUnlinkCommentFromConcept).toHaveBeenCalledWith('comment-1', 'concept-1')
@@ -321,15 +351,19 @@ describe('useCanvasMutations', () => {
       const { result } = renderHook(() => useCanvasMutations())
 
       // Start an operation
-      result.current.startOperation()
+      await act(async () => {
+        result.current.startOperation()
+      })
       const operationId = useUndoStore.getState().currentOperationId
       expect(operationId).toBeTruthy()
 
       // Create a concept
-      await result.current.createConcept({
-        mapId: 'map-1',
-        label: 'Test Concept',
-        position: { x: 100, y: 200 },
+      await act(async () => {
+        await result.current.createConcept({
+          mapId: 'map-1',
+          label: 'Test Concept',
+          position: { x: 100, y: 200 },
+        })
       })
 
       // Verify mutation uses the operation ID
