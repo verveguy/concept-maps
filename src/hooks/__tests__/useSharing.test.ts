@@ -16,7 +16,7 @@ const mockUseAuth = vi.mocked(db.useAuth)
 const mockId = vi.mocked(id)
 
 // Helper to create mock transaction objects
-const createMockTxObject = (entity: string, id: string) => ({
+const createMockTxObject = (_entity: string, _id: string) => ({
   update: vi.fn().mockReturnValue({
     link: vi.fn().mockReturnValue({}),
   }),
@@ -36,7 +36,7 @@ describe('useSharing - Manager Permissions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockId.mockReturnValue('mock-id-123')
-    mockTransact.mockResolvedValue(undefined)
+    mockTransact.mockResolvedValue({} as any)
     
     // Setup default tx mocks
     ;(tx.shareInvitations as any)['mock-id-123'] = createMockTxObject('shareInvitations', 'mock-id-123')
@@ -182,7 +182,9 @@ describe('useSharing - Manager Permissions', () => {
       const transaction = mockTransact.mock.calls[0][0]
       expect(Array.isArray(transaction)).toBe(true)
       // Should have invitation update + share create + permission links
-      expect(transaction.length).toBeGreaterThanOrEqual(3)
+      if (Array.isArray(transaction)) {
+        expect(transaction.length).toBeGreaterThanOrEqual(3)
+      }
     })
   })
 
@@ -351,7 +353,9 @@ describe('useSharing - Manager Permissions', () => {
       const transaction = mockTransact.mock.calls[0][0]
       expect(Array.isArray(transaction)).toBe(true)
       // Should have: share update + unlink writePermissions + unlink managePermissions
-      expect(transaction.length).toBeGreaterThan(1)
+      if (Array.isArray(transaction)) {
+        expect(transaction.length).toBeGreaterThan(1)
+      }
     })
   })
 })
