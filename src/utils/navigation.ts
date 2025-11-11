@@ -38,15 +38,25 @@ export function navigateToConcept(mapId: string, conceptId: string): void {
  * Works with GitHub Pages SPA routing.
  * 
  * @param mapId - The ID of the map to navigate to
+ * @param clearQueryParams - If true, removes all query parameters from the URL (default: false)
  */
-export function navigateToMap(mapId: string): void {
+export function navigateToMap(mapId: string, clearQueryParams = false): void {
   if (typeof window === 'undefined') return
 
   const basePath = import.meta.env.BASE_URL.replace(/\/$/, '')
   const newPath = `${basePath}/map/${mapId}`
   
   // Update URL without reloading (works with GitHub Pages 404.html redirect mechanism)
-  window.history.pushState({}, '', newPath)
+  // Use replaceState if clearing query params to avoid adding invitation URL to history
+  if (clearQueryParams) {
+    window.history.replaceState({}, '', newPath)
+    // Dispatch custom event so App.tsx can react to URL changes (since replaceState doesn't trigger popstate)
+    window.dispatchEvent(new Event('navigation'))
+  } else {
+    window.history.pushState({}, '', newPath)
+    // Dispatch custom event so App.tsx can react to URL changes
+    window.dispatchEvent(new Event('navigation'))
+  }
   
   // Update the store directly (App.tsx will sync URL->store on popstate, but we're using pushState)
   const { setCurrentMapId, setCurrentConceptId } = useMapStore.getState()

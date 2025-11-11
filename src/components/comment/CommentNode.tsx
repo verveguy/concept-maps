@@ -366,8 +366,6 @@ export const CommentNode = memo(({ data, selected }: NodeProps<CommentNodeData>)
   const tapeTop = baseTop + offsetY
   const tapeLeft = baseLeft + offsetX
   
-  // Debug: log the angle, length, and position for each comment
-  console.log(`Comment ID: ${data.comment.id.substring(0, 8)}..., Angle: ${tapeRotation.toFixed(2)}°, Length: ${tapeLength.toFixed(1)}px, Position offset: ${tapePositionOffset.toFixed(2)}px`)
 
   return (
     <>

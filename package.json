@@ -11,6 +11,9 @@
     "build:all": "pnpm build && pnpm build:docs",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
     "docs:dev": "cd docs && pnpm start",
     "docs:build": "cd docs && pnpm build",
     "docs:serve": "cd docs && pnpm serve",
@@ -45,6 +48,9 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.17",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/d3-force": "^3.0.10",
     "@types/dagre": "^0.7.53",
     "@types/react": "^19.2.2",
@@ -52,12 +58,14 @@
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
     "@vitejs/plugin-react": "^5.1.0",
+    "@vitest/ui": "^4.0.8",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "glob": "^11.0.3",
     "instant-cli": "^0.22.49",
+    "jsdom": "^27.1.0",
     "postcss": "^8.5.6",
     "prettier": "^3.6.2",
     "react-scan": "^0.4.3",
@@ -67,7 +75,8 @@
     "typedoc": "^0.28.14",
     "typedoc-plugin-markdown": "^4.9.0",
     "typescript": "^5.9.3",
-    "vite": "^7.2.2"
+    "vite": "^7.2.2",
+    "vitest": "^4.0.8"
   },
   "packageManager": "pnpm@10.20.0+sha512.cf9998222162dd85864d0a8102e7892e7ba4ceadebbf5a31f9c2fce48dfce317a9c53b9f6464d1ef9042cba2e02ae02a9f7c143a2b438cd93c91840f0192b9dd"
 }
