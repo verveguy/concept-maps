@@ -3,9 +3,10 @@
  * Handles authentication routing and renders the appropriate view based on auth state.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { db } from '@/lib/instant'
 import { LoginForm } from '@/components/auth/LoginForm'
+import { LoadingScreen } from '@/components/auth/LoadingScreen'
 import { MapPage } from '@/pages/MapPage'
 import { InvitationPage } from '@/pages/InvitationPage'
 import { useMapStore } from '@/stores/mapStore'
@@ -23,12 +24,22 @@ function App() {
   const setCurrentConceptId = useMapStore((state) => state.setCurrentConceptId)
   const setShouldAutoCenterConcept = useMapStore((state) => state.setShouldAutoCenterConcept)
   
+  // Track if auth has been initialized to prevent showing login form during initial check
+  const authInitialized = useRef(false)
+  const [isAuthLoading, setIsAuthLoading] = useState(true)
+  const mountTimeRef = useRef<number | null>(null)
+  
   // Extract inviteToken from query params (reactive to URL changes)
   const [inviteToken, setInviteToken] = useState<string | null>(
     typeof window !== 'undefined'
       ? new URLSearchParams(window.location.search).get('inviteToken')
       : null
   )
+  
+  // Record mount time
+  useEffect(() => {
+    mountTimeRef.current = Date.now()
+  }, [])
 
   // Parse map ID from URL path (format: /map/{mapId})
   // Listens to both initial load and navigation events (popstate)
@@ -104,12 +115,42 @@ function App() {
     }
   }, [setCurrentMapId, setCurrentConceptId, setShouldAutoCenterConcept])
 
+  // Track auth initialization to prevent flickering
   useEffect(() => {
-    // Check authentication status
-    if (!auth.user) {
-      console.log('Not authenticated')
+    // Check if auth has been initialized
+    // Always show loading screen for at least 2 seconds for a smooth user experience
+    const checkAuthInitialized = () => {
+      const timeSinceMount = mountTimeRef.current ? Date.now() - mountTimeRef.current : 0
+      const minLoadingTime = 2000 // Minimum loading time: 2 seconds
+      
+      // If we have a user, auth is definitely initialized
+      if (auth.user) {
+        if (!authInitialized.current) {
+          authInitialized.current = true
+          // Ensure minimum loading time for smooth transition
+          const remainingTime = Math.max(0, minLoadingTime - timeSinceMount)
+          setTimeout(() => {
+            setIsAuthLoading(false)
+          }, remainingTime)
+        }
+        return
+      }
+      
+      // If no user, wait for minimum loading time to ensure smooth experience
+      // This prevents showing login form immediately when user is actually authenticated
+      if (!authInitialized.current && timeSinceMount >= minLoadingTime) {
+        authInitialized.current = true
+        setIsAuthLoading(false)
+      }
     }
-  }, [auth])
+    
+    checkAuthInitialized()
+  }, [auth.user])
+
+  // Show loading screen while checking authentication
+  if (isAuthLoading || !authInitialized.current) {
+    return <LoadingScreen />
+  }
 
   // Show login form if not authenticated
   if (!auth.user) {
