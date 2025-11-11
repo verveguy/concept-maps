@@ -7,7 +7,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import { useMapPermissions } from '../useMapPermissions'
 import { db } from '@/lib/instant'
-import { useMapStore } from '@/stores/mapStore'
 
 // Mock InstantDB
 const mockUseQuery = vi.mocked(db.useQuery)

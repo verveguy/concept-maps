@@ -29,11 +29,9 @@ describe('useSharing - Manager Permissions', () => {
   const mockOwnerId = 'owner-1'
   const mockManagerId = 'manager-1'
   const mockEditorId = 'editor-1'
-  const mockViewerId = 'viewer-1'
   const mockOwnerEmail = 'owner@example.com'
   const mockManagerEmail = 'manager@example.com'
   const mockEditorEmail = 'editor@example.com'
-  const mockViewerEmail = 'viewer@example.com'
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -286,13 +284,21 @@ describe('useSharing - Manager Permissions', () => {
         expect(result.current.shares.length).toBeGreaterThan(0)
       })
 
+      // Clear any previous calls
+      const mapLinkMock = (tx.maps as any)[mockMapId].link
+      mapLinkMock.mockClear()
+
       await result.current.updateSharePermission(mockShareId, 'manage')
 
       expect(mockTransact).toHaveBeenCalledTimes(1)
       const transaction = mockTransact.mock.calls[0][0]
       expect(Array.isArray(transaction)).toBe(true)
-      // Should have: share update + link managePermissions (writePermissions already exists)
-      expect(transaction.length).toBeGreaterThan(1)
+      
+      // Verify that both writePermissions and managePermissions are linked
+      // (making it idempotent and handling edge cases)
+      expect(mapLinkMock).toHaveBeenCalledTimes(2)
+      expect(mapLinkMock).toHaveBeenCalledWith({ writePermissions: mockEditorId })
+      expect(mapLinkMock).toHaveBeenCalledWith({ managePermissions: mockEditorId })
     })
   })
 

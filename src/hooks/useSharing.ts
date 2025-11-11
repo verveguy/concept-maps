@@ -469,8 +469,12 @@ export function useSharing(mapId: string | null) {
         unlinkOperations.push(tx.maps[share.mapId].unlink({ writePermissions: userId }))
         linkOperations.push(tx.maps[share.mapId].link({ readPermissions: userId }))
       } else if (oldPerm === 'edit' && newPerm === 'manage') {
-        // Edit -> Manage: keep writePermissions, just link managePermissions
-        linkOperations.push(tx.maps[share.mapId].link({ managePermissions: userId }))
+        // Edit -> Manage: ensure writePermissions exists and link managePermissions
+        // Explicitly link both to make operation idempotent and handle edge cases
+        linkOperations.push(
+          tx.maps[share.mapId].link({ writePermissions: userId }),
+          tx.maps[share.mapId].link({ managePermissions: userId })
+        )
       } else if (oldPerm === 'manage' && newPerm === 'view') {
         // Manage -> View: unlink writePermissions and managePermissions, link readPermissions
         unlinkOperations.push(
