@@ -11,6 +11,8 @@ import { cleanup } from '@testing-library/react'
 // This prevents InstantDB from trying to initialize IndexedDB in test environment
 vi.mock('@/lib/instant', () => ({
   db: {
+    useAuth: vi.fn(() => ({ user: null })),
+    useQuery: vi.fn(() => ({ data: null })),
     transact: vi.fn().mockResolvedValue(undefined),
   },
   tx: {
@@ -32,6 +34,9 @@ vi.mock('@/lib/instant', () => ({
       update: vi.fn(),
       delete: vi.fn(),
     },
+    shareInvitations: {},
+    shares: {},
+    maps: {},
   },
   id: vi.fn(() => 'mock-id'),
 }))

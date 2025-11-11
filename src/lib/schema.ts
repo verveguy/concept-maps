@@ -152,16 +152,17 @@ export interface Perspective {
  * **Permission Levels:**
  * - `'view'`: Read-only access - can view but not modify
  * - `'edit'`: Read-write access - can view and modify
+ * - `'manage'`: Manager access - can edit map and manage shares (invite others, update permissions, revoke shares)
  * 
  * **Status:**
  * - `'pending'`: Share invitation has been sent but not yet accepted
  * - `'active'`: Share is active and user has access
- * - `'revoked'`: Share has been revoked by the map owner
+ * - `'revoked'`: Share has been revoked by the map owner or manager
  * 
  * **Lifecycle:**
  * Shares are typically created from ShareInvitations. When a user accepts an
  * invitation, a Share record is created and linked to the appropriate permission
- * set (readPermissions or writePermissions) on the map.
+ * set (readPermissions, writePermissions, or managePermissions) on the map.
  */
 export interface Share {
   id: string
@@ -169,7 +170,7 @@ export interface Share {
   userId: string
   userEmail: string | null // Email address of the user with whom the map is shared
   userImageURL: string | null // User's avatar image URL (if available)
-  permission: 'view' | 'edit'
+  permission: 'view' | 'edit' | 'manage'
   createdAt: Date
   acceptedAt: Date | null // Timestamp when user accepted the share
   status: 'pending' | 'active' | 'revoked'
@@ -185,7 +186,7 @@ export interface Share {
  * sent to users via email.
  * 
  * **Invitation Flow:**
- * 1. Owner creates invitation with target email and permission level
+ * 1. Owner or manager creates invitation with target email and permission level
  * 2. Invitation token is generated and shared with invitee
  * 3. Invitee accepts invitation (validates email match)
  * 4. Share record is created and linked to appropriate permissions
@@ -195,7 +196,7 @@ export interface Share {
  * - `'pending'`: Invitation sent but not yet responded to
  * - `'accepted'`: Invitation accepted, share created
  * - `'declined'`: Invitation declined by invitee
- * - `'revoked'`: Invitation revoked by owner
+ * - `'revoked'`: Invitation revoked by owner or manager
  * - `'expired'`: Invitation expired (if expiration is implemented)
  * 
  * **Security:**
@@ -207,7 +208,7 @@ export interface ShareInvitation {
   mapId: string
   invitedEmail: string
   invitedUserId: string | null
-  permission: 'view' | 'edit'
+  permission: 'view' | 'edit' | 'manage'
   token: string
   status: 'pending' | 'accepted' | 'declined' | 'revoked' | 'expired'
   createdBy: string
