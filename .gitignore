@@ -34,3 +34,7 @@ docs/docs/developing/api/
 
 # Generated API sidebar configuration
 docs/sidebars.api.ts
+
+# Test coverage reports
+coverage/
+*.lcov
