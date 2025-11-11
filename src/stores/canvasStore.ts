@@ -127,28 +127,46 @@ export interface CanvasState {
 }
 
 /**
+ * Initial state values for resettable canvas state.
+ * These values are reset when switching maps.
+ * Note: selectedLayout and hasCheckedInitialConcept are preserved as user preferences.
+ */
+const INITIAL_RESETTABLE_STATE = {
+  connectionStart: null as ConnectionStart | null,
+  connectionMade: false,
+  contextMenuVisible: false,
+  contextMenuPosition: null as { x: number; y: number } | null,
+  activeLayout: null as LayoutType | null,
+  laidOutNodeIds: new Set<string>(),
+  newlyCreatedRelationshipIds: new Map<string, string>(),
+  lastUpdateTime: new Map<string, number>(),
+  pendingConcept: null as PendingConcept | null,
+  prevConceptIds: new Set<string>(),
+} as const
+
+/**
  * Zustand store for canvas state management.
  * Provides reactive state for connection, context menu, layout, and creation tracking.
  */
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   // Connection state
-  connectionStart: null,
+  connectionStart: INITIAL_RESETTABLE_STATE.connectionStart,
   setConnectionStart: (start) => set({ connectionStart: start }),
-  connectionMade: false,
+  connectionMade: INITIAL_RESETTABLE_STATE.connectionMade,
   setConnectionMade: (made) => set({ connectionMade: made }),
 
   // Context menu state
-  contextMenuVisible: false,
+  contextMenuVisible: INITIAL_RESETTABLE_STATE.contextMenuVisible,
   setContextMenuVisible: (visible) => set({ contextMenuVisible: visible }),
-  contextMenuPosition: null,
+  contextMenuPosition: INITIAL_RESETTABLE_STATE.contextMenuPosition,
   setContextMenuPosition: (position) => set({ contextMenuPosition: position }),
 
   // Layout state
-  activeLayout: null,
+  activeLayout: INITIAL_RESETTABLE_STATE.activeLayout,
   setActiveLayout: (layout) => set({ activeLayout: layout }),
   selectedLayout: 'force-directed',
   setSelectedLayout: (layout) => set({ selectedLayout: layout }),
-  laidOutNodeIds: new Set<string>(),
+  laidOutNodeIds: INITIAL_RESETTABLE_STATE.laidOutNodeIds,
   addLaidOutNodeId: (nodeId) =>
     set((state) => ({
       laidOutNodeIds: new Set(state.laidOutNodeIds).add(nodeId),
@@ -159,10 +177,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       newSet.delete(nodeId)
       return { laidOutNodeIds: newSet }
     }),
-  clearLaidOutNodeIds: () => set({ laidOutNodeIds: new Set<string>() }),
+  clearLaidOutNodeIds: () => set({ laidOutNodeIds: INITIAL_RESETTABLE_STATE.laidOutNodeIds }),
 
   // Creation tracking
-  newlyCreatedRelationshipIds: new Map<string, string>(),
+  newlyCreatedRelationshipIds: INITIAL_RESETTABLE_STATE.newlyCreatedRelationshipIds,
   addNewlyCreatedRelationship: (conceptId, relationshipId) =>
     set((state) => {
       const newMap = new Map(state.newlyCreatedRelationshipIds)
@@ -176,7 +194,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       return { newlyCreatedRelationshipIds: newMap }
     }),
   clearNewlyCreatedRelationships: () =>
-    set({ newlyCreatedRelationshipIds: new Map<string, string>() }),
+    set({ newlyCreatedRelationshipIds: INITIAL_RESETTABLE_STATE.newlyCreatedRelationshipIds }),
   hasCheckedInitialConcept: new Set<string>(),
   markInitialConceptChecked: (mapId) =>
     set((state) => ({
@@ -193,7 +211,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }),
 
   // Throttling state
-  lastUpdateTime: new Map<string, number>(),
+  lastUpdateTime: INITIAL_RESETTABLE_STATE.lastUpdateTime,
   setLastUpdateTime: (nodeId, time) =>
     set((state) => {
       const newMap = new Map(state.lastUpdateTime)
@@ -209,33 +227,38 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       newMap.delete(nodeId)
       return { lastUpdateTime: newMap }
     }),
-  clearAllLastUpdateTimes: () => set({ lastUpdateTime: new Map<string, number>() }),
+  clearAllLastUpdateTimes: () => set({ lastUpdateTime: INITIAL_RESETTABLE_STATE.lastUpdateTime }),
 
   // Pending concept
-  pendingConcept: null,
+  pendingConcept: INITIAL_RESETTABLE_STATE.pendingConcept,
   setPendingConcept: (concept) => set({ pendingConcept: concept }),
 
   // Previous concept IDs
-  prevConceptIds: new Set<string>(),
+  prevConceptIds: INITIAL_RESETTABLE_STATE.prevConceptIds,
   setPrevConceptIds: (ids) => set({ prevConceptIds: ids }),
-  clearPrevConceptIds: () => set({ prevConceptIds: new Set<string>() }),
+  clearPrevConceptIds: () => set({ prevConceptIds: INITIAL_RESETTABLE_STATE.prevConceptIds }),
 
-  // Reset function
-  resetCanvasState: () =>
+  // Reset function - resets all resettable state to initial values
+  // Note: selectedLayout and hasCheckedInitialConcept are preserved
+  // as they are user preferences and should persist across map switches
+  resetCanvasState: () => {
+    const currentState = get()
     set({
-      connectionStart: null,
-      connectionMade: false,
-      contextMenuVisible: false,
-      contextMenuPosition: null,
-      activeLayout: null,
+      connectionStart: INITIAL_RESETTABLE_STATE.connectionStart,
+      connectionMade: INITIAL_RESETTABLE_STATE.connectionMade,
+      contextMenuVisible: INITIAL_RESETTABLE_STATE.contextMenuVisible,
+      contextMenuPosition: INITIAL_RESETTABLE_STATE.contextMenuPosition,
+      activeLayout: INITIAL_RESETTABLE_STATE.activeLayout,
       laidOutNodeIds: new Set<string>(),
       newlyCreatedRelationshipIds: new Map<string, string>(),
       lastUpdateTime: new Map<string, number>(),
-      pendingConcept: null,
+      pendingConcept: INITIAL_RESETTABLE_STATE.pendingConcept,
       prevConceptIds: new Set<string>(),
-      // Note: selectedLayout and hasCheckedInitialConcept are preserved
-      // as they are user preferences and should persist across map switches
-    }),
+      // Preserve user preferences
+      selectedLayout: currentState.selectedLayout,
+      hasCheckedInitialConcept: currentState.hasCheckedInitialConcept,
+    })
+  },
 }))
 
 

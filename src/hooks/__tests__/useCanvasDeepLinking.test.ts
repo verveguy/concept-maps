@@ -262,14 +262,13 @@ describe('useCanvasDeepLinking', () => {
         return selector ? selector(state as any) : state
       })
 
+      // Mock getViewport to simulate zoom change after fitView
+      let zoomValue = 1.0
+      mockGetViewport.mockImplementation(() => ({ x: 0, y: 0, zoom: zoomValue }))
+
       renderHook(() => useCanvasDeepLinking(defaultOptions))
 
-      // Wait for initial effect
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0))
-      })
-
-      // Wait for fitView timeout (100ms)
+      // Wait for initial effect and initial delay (100ms)
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 150))
       })
@@ -277,13 +276,18 @@ describe('useCanvasDeepLinking', () => {
       // Should call fitView
       expect(mockFitView).toHaveBeenCalledWith({ padding: 0.1, duration: 300 })
 
-      // Wait for setCenter timeout (350ms after fitView)
+      // Simulate zoom change (fitView completes and changes zoom)
+      zoomValue = 0.8
+      mockGetViewport.mockImplementation(() => ({ x: 0, y: 0, zoom: zoomValue }))
+
+      // Wait for waitForZoomChange to detect the zoom change (uses requestAnimationFrame)
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 400))
+        // Wait for a few animation frames to allow polling to complete
+        await new Promise((resolve) => setTimeout(resolve, 100))
       })
 
       // Should call setCenter with node position and viewport zoom
-      expect(mockSetCenter).toHaveBeenCalledWith(100, 100, { zoom: 1, duration: 300 })
+      expect(mockSetCenter).toHaveBeenCalledWith(100, 100, { zoom: 0.8, duration: 300 })
 
       // Should clear currentConceptId
       expect(mockSetCurrentConceptId).toHaveBeenCalledWith(null)
@@ -363,21 +367,27 @@ describe('useCanvasDeepLinking', () => {
 
       mockGetNode.mockReturnValue(undefined)
 
+      // Mock getViewport to simulate zoom change after fitView
+      let zoomValue = 1.0
+      mockGetViewport.mockImplementation(() => ({ x: 0, y: 0, zoom: zoomValue }))
+
       renderHook(() => useCanvasDeepLinking(defaultOptions))
 
-      // Wait for initial effect
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0))
-      })
-
-      // Wait for fitView timeout
+      // Wait for initial effect and initial delay (100ms)
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 150))
       })
 
-      // Wait for setCenter timeout
+      // Should call fitView
+      expect(mockFitView).toHaveBeenCalledWith({ padding: 0.1, duration: 300 })
+
+      // Simulate zoom change (fitView completes and changes zoom)
+      zoomValue = 0.8
+      mockGetViewport.mockImplementation(() => ({ x: 0, y: 0, zoom: zoomValue }))
+
+      // Wait for waitForZoomChange to detect the zoom change
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 400))
+        await new Promise((resolve) => setTimeout(resolve, 100))
       })
 
       // Should still clear currentConceptId even if getNode returns undefined

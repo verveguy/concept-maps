@@ -58,8 +58,33 @@ export function useCanvasDeepLinking(options: UseCanvasDeepLinkingOptions) {
   const setShouldAutoCenterConcept = useMapStore((state) => state.setShouldAutoCenterConcept)
   const setSelectedConceptId = useUIStore((state) => state.setSelectedConceptId)
 
-  // Track if we're currently centering on a concept (to prevent timeout cleanup)
+  // Track if we're currently centering on a concept (to prevent duplicate calls)
   const isCenteringRef = useRef(false)
+  // Track if component is mounted (to prevent state updates after unmount)
+  const isMountedRef = useRef(true)
+  // Track cancellation for async operations
+  const cancelledRef = useRef(false)
+
+  /**
+   * Wait for zoom change using requestAnimationFrame polling.
+   * More reliable than setTimeout as it waits for actual zoom changes.
+   */
+  const waitForZoomChange = (initialZoom: number, maxTries = 60): Promise<void> => {
+    return new Promise((resolve) => {
+      let tries = 0
+      const check = () => {
+        if (cancelledRef.current) return
+        const viewport = getViewport()
+        if (viewport.zoom !== initialZoom || tries >= maxTries) {
+          resolve()
+        } else {
+          tries++
+          requestAnimationFrame(check)
+        }
+      }
+      check()
+    })
+  }
 
   /**
    * Handle deep linking to concepts: select and center when concept ID is in URL.
@@ -120,32 +145,51 @@ export function useCanvasDeepLinking(options: UseCanvasDeepLinkingOptions) {
     setShouldAutoCenterConcept(false)
 
     // Center on the concept and fit view to show the whole map
-    // Use setTimeout to ensure React Flow is ready
-    const timeoutId = setTimeout(() => {
+    // Use a promise-based approach to ensure React Flow is ready
+    ;(async () => {
+      // Small delay to ensure React Flow is ready
+      await new Promise((resolve) => setTimeout(resolve, 100))
+
+      // Check if component is still mounted before proceeding
+      if (!isMountedRef.current || cancelledRef.current) {
+        return
+      }
+
       // First fit view to show the whole map (this sets the zoom level)
+      const initialZoom = getViewport().zoom
       fitView({ padding: 0.1, duration: 300 })
 
-      // After fitView completes, get the current viewport and center on the concept
-      setTimeout(() => {
-        const node = getNode(currentConceptId)
-        if (node) {
-          // Get current viewport to preserve zoom level from fitView
-          const viewport = getViewport()
-          // Center on the concept node while preserving the zoom from fitView
-          setCenter(node.position.x, node.position.y, { zoom: viewport.zoom, duration: 300 })
-        }
-        // Clear currentConceptId from store after handling to prevent interference with normal selection
-        setCurrentConceptId(null)
-        // Reset centering flag
-        isCenteringRef.current = false
-      }, 350)
-    }, 100)
+      // Wait for zoom change to ensure fitView animation completes
+      await waitForZoomChange(initialZoom)
 
-    // Only clear timeout if we're not currently centering (prevent cleanup from canceling the operation)
-    return () => {
-      if (!isCenteringRef.current) {
-        clearTimeout(timeoutId)
+      // Check again if component is still mounted
+      if (!isMountedRef.current || cancelledRef.current) {
+        return
       }
+
+      // After fitView completes, get the current viewport and center on the concept
+      const node = getNode(currentConceptId)
+      if (node) {
+        // Get current viewport to preserve zoom level from fitView
+        const viewport = getViewport()
+        // Center on the concept node while preserving the zoom from fitView
+        setCenter(node.position.x, node.position.y, { zoom: viewport.zoom, duration: 300 })
+      }
+      // Clear currentConceptId from store after handling to prevent interference with normal selection
+      setCurrentConceptId(null)
+      // Reset centering flag
+      isCenteringRef.current = false
+    })().catch((error) => {
+      // Handle any errors silently (component may have unmounted)
+      if (isMountedRef.current) {
+        console.error('Error in deep linking:', error)
+      }
+    })
+
+    // Cleanup: cancel any pending operations
+    return () => {
+      cancelledRef.current = true
+      isCenteringRef.current = false
     }
   }, [
     shouldAutoCenterConcept,
@@ -166,5 +210,15 @@ export function useCanvasDeepLinking(options: UseCanvasDeepLinkingOptions) {
   useEffect(() => {
     isCenteringRef.current = false
   }, [concepts])
+
+  // Track mount state for cleanup
+  useEffect(() => {
+    isMountedRef.current = true
+    cancelledRef.current = false
+    return () => {
+      isMountedRef.current = false
+      cancelledRef.current = true
+    }
+  }, [])
 }
 
