@@ -12,6 +12,7 @@ import { ErrorBoundary } from '@/components/graph/ErrorBoundary'
 import { UnifiedEditor } from '@/components/editor/UnifiedEditor'
 import { PerspectiveEditor } from '@/components/perspective/PerspectiveEditor'
 import { ShareDialog } from '@/components/share/ShareDialog'
+import { InvitationAcceptScreen } from '@/components/invitation/InvitationAcceptScreen'
 import { SearchBox } from '@/components/layout/SearchBox'
 import { UndoButton } from '@/components/ui/UndoButton'
 import { PresenceHeader } from '@/components/presence/PresenceHeader'
@@ -21,6 +22,7 @@ import { useConceptActions } from '@/hooks/useConceptActions'
 import { useMap } from '@/hooks/useMap'
 import { usePerspectives } from '@/hooks/usePerspectives'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
+import { usePendingInvitation } from '@/hooks/usePendingInvitation'
 import { navigateToRoot } from '@/utils/navigation'
 
 /**
@@ -41,7 +43,8 @@ export function MapPage() {
   const perspectives = usePerspectives()
   const currentPerspective = perspectives.find((p) => p.id === currentPerspectiveId)
   const { createConcept } = useConceptActions()
-  const { hasWriteAccess } = useMapPermissions()
+  const { hasWriteAccess, hasReadAccess } = useMapPermissions()
+  const { invitation: pendingInvitation, isLoading: isInvitationLoading } = usePendingInvitation(currentMapId)
   const [isCreatingConcept, setIsCreatingConcept] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showShareDialog, setShowShareDialog] = useState(false)
@@ -137,6 +140,50 @@ export function MapPage() {
             >
               Return to Home
             </button>
+          </div>
+        </div>
+      </AppLayout>
+    )
+  }
+
+  // Check if user has read access but there's a pending or recently accepted invitation
+  // This handles the case where the map is visible (due to hasPendingInvitation permission)
+  // but the user hasn't accepted the invitation yet, or has accepted but permissions haven't propagated
+  const showInvitationScreen = !hasReadAccess && pendingInvitation && !isInvitationLoading
+
+  // If showing invitation screen, render it in the Canvas area but keep the toolbar visible
+  if (showInvitationScreen) {
+    return (
+      <AppLayout>
+        <div className="h-full w-full flex flex-col">
+          {/* Toolbar */}
+          <div className="border-b bg-card px-4 py-2 flex items-center gap-2">
+            {/* Sidebar toggle button - only show when sidebar is closed */}
+            {!sidebarOpen && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="p-1.5 rounded-md hover:bg-accent transition-colors -ml-1"
+                title="Open sidebar"
+                aria-label="Open sidebar"
+              >
+                <PanelLeft className="h-4 w-4" />
+              </button>
+            )}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <h1 className="text-lg font-semibold">{map?.name || 'Untitled Map'}</h1>
+            </div>
+            <div className="flex-1" />
+            {/* Presence Header - shows all users */}
+            <PresenceHeader />
+            {/* Search Box */}
+            <SearchBox />
+            {/* Undo Button */}
+            <UndoButton />
+          </div>
+
+          {/* Invitation Accept Screen - displayed in Canvas area */}
+          <div className="flex-1 overflow-hidden relative">
+            <InvitationAcceptScreen invitation={pendingInvitation} mapId={currentMapId} />
           </div>
         </div>
       </AppLayout>
