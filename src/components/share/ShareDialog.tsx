@@ -279,8 +279,14 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
   if (!mapId || !map) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70">
-      <div className="bg-card text-card-foreground rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col border">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/70"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-card text-card-foreground rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col border"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-xl font-semibold text-card-foreground">Share "{map.name}"</h2>
@@ -294,7 +300,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-0">
           {/* Share with User Section */}
           {canManageShares && (
             <div>
@@ -363,7 +369,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
             {visibleInvitations.length === 0 ? (
               <p className="text-sm text-muted-foreground">No pending invitations.</p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-64 overflow-y-auto">
                 {visibleInvitations.map((invitation) => (
                   <div
                     key={invitation.id}
@@ -428,7 +434,7 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
             {shares.length === 0 ? (
               <p className="text-sm text-muted-foreground">No users shared yet</p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-64 overflow-y-auto">
                 {shares.map((share) => (
                   <div
                     key={share.id}
@@ -503,16 +509,6 @@ export function ShareDialog({ mapId, onClose }: ShareDialogProps) {
               </div>
             )}
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t bg-muted/50">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-foreground bg-background border border-input rounded-md hover:bg-accent transition-colors"
-          >
-            Close
-          </button>
         </div>
       </div>
     </div>
