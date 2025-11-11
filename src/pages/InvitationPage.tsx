@@ -173,7 +173,8 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
       ])
 
       // Navigate to the map URL after accepting the invitation
-      navigateToMap(invitation.map.id)
+      // Clear query params (inviteToken) so App.tsx doesn't keep showing InvitationPage
+      navigateToMap(invitation.map.id, true)
     } catch (error) {
       console.error('Failed to accept invitation', error)
       setErrorMessage('Failed to accept the invitation. Please try again or contact the owner.')
@@ -350,8 +351,9 @@ export function InvitationPage({ inviteToken }: InvitationPageProps) {
             <button
               onClick={() => {
                 // Navigate to the map URL
+                // Clear query params (inviteToken) so App.tsx doesn't keep showing InvitationPage
                 if (invitation.map?.id) {
-                  navigateToMap(invitation.map.id)
+                  navigateToMap(invitation.map.id, true)
                 } else {
                   navigateToRoot()
                 }

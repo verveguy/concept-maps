@@ -3,7 +3,7 @@
  * Handles authentication routing and renders the appropriate view based on auth state.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { db } from '@/lib/instant'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { MapPage } from '@/pages/MapPage'
@@ -23,10 +23,12 @@ function App() {
   const setCurrentConceptId = useMapStore((state) => state.setCurrentConceptId)
   const setShouldAutoCenterConcept = useMapStore((state) => state.setShouldAutoCenterConcept)
   
-  // Extract inviteToken from query params
-  const inviteToken = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.search).get('inviteToken')
-    : null
+  // Extract inviteToken from query params (reactive to URL changes)
+  const [inviteToken, setInviteToken] = useState<string | null>(
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('inviteToken')
+      : null
+  )
 
   // Parse map ID from URL path (format: /map/{mapId})
   // Listens to both initial load and navigation events (popstate)
@@ -37,6 +39,7 @@ function App() {
 
     /**
      * Extract and set map ID from current URL path.
+     * Also updates inviteToken state when URL changes.
      */
     const updateMapIdFromUrl = () => {
       // Check for redirect query parameter (from 404.html)
@@ -49,6 +52,10 @@ function App() {
         const newUrl = basePath + decodeURIComponent(redirectPath)
         window.history.replaceState({}, '', newUrl)
       }
+
+      // Update inviteToken from current URL query params
+      const currentInviteToken = urlParams.get('inviteToken')
+      setInviteToken(currentInviteToken)
 
       const pathname = window.location.pathname
       // Remove base path if present (e.g., /concept-maps/app)
@@ -82,11 +89,18 @@ function App() {
     // Update on mount
     updateMapIdFromUrl()
 
-    // Listen for browser navigation events (back/forward buttons, programmatic navigation)
+    // Listen for browser navigation events (back/forward buttons)
     window.addEventListener('popstate', updateMapIdFromUrl)
+    
+    // Listen for custom navigation events (for programmatic navigation via replaceState/pushState)
+    const handleNavigation = () => {
+      updateMapIdFromUrl()
+    }
+    window.addEventListener('navigation', handleNavigation)
 
     return () => {
       window.removeEventListener('popstate', updateMapIdFromUrl)
+      window.removeEventListener('navigation', handleNavigation)
     }
   }, [setCurrentMapId, setCurrentConceptId, setShouldAutoCenterConcept])
 
