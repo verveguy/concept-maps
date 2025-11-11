@@ -65,6 +65,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install dependencies (docs)
+        if: matrix.build-type == 'docs'
+        run: cd docs && pnpm install --frozen-lockfile
+
       - name: Build application
         if: matrix.build-type == 'app'
         run: pnpm build

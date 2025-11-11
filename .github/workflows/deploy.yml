@@ -19,11 +19,10 @@ permissions:
   id-token: write
 
 jobs:
-  build-and-deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  test:
+    name: Type Check & Test
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,6 +39,9 @@ jobs:
       - name: Install dependencies (root)
         run: pnpm install --frozen-lockfile
 
+      - name: Type check
+        run: pnpm exec tsc --noEmit
+
       - name: Run tests with coverage
         run: pnpm test:coverage
 
@@ -53,10 +55,37 @@ jobs:
           flags: unittests
           name: codecov-umbrella
 
+  build:
+    name: Build (${{ matrix.build-type }})
+    runs-on: ubuntu-latest
+    needs: test
+    strategy:
+      matrix:
+        build-type: [app, docs]
+      fail-fast: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies (root)
+        run: pnpm install --frozen-lockfile
+
       - name: Install dependencies (docs)
+        if: matrix.build-type == 'docs'
         run: cd docs && pnpm install --frozen-lockfile
 
       - name: Build app
+        if: matrix.build-type == 'app'
         run: pnpm build
         env:
           # Use repository variable for App ID since it's safe to expose
@@ -67,7 +96,48 @@ jobs:
           VITE_INSTANTDB_API_KEY: ${{ secrets.VITE_INSTANTDB_API_KEY }}
 
       - name: Build docs
+        if: matrix.build-type == 'docs'
         run: pnpm build:docs:full
+
+      - name: Upload app build artifact
+        if: matrix.build-type == 'app'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-build
+          path: dist
+          retention-days: 1
+
+      - name: Upload docs build artifact
+        if: matrix.build-type == 'docs'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-build
+          path: docs/build
+          retention-days: 1
+
+  deploy:
+    name: Deploy to GitHub Pages
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download app build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-build
+          path: dist
+
+      - name: Download docs build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docs-build
+          path: docs/build
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
