@@ -134,6 +134,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const currentMapId = useMapStore((state) => state.currentMapId)
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
   const isEditingPerspective = useMapStore((state) => state.isEditingPerspective)
+  const shouldAutoCenterConcept = useMapStore((state) => state.shouldAutoCenterConcept)
   
   // Ref for the React Flow wrapper div (used for event handlers)
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null)
@@ -147,8 +148,8 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMapId]) // Only depend on currentMapId - store actions are stable
   
-  // Check if user has write access to the current map
-  const { hasWriteAccess } = useMapPermissions()
+  // Check if user has write access and read access to the current map
+  const { hasWriteAccess, hasReadAccess } = useMapPermissions()
   
   // Get perspectives to check which concepts are included
   const perspectives = usePerspectives()
@@ -415,6 +416,45 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     setCenter,
     getViewport,
   })
+
+  // Automatic zoom-to-fit when opening a map (if not doing deep linking)
+  // Track if we've already zoomed for the current map to prevent re-zooming on every render
+  const hasZoomedForMapRef = useRef<string | null>(null)
+  
+  useEffect(() => {
+    // Reset zoom tracking when switching maps
+    if (currentMapId !== hasZoomedForMapRef.current && hasZoomedForMapRef.current !== null) {
+      hasZoomedForMapRef.current = null
+    }
+
+    // Only zoom-to-fit if:
+    // 1. Map is loaded
+    // 2. User has read access
+    // 3. Nodes are loaded
+    // 4. NOT doing deep linking (shouldAutoCenterConcept is false)
+    // 5. Haven't already zoomed for this map
+    if (
+      !currentMapId ||
+      !hasReadAccess ||
+      nodes.length === 0 ||
+      shouldAutoCenterConcept ||
+      hasZoomedForMapRef.current === currentMapId
+    ) {
+      return
+    }
+
+    // Mark that we've zoomed for this map
+    hasZoomedForMapRef.current = currentMapId
+
+    // Small delay to ensure React Flow is ready and nodes are rendered
+    const timeoutId = setTimeout(() => {
+      fitView({ padding: 0.1, duration: 300 })
+    }, 100)
+
+    return () => {
+      clearTimeout(timeoutId)
+    }
+  }, [currentMapId, hasReadAccess, nodes.length, shouldAutoCenterConcept, fitView])
 
   // Expose layout handler via ref (must be after nodes/edges are initialized)
   useImperativeHandle(ref, () => ({
