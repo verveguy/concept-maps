@@ -475,8 +475,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     }
   }, [])
   
-  // Track when React Flow is ready via onLoad callback
+  // Track when React Flow is ready via onInit callback
   const handleReactFlowLoad = useRef(() => {
+    console.log('[zoom-to-fit] React Flow onInit called')
     reactFlowReadyRef.current = true
   }).current
 
@@ -502,15 +503,21 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
 
     // Use async approach similar to deep linking hook for better reliability
     ;(async () => {
-      // Wait for React Flow to be ready (poll until onLoad has been called)
+      // Wait for React Flow to be ready (poll until onInit has been called, but with timeout)
       let tries = 0
-      while (!reactFlowReadyRef.current && tries < 100 && isMountedRef.current && !cancelledRef.current) {
+      const maxWaitTries = 200 // ~3 seconds max wait (200 * ~16ms per frame)
+      while (!reactFlowReadyRef.current && tries < maxWaitTries && isMountedRef.current && !cancelledRef.current) {
         await new Promise((resolve) => requestAnimationFrame(resolve))
         tries++
       }
       
+      // If React Flow never initialized, log warning but continue anyway
+      if (!reactFlowReadyRef.current && isMountedRef.current) {
+        console.warn('[zoom-to-fit] React Flow onInit not called within timeout, proceeding anyway')
+      }
+      
       // Additional delay to ensure nodes are rendered
-      await new Promise((resolve) => setTimeout(resolve, 200))
+      await new Promise((resolve) => setTimeout(resolve, 300))
       
       // Check if component is still mounted and not cancelled
       if (!isMountedRef.current || cancelledRef.current) {
@@ -520,6 +527,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       // Double-check that we still have nodes (check from React Flow to avoid stale closure)
       const currentNodes = getNodesFromFlow()
       if (currentNodes.length === 0) {
+        console.warn('[zoom-to-fit] No nodes found after wait, skipping zoom-to-fit')
         return
       }
 
@@ -534,6 +542,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       // Final check that nodes are still present
       const finalNodes = getNodesFromFlow()
       if (finalNodes.length === 0) {
+        console.warn('[zoom-to-fit] No nodes found in final check, skipping zoom-to-fit')
         return
       }
       
