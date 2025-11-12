@@ -238,6 +238,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setPrevConceptIds: (ids) => set({ prevConceptIds: ids }),
   clearPrevConceptIds: () => set({ prevConceptIds: INITIAL_RESETTABLE_STATE.prevConceptIds }),
 
+  // Connection end handler
+  onConnectEndHandler: null as ((event: MouseEvent | TouchEvent) => Promise<void>) | null,
+  setOnConnectEndHandler: (handler) => set({ onConnectEndHandler: handler }),
+  // Connection start handler
+  onConnectStartHandler: null as ((event: MouseEvent | TouchEvent | null, params: { nodeId: string | null; handleId: string | null }) => void) | null,
+  setOnConnectStartHandler: (handler) => set({ onConnectStartHandler: handler }),
+
   // Reset function - resets all resettable state to initial values
   // Note: selectedLayout and hasCheckedInitialConcept are preserved
   // as they are user preferences and should persist across map switches

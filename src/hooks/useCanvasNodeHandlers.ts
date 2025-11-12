@@ -69,6 +69,7 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
   const {
     getLastUpdateTime,
     setLastUpdateTime,
+    connectionStart,
   } = useCanvasStore()
 
   const {
@@ -193,6 +194,7 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
 
   /**
    * Handle node drag - update position in database with throttling.
+   * Skips position updates if Option-drag is active (connection creation in progress).
    */
   const onNodeDrag = useCallback(
     async (_event: React.MouseEvent, node: Node) => {
@@ -201,6 +203,18 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
       // Handle text view node position update (no throttling needed for UI state)
       if (node.id === 'text-view-node') {
         setTextViewPosition(node.position)
+        return
+      }
+
+      // Skip position updates if Option-drag is active (connection creation in progress)
+      // This prevents the node from moving while creating a connection
+      if (connectionStart && connectionStart.sourceId === node.id) {
+        // Still update cursor position for presence, but don't update node position
+        const flowPosition = screenToFlowPosition({
+          x: _event.clientX,
+          y: _event.clientY,
+        })
+        setCursor(flowPosition)
         return
       }
 
@@ -252,6 +266,7 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
       hasWriteAccess,
       getLastUpdateTime,
       setLastUpdateTime,
+      connectionStart,
     ]
   )
 
