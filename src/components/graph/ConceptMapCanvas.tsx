@@ -134,9 +134,35 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const currentMapId = useMapStore((state) => state.currentMapId)
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
   const isEditingPerspective = useMapStore((state) => state.isEditingPerspective)
+  const setIsOptionKeyPressed = useCanvasStore((state) => state.setIsOptionKeyPressed)
   
   // Ref for the React Flow wrapper div (used for event handlers)
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null)
+
+  // Track Option/Alt key state globally (single listener for all nodes)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only check for Alt key - Option key on Mac maps to Alt key
+      // Meta key is Command key, not Option key
+      if (e.key === 'Alt') {
+        setIsOptionKeyPressed(true)
+      }
+    }
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Alt') {
+        setIsOptionKeyPressed(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('keyup', handleKeyUp)
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [setIsOptionKeyPressed])
   
   // Reset canvas state when switching maps
   useEffect(() => {

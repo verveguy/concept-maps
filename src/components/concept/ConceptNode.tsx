@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm'
 import type { ConceptNodeData } from '@/lib/reactFlowTypes'
 import { useUIStore } from '@/stores/uiStore'
 import { useMapStore } from '@/stores/mapStore'
+import { useCanvasStore } from '@/stores/canvasStore'
 import { useConceptActions } from '@/hooks/useConceptActions'
 import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
 import { usePresence } from '@/hooks/usePresence'
@@ -119,6 +120,9 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasTriggeredEditRef = useRef(false)
   const nodeRef = useRef<HTMLDivElement>(null)
+  const [isOptionHovered, setIsOptionHovered] = useState(false)
+  const isMouseOverRef = useRef(false)
+  const isOptionKeyPressed = useCanvasStore((state) => state.isOptionKeyPressed)
   
   // Get users editing this node
   const editingUsers = otherUsersPresence
@@ -275,6 +279,44 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
     setIsEditing(true)
     setEditLabel(data.label)
   }
+
+  /**
+   * Handle mouse enter - check if Option/Alt key is pressed and expand handle.
+   */
+  const handleMouseEnter = () => {
+    isMouseOverRef.current = true
+    if (isOptionKeyPressed && hasWriteAccess && !isEditing) {
+      setIsOptionHovered(true)
+    }
+  }
+
+  /**
+   * Handle mouse leave - collapse handle if Option was held.
+   */
+  const handleMouseLeave = () => {
+    isMouseOverRef.current = false
+    setIsOptionHovered(false)
+  }
+
+  /**
+   * Handle mouse move - check if Option key state changed while hovering.
+   */
+  const handleMouseMove = (e: React.MouseEvent) => {
+    // Only check altKey - metaKey is Command key, not Option key
+    const isOptionKey = e.altKey
+    if (hasWriteAccess && !isEditing) {
+      setIsOptionHovered(isOptionKey)
+    }
+  }
+
+  // Update hover state when Option key state changes (if mouse is over node)
+  useEffect(() => {
+    if (isMouseOverRef.current && hasWriteAccess && !isEditing) {
+      setIsOptionHovered(isOptionKeyPressed)
+    } else if (!isOptionKeyPressed) {
+      setIsOptionHovered(false)
+    }
+  }, [isOptionKeyPressed, hasWriteAccess, isEditing])
 
   const handleSave = async () => {
     if (!hasWriteAccess) {
@@ -564,12 +606,15 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   const isGreyedOut = isEditingPerspective && !isInPerspective
   const nodeOpacity = isGreyedOut ? 0.3 : 1
   const nodeFilter = isGreyedOut ? 'grayscale(0.5)' : 'none'
+  
+  // Determine if node should be non-draggable (only when editing)
+  const shouldPreventDrag = isEditing
 
   return (
     <>
       <div
         ref={nodeRef}
-        className="px-4 py-3 rounded-lg shadow-md cursor-pointer transition-all hover:shadow-lg min-w-[120px] relative"
+        className={`px-4 py-3 rounded-lg shadow-md cursor-pointer transition-all hover:shadow-lg min-w-[120px] relative ${shouldPreventDrag ? 'nodrag' : ''}`}
         style={{
           backgroundColor: nodeStyle.fillColor,
           borderWidth: `${nodeStyle.borderThickness}px`,
@@ -581,6 +626,9 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
         }}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onMouseMove={handleMouseMove}
       >
       {/* Editing highlights from other users */}
       {editingUsers.map((presence) => (
@@ -621,20 +669,21 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
         </div>
       )}
       
-      {/* Centered target handle */}
+      {/* Centered target handle - expands to cover whole node when Option is held */}
       <Handle
         type="target"
         position={Position.Top}
         style={{
           position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
+          top: isOptionHovered ? '0' : '50%',
+          left: isOptionHovered ? '0' : '50%',
+          transform: isOptionHovered ? 'none' : 'translate(-50%, -50%)',
           backgroundColor: 'transparent',
-          width: '20px',
-          height: '20px',
-          borderRadius: '50%',
+          width: isOptionHovered ? '100%' : '20px',
+          height: isOptionHovered ? '100%' : '20px',
+          borderRadius: isOptionHovered ? '8px' : '50%',
           border: 'none',
+          zIndex: isOptionHovered ? 10 : 1,
         }}
       />
       
