@@ -139,11 +139,6 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   
   // Ref for the React Flow wrapper div (used for event handlers)
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null)
-  
-  // Track if this is the initial mount (for fitView prop - only use on first mount)
-  // Note: We don't use fitView prop when navigating directly via URL, only on true initial app load
-  const isInitialMountRef = useRef(true)
-  const hasInitialMapIdRef = useRef<string | null>(null)
 
   // Track Option/Alt key state globally (single listener for all nodes)
   useEffect(() => {
@@ -176,16 +171,6 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     
     clearLaidOutNodeIds()
     resetCanvasState()
-    
-    // Track if we had an initial map ID on mount (direct URL navigation)
-    if (isInitialMountRef.current && hasInitialMapIdRef.current === null) {
-      hasInitialMapIdRef.current = currentMapId
-    }
-    
-    // Mark that we're no longer on initial mount after first map load
-    if (isInitialMountRef.current && hasInitialMapIdRef.current !== currentMapId) {
-      isInitialMountRef.current = false
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMapId]) // Only depend on currentMapId - store actions are stable
   
@@ -463,29 +448,21 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const hasZoomedForMapRef = useRef<string | null>(null)
   const isMountedRef = useRef(true)
   const cancelledRef = useRef(false)
-  const reactFlowReadyRef = useRef(false)
   
   useEffect(() => {
     isMountedRef.current = true
     cancelledRef.current = false
-    reactFlowReadyRef.current = false // Reset when component mounts
     return () => {
       isMountedRef.current = false
       cancelledRef.current = true
     }
   }, [])
-  
-  // Track when React Flow is ready via onInit callback
-  const handleReactFlowLoad = useRef(() => {
-    console.log('[zoom-to-fit] React Flow onInit called')
-    reactFlowReadyRef.current = true
-  }).current
 
   useEffect(() => {
     // Only zoom-to-fit if:
     // 1. Map is loaded
     // 2. User has read access
-    // 3. Nodes are loaded (check for concept nodes specifically, not just any nodes)
+    // 3. Nodes are loaded (at least one node exists)
     // 4. NOT doing deep linking (shouldAutoCenterConcept is false)
     // 5. Haven't already zoomed for this map
     if (
@@ -498,25 +475,13 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       return
     }
 
-    // Mark that we've zoomed for this map BEFORE async operations
-    hasZoomedForMapRef.current = currentMapId
-
     // Use async approach - wait for React Flow and nodes to be ready
     // Use a simple timeout approach instead of blocking polling to avoid blocking React Flow initialization
     ;(async () => {
-      // Wait for React Flow to initialize and nodes to render
-      // Use multiple shorter delays instead of blocking polling
+      // Wait for React Flow to initialize and nodes to render (consistent with deep linking hook delay)
       await new Promise((resolve) => setTimeout(resolve, 100))
       
       // Check if component is still mounted
-      if (!isMountedRef.current || cancelledRef.current) {
-        return
-      }
-
-      // Wait a bit more for nodes to be available
-      await new Promise((resolve) => setTimeout(resolve, 200))
-      
-      // Check if component is still mounted and not cancelled
       if (!isMountedRef.current || cancelledRef.current) {
         return
       }
@@ -525,25 +490,16 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       const currentNodes = getNodesFromFlow()
       if (currentNodes.length === 0) {
         // If no nodes yet, wait a bit more and try once more
-        await new Promise((resolve) => setTimeout(resolve, 300))
+        await new Promise((resolve) => setTimeout(resolve, 200))
         if (!isMountedRef.current || cancelledRef.current) {
           return
         }
         const retryNodes = getNodesFromFlow()
         if (retryNodes.length === 0) {
-          console.warn('[zoom-to-fit] No nodes found after waiting, skipping zoom-to-fit')
-          return
+          return // Silently skip if nodes still not available
         }
       }
 
-      // Wait for next frame to ensure DOM is fully rendered
-      await new Promise((resolve) => requestAnimationFrame(resolve))
-      
-      // Check again if component is still mounted
-      if (!isMountedRef.current || cancelledRef.current) {
-        return
-      }
-      
       // Wait for zoom change using requestAnimationFrame polling (similar to deep linking hook)
       const waitForZoomChange = (initialZoom: number, maxTries = 60): Promise<void> => {
         return new Promise((resolve) => {
@@ -572,22 +528,18 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         // Wait for zoom change to ensure fitView animation completes (similar to deep linking)
         await waitForZoomChange(initialZoom)
         
+        // Only mark as zoomed AFTER successful fitView call
         if (isMountedRef.current && !cancelledRef.current) {
-          const viewportAfter = getViewport()
-          console.log('[zoom-to-fit] Zoom-to-fit completed', {
-            initialZoom,
-            finalZoom: viewportAfter.zoom,
-            viewport: viewportAfter,
-          })
+          hasZoomedForMapRef.current = currentMapId
         }
       } catch (error) {
-        // Silently handle errors (component may have unmounted)
+        // Handle errors from fitView call (component may have unmounted)
         if (isMountedRef.current) {
           console.error('[zoom-to-fit] Error calling fitView:', error)
         }
       }
     })().catch((error) => {
-      // Handle any errors silently (component may have unmounted)
+      // Handle any errors from async zoom-to-fit logic (component may have unmounted)
       if (isMountedRef.current) {
         console.error('[zoom-to-fit] Error in async zoom-to-fit:', error)
       }
@@ -636,7 +588,6 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
-        onInit={handleReactFlowLoad}
         nodesDraggable={hasWriteAccess}
         nodesConnectable={hasWriteAccess}
         fitView={false}
