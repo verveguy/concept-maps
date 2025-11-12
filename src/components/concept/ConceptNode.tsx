@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm'
 import type { ConceptNodeData } from '@/lib/reactFlowTypes'
 import { useUIStore } from '@/stores/uiStore'
 import { useMapStore } from '@/stores/mapStore'
+import { useCanvasStore } from '@/stores/canvasStore'
 import { useConceptActions } from '@/hooks/useConceptActions'
 import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
 import { usePresence } from '@/hooks/usePresence'
@@ -120,8 +121,8 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   const hasTriggeredEditRef = useRef(false)
   const nodeRef = useRef<HTMLDivElement>(null)
   const [isOptionHovered, setIsOptionHovered] = useState(false)
-  const optionKeyPressedRef = useRef(false)
   const isMouseOverRef = useRef(false)
+  const isOptionKeyPressed = useCanvasStore((state) => state.isOptionKeyPressed)
   
   // Get users editing this node
   const editingUsers = otherUsersPresence
@@ -284,7 +285,7 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
    */
   const handleMouseEnter = () => {
     isMouseOverRef.current = true
-    if (optionKeyPressedRef.current && hasWriteAccess && !isEditing) {
+    if (isOptionKeyPressed && hasWriteAccess && !isEditing) {
       setIsOptionHovered(true)
     }
   }
@@ -301,41 +302,21 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
    * Handle mouse move - check if Option key state changed while hovering.
    */
   const handleMouseMove = (e: React.MouseEvent) => {
-    const isOptionKey = e.altKey || e.metaKey
+    // Only check altKey - metaKey is Command key, not Option key
+    const isOptionKey = e.altKey
     if (hasWriteAccess && !isEditing) {
       setIsOptionHovered(isOptionKey)
-      optionKeyPressedRef.current = isOptionKey
     }
   }
 
-  // Track Option/Alt key state globally to handle key press/release
+  // Update hover state when Option key state changes (if mouse is over node)
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Option key (Mac) or Alt key (Windows/Linux)
-      if (e.key === 'Alt' || e.key === 'Meta') {
-        optionKeyPressedRef.current = true
-        // If mouse is currently over this node, expand the handle immediately
-        if (isMouseOverRef.current && hasWriteAccess && !isEditing) {
-          setIsOptionHovered(true)
-        }
-      }
+    if (isMouseOverRef.current && hasWriteAccess && !isEditing) {
+      setIsOptionHovered(isOptionKeyPressed)
+    } else if (!isOptionKeyPressed) {
+      setIsOptionHovered(false)
     }
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Alt' || e.key === 'Meta') {
-        optionKeyPressedRef.current = false
-        setIsOptionHovered(false)
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    document.addEventListener('keyup', handleKeyUp)
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      document.removeEventListener('keyup', handleKeyUp)
-    }
-  }, [hasWriteAccess, isEditing])
+  }, [isOptionKeyPressed, hasWriteAccess, isEditing])
 
   const handleSave = async () => {
     if (!hasWriteAccess) {
