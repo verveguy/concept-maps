@@ -501,34 +501,39 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     // Mark that we've zoomed for this map BEFORE async operations
     hasZoomedForMapRef.current = currentMapId
 
-    // Use async approach similar to deep linking hook for better reliability
+    // Use async approach - wait for React Flow and nodes to be ready
+    // Use a simple timeout approach instead of blocking polling to avoid blocking React Flow initialization
     ;(async () => {
-      // Wait for React Flow to be ready (poll until onInit has been called, but with timeout)
-      let tries = 0
-      const maxWaitTries = 200 // ~3 seconds max wait (200 * ~16ms per frame)
-      while (!reactFlowReadyRef.current && tries < maxWaitTries && isMountedRef.current && !cancelledRef.current) {
-        await new Promise((resolve) => requestAnimationFrame(resolve))
-        tries++
-      }
+      // Wait for React Flow to initialize and nodes to render
+      // Use multiple shorter delays instead of blocking polling
+      await new Promise((resolve) => setTimeout(resolve, 100))
       
-      // If React Flow never initialized, log warning but continue anyway
-      if (!reactFlowReadyRef.current && isMountedRef.current) {
-        console.warn('[zoom-to-fit] React Flow onInit not called within timeout, proceeding anyway')
+      // Check if component is still mounted
+      if (!isMountedRef.current || cancelledRef.current) {
+        return
       }
-      
-      // Additional delay to ensure nodes are rendered
-      await new Promise((resolve) => setTimeout(resolve, 300))
+
+      // Wait a bit more for nodes to be available
+      await new Promise((resolve) => setTimeout(resolve, 200))
       
       // Check if component is still mounted and not cancelled
       if (!isMountedRef.current || cancelledRef.current) {
         return
       }
 
-      // Double-check that we still have nodes (check from React Flow to avoid stale closure)
+      // Check that we have nodes (check from React Flow to avoid stale closure)
       const currentNodes = getNodesFromFlow()
       if (currentNodes.length === 0) {
-        console.warn('[zoom-to-fit] No nodes found after wait, skipping zoom-to-fit')
-        return
+        // If no nodes yet, wait a bit more and try once more
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        if (!isMountedRef.current || cancelledRef.current) {
+          return
+        }
+        const retryNodes = getNodesFromFlow()
+        if (retryNodes.length === 0) {
+          console.warn('[zoom-to-fit] No nodes found after waiting, skipping zoom-to-fit')
+          return
+        }
       }
 
       // Wait for next frame to ensure DOM is fully rendered
@@ -536,13 +541,6 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       
       // Check again if component is still mounted
       if (!isMountedRef.current || cancelledRef.current) {
-        return
-      }
-      
-      // Final check that nodes are still present
-      const finalNodes = getNodesFromFlow()
-      if (finalNodes.length === 0) {
-        console.warn('[zoom-to-fit] No nodes found in final check, skipping zoom-to-fit')
         return
       }
       
