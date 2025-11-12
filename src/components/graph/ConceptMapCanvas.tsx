@@ -474,6 +474,15 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   }, [])
 
   useEffect(() => {
+    // Debug logging
+    console.log('[zoom-to-fit] Effect running', {
+      currentMapId,
+      hasReadAccess,
+      nodesLength: nodes.length,
+      shouldAutoCenterConcept,
+      hasZoomedForMap: hasZoomedForMapRef.current,
+    })
+
     // Only zoom-to-fit if:
     // 1. Map is loaded
     // 2. User has read access
@@ -487,8 +496,17 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       shouldAutoCenterConcept ||
       hasZoomedForMapRef.current === currentMapId
     ) {
+      console.log('[zoom-to-fit] Conditions not met, skipping', {
+        hasMapId: !!currentMapId,
+        hasReadAccess,
+        hasNodes: nodes.length > 0,
+        notDeepLinking: !shouldAutoCenterConcept,
+        notAlreadyZoomed: hasZoomedForMapRef.current !== currentMapId,
+      })
       return
     }
+
+    console.log('[zoom-to-fit] All conditions met, starting zoom-to-fit')
 
     // Mark that we've zoomed for this map BEFORE async operations
     hasZoomedForMapRef.current = currentMapId
@@ -500,40 +518,48 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       
       // Check if component is still mounted and not cancelled
       if (!isMountedRef.current || cancelledRef.current) {
+        console.log('[zoom-to-fit] Component unmounted or cancelled during wait')
         return
       }
 
       // Double-check that we still have nodes (check from React Flow to avoid stale closure)
       const currentNodes = getNodesFromFlow()
       if (currentNodes.length === 0) {
+        console.log('[zoom-to-fit] No nodes found after wait')
         return
       }
+
+      console.log('[zoom-to-fit] Nodes found, calling fitView', { nodeCount: currentNodes.length })
 
       // Use requestAnimationFrame to ensure DOM is ready
       requestAnimationFrame(() => {
         if (!isMountedRef.current || cancelledRef.current) {
+          console.log('[zoom-to-fit] Component unmounted or cancelled in RAF')
           return
         }
         
         // Final check that nodes are still present
         const finalNodes = getNodesFromFlow()
         if (finalNodes.length === 0) {
+          console.log('[zoom-to-fit] No nodes found in RAF')
           return
         }
         
+        console.log('[zoom-to-fit] Calling fitView', { nodeCount: finalNodes.length })
         try {
           fitView({ padding: 0.1, duration: 300 })
+          console.log('[zoom-to-fit] fitView called successfully')
         } catch (error) {
           // Silently handle errors (component may have unmounted)
           if (isMountedRef.current) {
-            console.error('Error in zoom-to-fit:', error)
+            console.error('[zoom-to-fit] Error calling fitView:', error)
           }
         }
       })
     })().catch((error) => {
       // Handle any errors silently (component may have unmounted)
       if (isMountedRef.current) {
-        console.error('Error in zoom-to-fit:', error)
+        console.error('[zoom-to-fit] Error in async zoom-to-fit:', error)
       }
     })
   }, [currentMapId, hasReadAccess, nodes.length, shouldAutoCenterConcept, fitView, getNodesFromFlow])
