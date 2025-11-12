@@ -59,9 +59,10 @@ export function navigateToMap(mapId: string, clearQueryParams = false): void {
   }
   
   // Update the store directly (App.tsx will sync URL->store on popstate, but we're using pushState)
-  const { setCurrentMapId, setCurrentConceptId } = useMapStore.getState()
+  const { setCurrentMapId, setCurrentConceptId, setShouldAutoCenterConcept } = useMapStore.getState()
   setCurrentMapId(mapId)
   setCurrentConceptId(null) // Clear concept ID when navigating to map without concept
+  setShouldAutoCenterConcept(false) // Disable auto-centering when navigating to map (not a specific concept)
 }
 
 /**
