@@ -448,11 +448,6 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const hasZoomedForMapRef = useRef<string | null>(null)
   
   useEffect(() => {
-    // Reset zoom tracking when switching maps
-    if (currentMapId !== hasZoomedForMapRef.current && hasZoomedForMapRef.current !== null) {
-      hasZoomedForMapRef.current = null
-    }
-
     // Only zoom-to-fit if:
     // 1. Map is loaded
     // 2. User has read access
