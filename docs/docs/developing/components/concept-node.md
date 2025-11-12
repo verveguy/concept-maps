@@ -41,12 +41,23 @@ import { ConceptNode } from '@/components/concept/ConceptNode'
 ## Features
 
 - **Inline Editing**: Double-click to edit the label
+- **Option/Alt-Drag**: Hold Option (Mac) or Alt (Windows/Linux) while hovering to expand the handle to cover the entire node, allowing drag from anywhere
 - **Triple Entry Mode**: When editing a label, entering text in the format "Noun verb phrase Noun" automatically creates a relationship and new concept
 - **Multiple Handles**: Supports multiple edges between the same nodes
 - **Notes**: Expandable notes section with Markdown rendering
 - **Metadata**: Custom key-value pairs
 - **Presence**: Shows avatars of users viewing/editing the concept
 - **Styling**: Customizable colors via metadata
+
+## Option/Alt-Drag Feature
+
+When the user holds Option (Mac) or Alt (Windows/Linux) while hovering over a concept node, the Handle component expands to cover the entire node. This allows users to drag from anywhere on the node to create relationships, not just from the small center handle.
+
+**Implementation Details:**
+- Tracks Option/Alt key state globally via keyboard event listeners
+- Tracks mouse-over state to handle edge case where Option is pressed while already hovering
+- Handle dynamically resizes from 20px circle to 100% width/height with rounded corners
+- Uses React Flow's built-in connection creation mechanism - no manual event handling needed
 
 ## Triple Entry Mode
 

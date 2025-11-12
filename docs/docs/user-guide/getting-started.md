@@ -29,12 +29,18 @@ This guide will help you get started with the Concept Mapping Tool.
 
 4. **Create Relationships**
 
-   **Method 1: Drag and Drop**
-   - Click and drag from one concept to another
+   **Method 1: Option/Alt-Drag (Easiest)**
+   - Hold **Option** (Mac) or **Alt** (Windows/Linux) and hover over a concept
+   - The handle expands to cover the entire node
+   - Drag from anywhere on the node to another concept
+   - Enter the relationship label and press Enter
+
+   **Method 2: Drag from Center Handle**
+   - Click and drag from the small center handle on a concept
    - Enter the relationship label
    - Press Enter to confirm
 
-   **Method 2: Triple Entry (Fast Keyboard Method)**
+   **Method 3: Triple Entry (Fast Keyboard Method)**
    - Double-click on a concept node to edit its label
    - Type: `"Concept1 verb phrase Concept2"` (e.g., `"Diagrams explain Architecture"`)
    - Press Enter
