@@ -524,32 +524,41 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         return
       }
       
-      // Get viewport before fitView to verify it changes
-      const viewportBefore = getViewport()
+      // Wait for zoom change using requestAnimationFrame polling (similar to deep linking hook)
+      const waitForZoomChange = (initialZoom: number, maxTries = 60): Promise<void> => {
+        return new Promise((resolve) => {
+          let tries = 0
+          const check = () => {
+            if (cancelledRef.current || !isMountedRef.current) return
+            const viewport = getViewport()
+            if (viewport.zoom !== initialZoom || tries >= maxTries) {
+              resolve()
+            } else {
+              tries++
+              requestAnimationFrame(check)
+            }
+          }
+          check()
+        })
+      }
+      
+      // Get initial zoom before fitView
+      const initialZoom = getViewport().zoom
       
       try {
         // Call fitView with padding and duration
         fitView({ padding: 0.1, duration: 300 })
         
-        // Wait a bit for the animation to start, then verify viewport changed
-        await new Promise((resolve) => setTimeout(resolve, 100))
+        // Wait for zoom change to ensure fitView animation completes (similar to deep linking)
+        await waitForZoomChange(initialZoom)
         
         if (isMountedRef.current && !cancelledRef.current) {
           const viewportAfter = getViewport()
-          // Log if viewport actually changed (zoom or position)
-          if (viewportBefore.zoom !== viewportAfter.zoom || 
-              viewportBefore.x !== viewportAfter.x || 
-              viewportBefore.y !== viewportAfter.y) {
-            console.log('[zoom-to-fit] Viewport changed successfully', {
-              before: viewportBefore,
-              after: viewportAfter,
-            })
-          } else {
-            console.warn('[zoom-to-fit] fitView called but viewport did not change', {
-              before: viewportBefore,
-              after: viewportAfter,
-            })
-          }
+          console.log('[zoom-to-fit] Zoom-to-fit completed', {
+            initialZoom,
+            finalZoom: viewportAfter.zoom,
+            viewport: viewportAfter,
+          })
         }
       } catch (error) {
         // Silently handle errors (component may have unmounted)
