@@ -134,6 +134,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const currentMapId = useMapStore((state) => state.currentMapId)
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
   const isEditingPerspective = useMapStore((state) => state.isEditingPerspective)
+  const shouldAutoCenterConcept = useMapStore((state) => state.shouldAutoCenterConcept)
   const setIsOptionKeyPressed = useCanvasStore((state) => state.setIsOptionKeyPressed)
   
   // Ref for the React Flow wrapper div (used for event handlers)
@@ -173,8 +174,8 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMapId]) // Only depend on currentMapId - store actions are stable
   
-  // Check if user has write access to the current map
-  const { hasWriteAccess } = useMapPermissions()
+  // Check if user has write access and read access to the current map
+  const { hasWriteAccess, hasReadAccess } = useMapPermissions()
   
   // Get perspectives to check which concepts are included
   const perspectives = usePerspectives()
@@ -442,6 +443,109 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     getViewport,
   })
 
+  // Automatic zoom-to-fit when opening a map (if not doing deep linking)
+  // Track if we've already zoomed for the current map to prevent re-zooming on every render
+  const hasZoomedForMapRef = useRef<string | null>(null)
+  const isMountedRef = useRef(true)
+  const cancelledRef = useRef(false)
+  
+  useEffect(() => {
+    isMountedRef.current = true
+    cancelledRef.current = false
+    return () => {
+      isMountedRef.current = false
+      cancelledRef.current = true
+    }
+  }, [])
+
+  useEffect(() => {
+    // Only zoom-to-fit if:
+    // 1. Map is loaded
+    // 2. User has read access
+    // 3. Nodes are loaded (at least one node exists)
+    // 4. NOT doing deep linking (shouldAutoCenterConcept is false)
+    // 5. Haven't already zoomed for this map
+    if (
+      !currentMapId ||
+      !hasReadAccess ||
+      nodes.length === 0 ||
+      shouldAutoCenterConcept ||
+      hasZoomedForMapRef.current === currentMapId
+    ) {
+      return
+    }
+
+    // Use async approach - wait for React Flow and nodes to be ready
+    // Use a simple timeout approach instead of blocking polling to avoid blocking React Flow initialization
+    ;(async () => {
+      // Wait for React Flow to initialize and nodes to render (consistent with deep linking hook delay)
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      
+      // Check if component is still mounted
+      if (!isMountedRef.current || cancelledRef.current) {
+        return
+      }
+
+      // Check that we have nodes (check from React Flow to avoid stale closure)
+      const currentNodes = getNodesFromFlow()
+      if (currentNodes.length === 0) {
+        // If no nodes yet, wait a bit more and try once more
+        await new Promise((resolve) => setTimeout(resolve, 200))
+        if (!isMountedRef.current || cancelledRef.current) {
+          return
+        }
+        const retryNodes = getNodesFromFlow()
+        if (retryNodes.length === 0) {
+          return // Silently skip if nodes still not available
+        }
+      }
+
+      // Wait for zoom change using requestAnimationFrame polling (similar to deep linking hook)
+      const waitForZoomChange = (initialZoom: number, maxTries = 60): Promise<void> => {
+        return new Promise((resolve) => {
+          let tries = 0
+          const check = () => {
+            if (cancelledRef.current || !isMountedRef.current) return
+            const viewport = getViewport()
+            if (viewport.zoom !== initialZoom || tries >= maxTries) {
+              resolve()
+            } else {
+              tries++
+              requestAnimationFrame(check)
+            }
+          }
+          check()
+        })
+      }
+      
+      // Get initial zoom before fitView
+      const initialZoom = getViewport().zoom
+      
+      try {
+        // Call fitView with padding and duration
+        fitView({ padding: 0.1, duration: 300 })
+        
+        // Wait for zoom change to ensure fitView animation completes (similar to deep linking)
+        await waitForZoomChange(initialZoom)
+        
+        // Only mark as zoomed AFTER successful fitView call
+        if (isMountedRef.current && !cancelledRef.current) {
+          hasZoomedForMapRef.current = currentMapId
+        }
+      } catch (error) {
+        // Handle errors from fitView call (component may have unmounted)
+        if (isMountedRef.current) {
+          console.error('[zoom-to-fit] Error calling fitView:', error)
+        }
+      }
+    })().catch((error) => {
+      // Handle any errors from async zoom-to-fit logic (component may have unmounted)
+      if (isMountedRef.current) {
+        console.error('[zoom-to-fit] Error in async zoom-to-fit:', error)
+      }
+    })
+  }, [currentMapId, hasReadAccess, nodes.length, shouldAutoCenterConcept, fitView, getNodesFromFlow, getViewport])
+
   // Expose layout handler via ref (must be after nodes/edges are initialized)
   useImperativeHandle(ref, () => ({
     applyLayout: applyLayoutSimple,
@@ -486,7 +590,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         onPaneClick={onPaneClick}
         nodesDraggable={hasWriteAccess}
         nodesConnectable={hasWriteAccess}
-        fitView
+        fitView={false}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         connectionLineComponent={CustomConnectionLine}
       >
