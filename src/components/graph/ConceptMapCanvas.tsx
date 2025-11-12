@@ -141,7 +141,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null)
   
   // Track if this is the initial mount (for fitView prop - only use on first mount)
+  // Note: We don't use fitView prop when navigating directly via URL, only on true initial app load
   const isInitialMountRef = useRef(true)
+  const hasInitialMapIdRef = useRef<string | null>(null)
 
   // Track Option/Alt key state globally (single listener for all nodes)
   useEffect(() => {
@@ -174,8 +176,14 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     
     clearLaidOutNodeIds()
     resetCanvasState()
+    
+    // Track if we had an initial map ID on mount (direct URL navigation)
+    if (isInitialMountRef.current && hasInitialMapIdRef.current === null) {
+      hasInitialMapIdRef.current = currentMapId
+    }
+    
     // Mark that we're no longer on initial mount after first map load
-    if (isInitialMountRef.current) {
+    if (isInitialMountRef.current && hasInitialMapIdRef.current !== currentMapId) {
       isInitialMountRef.current = false
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -574,7 +582,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         onPaneClick={onPaneClick}
         nodesDraggable={hasWriteAccess}
         nodesConnectable={hasWriteAccess}
-        fitView={isInitialMountRef.current}
+        fitView={false}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         connectionLineComponent={CustomConnectionLine}
       >
