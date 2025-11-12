@@ -139,6 +139,9 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   
   // Ref for the React Flow wrapper div (used for event handlers)
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null)
+  
+  // Track if this is the initial mount (for fitView prop - only use on first mount)
+  const isInitialMountRef = useRef(true)
 
   // Track Option/Alt key state globally (single listener for all nodes)
   useEffect(() => {
@@ -171,6 +174,10 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     
     clearLaidOutNodeIds()
     resetCanvasState()
+    // Mark that we're no longer on initial mount after first map load
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMapId]) // Only depend on currentMapId - store actions are stable
   
@@ -446,12 +453,23 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   // Automatic zoom-to-fit when opening a map (if not doing deep linking)
   // Track if we've already zoomed for the current map to prevent re-zooming on every render
   const hasZoomedForMapRef = useRef<string | null>(null)
+  const isMountedRef = useRef(true)
+  const cancelledRef = useRef(false)
   
+  useEffect(() => {
+    isMountedRef.current = true
+    cancelledRef.current = false
+    return () => {
+      isMountedRef.current = false
+      cancelledRef.current = true
+    }
+  }, [])
+
   useEffect(() => {
     // Only zoom-to-fit if:
     // 1. Map is loaded
     // 2. User has read access
-    // 3. Nodes are loaded
+    // 3. Nodes are loaded (check for concept nodes specifically, not just any nodes)
     // 4. NOT doing deep linking (shouldAutoCenterConcept is false)
     // 5. Haven't already zoomed for this map
     if (
@@ -464,18 +482,53 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
       return
     }
 
-    // Mark that we've zoomed for this map
+    // Mark that we've zoomed for this map BEFORE async operations
     hasZoomedForMapRef.current = currentMapId
 
-    // Small delay to ensure React Flow is ready and nodes are rendered
-    const timeoutId = setTimeout(() => {
-      fitView({ padding: 0.1, duration: 300 })
-    }, 100)
+    // Use async approach similar to deep linking hook for better reliability
+    ;(async () => {
+      // Wait for React Flow to be ready and nodes to be rendered
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      
+      // Check if component is still mounted and not cancelled
+      if (!isMountedRef.current || cancelledRef.current) {
+        return
+      }
 
-    return () => {
-      clearTimeout(timeoutId)
-    }
-  }, [currentMapId, hasReadAccess, nodes.length, shouldAutoCenterConcept, fitView])
+      // Double-check that we still have nodes (check from React Flow to avoid stale closure)
+      const currentNodes = getNodesFromFlow()
+      if (currentNodes.length === 0) {
+        return
+      }
+
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        if (!isMountedRef.current || cancelledRef.current) {
+          return
+        }
+        
+        // Final check that nodes are still present
+        const finalNodes = getNodesFromFlow()
+        if (finalNodes.length === 0) {
+          return
+        }
+        
+        try {
+          fitView({ padding: 0.1, duration: 300 })
+        } catch (error) {
+          // Silently handle errors (component may have unmounted)
+          if (isMountedRef.current) {
+            console.error('Error in zoom-to-fit:', error)
+          }
+        }
+      })
+    })().catch((error) => {
+      // Handle any errors silently (component may have unmounted)
+      if (isMountedRef.current) {
+        console.error('Error in zoom-to-fit:', error)
+      }
+    })
+  }, [currentMapId, hasReadAccess, nodes.length, shouldAutoCenterConcept, fitView, getNodesFromFlow])
 
   // Expose layout handler via ref (must be after nodes/edges are initialized)
   useImperativeHandle(ref, () => ({
@@ -521,7 +574,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         onPaneClick={onPaneClick}
         nodesDraggable={hasWriteAccess}
         nodesConnectable={hasWriteAccess}
-        fitView
+        fitView={isInitialMountRef.current}
         defaultViewport={{ x: 0, y: 0, zoom: 1 }}
         connectionLineComponent={CustomConnectionLine}
       >
