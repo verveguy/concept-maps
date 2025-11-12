@@ -463,15 +463,22 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const hasZoomedForMapRef = useRef<string | null>(null)
   const isMountedRef = useRef(true)
   const cancelledRef = useRef(false)
+  const reactFlowReadyRef = useRef(false)
   
   useEffect(() => {
     isMountedRef.current = true
     cancelledRef.current = false
+    reactFlowReadyRef.current = false // Reset when component mounts
     return () => {
       isMountedRef.current = false
       cancelledRef.current = true
     }
   }, [])
+  
+  // Track when React Flow is ready via onLoad callback
+  const handleReactFlowLoad = useRef(() => {
+    reactFlowReadyRef.current = true
+  }).current
 
   useEffect(() => {
     // Only zoom-to-fit if:
@@ -495,9 +502,15 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
 
     // Use async approach similar to deep linking hook for better reliability
     ;(async () => {
-      // Wait longer for React Flow to be fully initialized and nodes to be rendered
-      // Increased delay to ensure React Flow is ready
-      await new Promise((resolve) => setTimeout(resolve, 300))
+      // Wait for React Flow to be ready (poll until onLoad has been called)
+      let tries = 0
+      while (!reactFlowReadyRef.current && tries < 100 && isMountedRef.current && !cancelledRef.current) {
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+        tries++
+      }
+      
+      // Additional delay to ensure nodes are rendered
+      await new Promise((resolve) => setTimeout(resolve, 200))
       
       // Check if component is still mounted and not cancelled
       if (!isMountedRef.current || cancelledRef.current) {
@@ -616,6 +629,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
+        onInit={handleReactFlowLoad}
         nodesDraggable={hasWriteAccess}
         nodesConnectable={hasWriteAccess}
         fitView={false}
