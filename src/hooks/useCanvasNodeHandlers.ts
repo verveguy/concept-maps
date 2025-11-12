@@ -194,7 +194,7 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
 
   /**
    * Handle node drag - update position in database with throttling.
-   * Skips position updates if Option-drag is active (connection creation in progress).
+   * Skips position updates if connection creation is in progress (Handle drag).
    */
   const onNodeDrag = useCallback(
     async (_event: React.MouseEvent, node: Node) => {
@@ -206,8 +206,10 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
         return
       }
 
-      // Skip position updates if Option-drag is active (connection creation in progress)
-      // This prevents the node from moving while creating a connection
+      // Skip position updates if connection creation is in progress (Handle drag)
+      // This prevents the node from moving while creating a connection from any Handle
+      // (center handle or expanded Option-drag handle). React Flow may still fire
+      // onNodeDrag events during Handle drags, so this check ensures nodes don't move.
       if (connectionStart && connectionStart.sourceId === node.id) {
         // Still update cursor position for presence, but don't update node position
         const flowPosition = screenToFlowPosition({
