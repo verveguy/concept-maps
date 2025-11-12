@@ -10,13 +10,25 @@ Relationships connect concepts and describe how they relate to each other.
 
 ### In Graph View
 
-#### Method 1: Drag and Drop
-1. Click and drag from one concept node to another
+#### Method 1: Option/Alt-Drag (Drag from Anywhere)
+Hold **Option** (Mac) or **Alt** (Windows/Linux) while hovering over a concept node. The connection handle will expand to cover the entire node, allowing you to drag from anywhere on the node to create a relationship.
+
+1. **Hold Option/Alt** and hover over a concept node
+2. The handle expands to cover the entire node
+3. **Click and drag** from anywhere on the node to another concept (or empty space)
+4. Enter the relationship label
+5. Optionally enter a reverse label (how the relationship reads in the opposite direction)
+6. Press Enter to confirm
+
+**Tip:** This method is especially useful when nodes are large or when you want to drag from a specific part of the node without needing to find the small center handle.
+
+#### Method 2: Drag from Center Handle
+1. Click and drag from the center handle of one concept node to another
 2. Enter the relationship label
 3. Optionally enter a reverse label (how the relationship reads in the opposite direction)
 4. Press Enter to confirm
 
-#### Method 2: Triple Entry Mode (Fast Keyboard Creation)
+#### Method 3: Triple Entry Mode (Fast Keyboard Creation)
 1. **Double-click** on a concept node to edit its label
 2. Type a triple in the format: `"Noun verb phrase Noun"` (e.g., `"Diagrams explain Architecture"`)
 3. Press **Enter** or click outside the input

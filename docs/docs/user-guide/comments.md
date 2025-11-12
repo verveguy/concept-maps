@@ -16,9 +16,6 @@ Comments are sticky note-style annotations that you can add to your concept maps
 3. A new comment will appear at the click location
 4. **Double-click** the comment to start editing
 
-#### Method 2: Keyboard Shortcut
-- Use `Ctrl/Cmd + Shift + C` to create a comment at the current cursor position
-
 ## Editing Comments
 
 ### Inline Editing

@@ -22,26 +22,47 @@ Perspectives are useful for:
 
 ## Creating a Perspective
 
-1. Select the concepts and relationships you want to include
-2. Click "Create Perspective" in the toolbar
+1. In the sidebar, expand the map you want to create a perspective for
+2. Click **"Add Perspective"** at the bottom of the perspectives list
 3. Enter a name for the perspective
-4. Click "Create"
+4. Click **"Create"**
 
-The perspective will be saved and appear in the perspectives panel.
+The perspective will be created empty and appear in the sidebar. You can then edit it to add concepts and relationships.
 
 ## Viewing a Perspective
 
-1. Open the perspectives panel
-2. Click on a perspective name
-3. The view will filter to show only concepts and relationships in that perspective
+1. In the sidebar, click on a perspective name
+2. The canvas will filter to show only concepts and relationships included in that perspective
+3. Concepts and relationships not in the perspective are hidden
 
 ## Editing Perspectives
 
-1. Open the perspectives panel
-2. Click "Edit" next to a perspective
-3. Add or remove concepts and relationships
-4. Save changes
+To edit which concepts and relationships are included in a perspective:
+
+1. **Select a perspective** from the sidebar (to view it)
+2. Click the **"Edit Perspective"** button in the toolbar
+3. A side panel will open showing all concepts and relationships in the map
+4. **Toggle inclusion** using:
+   - **Checkboxes** in the side panel for concepts and relationships
+   - **Shift+Click** on concepts in the canvas to toggle them
+5. Concepts and relationships not included are shown greyed out
+6. Changes are saved automatically
+
+**Note:** Relationships can only be included if both their source and target concepts are already in the perspective.
+
+## Perspective Editor Modes
+
+The perspective editor has two modes:
+
+- **Edit Mode**: Shows all concepts and relationships (greyed out if not included)
+- **View Mode**: Shows only included concepts and relationships (read-only)
+
+Toggle between modes using the Eye/Edit icon button in the editor panel header.
 
 ## Deleting Perspectives
 
-Right-click on a perspective in the panel and select "Delete". This does not delete the underlying concepts or relationships.
+1. Open the perspective editor (click "Edit Perspective" button)
+2. Click the **"Delete Perspective"** button at the bottom of the editor panel
+3. Confirm the deletion
+
+Deleting a perspective does not delete the underlying concepts or relationships - it only removes the filtered view.

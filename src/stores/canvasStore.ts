@@ -121,6 +121,12 @@ export interface CanvasState {
   /** Clear previous concept IDs */
   clearPrevConceptIds: () => void
 
+  // Option/Alt key state (for handle expansion)
+  /** Whether Option/Alt key is currently pressed */
+  isOptionKeyPressed: boolean
+  /** Set Option/Alt key pressed state */
+  setIsOptionKeyPressed: (pressed: boolean) => void
+
   // Reset/clear functions
   /** Reset all canvas state (useful when switching maps) */
   resetCanvasState: () => void
@@ -237,6 +243,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   prevConceptIds: INITIAL_RESETTABLE_STATE.prevConceptIds,
   setPrevConceptIds: (ids) => set({ prevConceptIds: ids }),
   clearPrevConceptIds: () => set({ prevConceptIds: INITIAL_RESETTABLE_STATE.prevConceptIds }),
+
+  // Option/Alt key state
+  isOptionKeyPressed: false,
+  setIsOptionKeyPressed: (pressed) => set({ isOptionKeyPressed: pressed }),
 
   // Reset function - resets all resettable state to initial values
   // Note: selectedLayout and hasCheckedInitialConcept are preserved
