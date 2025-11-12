@@ -57,14 +57,15 @@ This guide will help you get started with the Concept Mapping Tool.
    - Use the toolbar to customize colors, styles, and line thickness
    - Changes are saved automatically
 
-## Editing Modes
+## View Modes
 
-The tool supports two editing modes:
+The tool supports multiple view modes:
 
 - **Graph View**: Visual node-and-edge representation (default)
-- **Text View**: Structured text representation with triple notation
+- **Text View**: Structured text representation with triple notation (appears as a draggable node on the canvas)
+- **Both**: Show graph and text view simultaneously
 
-Switch between modes using the toggle in the top toolbar.
+Toggle the text view using the **FileText** button in the React Flow controls (bottom-left of the canvas). The text view appears as a draggable node that you can position anywhere on the canvas.
 
 ## Next Steps
 
