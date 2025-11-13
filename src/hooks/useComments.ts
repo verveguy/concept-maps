@@ -94,6 +94,7 @@ export function useComments() {
       creatorEmail: c.creator?.email || null,
       creatorImageURL: c.creator?.imageURL || null,
       resolved: c.resolved || false,
+      userPlaced: c.userPlaced ?? undefined,
       createdAt: new Date(c.createdAt),
       updatedAt: new Date(c.updatedAt),
       deletedAt: c.deletedAt ? new Date(c.deletedAt) : null,

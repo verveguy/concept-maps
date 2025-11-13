@@ -28,6 +28,8 @@ export interface UpdateCommentData {
   text?: string
   /** New position coordinates */
   position?: { x: number; y: number }
+  /** Whether this node was placed by the user (true) or by layout algorithm (false) */
+  userPlaced?: boolean
 }
 
 /**
@@ -176,6 +178,7 @@ export function useCommentActions() {
       updateData.positionX = updates.position.x
       updateData.positionY = updates.position.y
     }
+    if (updates.userPlaced !== undefined) updateData.userPlaced = updates.userPlaced
 
     await db.transact([tx.comments[commentId].update(updateData)])
   }

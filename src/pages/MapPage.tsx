@@ -4,7 +4,7 @@
  * Includes concept creation, perspective management, and sharing functionality.
  */
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Plus, X, Share2, Eye, Edit, PanelLeft, Lock } from 'lucide-react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ConceptMapCanvas, type ConceptMapCanvasRef } from '@/components/graph/ConceptMapCanvas'
@@ -23,6 +23,7 @@ import { useMap } from '@/hooks/useMap'
 import { usePerspectives } from '@/hooks/usePerspectives'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { usePendingInvitation } from '@/hooks/usePendingInvitation'
+import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 import { navigateToRoot } from '@/utils/navigation'
 
 /**
@@ -45,12 +46,26 @@ export function MapPage() {
   const { createConcept } = useConceptActions()
   const { hasWriteAccess, hasReadAccess } = useMapPermissions()
   const { invitation: pendingInvitation, isLoading: isInvitationLoading } = usePendingInvitation(currentMapId)
+  const { updateMap } = useCanvasMutations()
   const [isCreatingConcept, setIsCreatingConcept] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showShareDialog, setShowShareDialog] = useState(false)
   const [conceptLabel, setConceptLabel] = useState('')
   const [createPosition, setCreatePosition] = useState<{ x: number; y: number } | null>(null)
   const canvasRef = useRef<ConceptMapCanvasRef>(null)
+  const mapNameRef = useRef<HTMLHeadingElement>(null)
+  const previousMapNameRef = useRef<string>('')
+  const isEditingRef = useRef(false)
+
+  // Sync contentEditable element with map name when it changes externally
+  useEffect(() => {
+    if (mapNameRef.current && !isEditingRef.current && map?.name) {
+      const currentText = mapNameRef.current.textContent?.trim() || ''
+      if (currentText !== map.name) {
+        mapNameRef.current.textContent = map.name
+      }
+    }
+  }, [map?.name])
 
   const handleCreateConcept = useCallback(
     async (position: { x: number; y: number }) => {
@@ -89,6 +104,66 @@ export function MapPage() {
       }
     },
     [currentMapId, map, createPosition, conceptLabel, createConcept]
+  )
+
+  /**
+   * Handle map name editing - save on blur.
+   */
+  const handleMapNameBlur = useCallback(
+    async (e: React.FocusEvent<HTMLHeadingElement>) => {
+      isEditingRef.current = false
+      if (!currentMapId || !map || !hasWriteAccess) return
+
+      const newName = e.currentTarget.textContent?.trim() || ''
+      const previousName = previousMapNameRef.current || map.name || 'Untitled Map'
+
+      // Only update if the name actually changed
+      if (newName !== previousName && newName.length > 0) {
+        try {
+          await updateMap(
+            currentMapId,
+            { name: newName },
+            { name: previousName }
+          )
+        } catch (error) {
+          console.error('Failed to update map name:', error)
+          // Revert to previous name on error
+          e.currentTarget.textContent = previousName
+        }
+      } else if (newName.length === 0) {
+        // If empty, revert to previous name
+        e.currentTarget.textContent = previousName
+      }
+    },
+    [currentMapId, map, hasWriteAccess, updateMap]
+  )
+
+  /**
+   * Handle map name focus - store previous name for undo.
+   */
+  const handleMapNameFocus = useCallback(
+    (e: React.FocusEvent<HTMLHeadingElement>) => {
+      isEditingRef.current = true
+      previousMapNameRef.current = e.currentTarget.textContent?.trim() || map?.name || 'Untitled Map'
+    },
+    [map]
+  )
+
+  /**
+   * Handle Enter key to blur (save) the map name.
+   */
+  const handleMapNameKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLHeadingElement>) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        e.currentTarget.blur()
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        e.currentTarget.textContent = previousMapNameRef.current || map?.name || 'Untitled Map'
+        e.currentTarget.blur()
+      }
+    },
+    [map]
   )
 
   if (!currentMapId) {
@@ -170,7 +245,18 @@ export function MapPage() {
               </button>
             )}
             <div className="flex items-center gap-2 flex-1 min-w-0">
-              <h1 className="text-lg font-semibold">{map?.name || 'Untitled Map'}</h1>
+              <h1
+                ref={mapNameRef}
+                contentEditable={hasWriteAccess}
+                suppressContentEditableWarning
+                onBlur={handleMapNameBlur}
+                onFocus={handleMapNameFocus}
+                onKeyDown={handleMapNameKeyDown}
+                className="text-lg font-semibold outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-1 -mx-1"
+                style={{ cursor: hasWriteAccess ? 'text' : 'default' }}
+              >
+                {map?.name || 'Untitled Map'}
+              </h1>
             </div>
             <div className="flex-1" />
             {/* Presence Header - shows all users */}
@@ -207,7 +293,18 @@ export function MapPage() {
             </button>
           )}
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <h1 className="text-lg font-semibold">{map?.name || 'Untitled Map'}</h1>
+            <h1
+              ref={mapNameRef}
+              contentEditable={hasWriteAccess}
+              suppressContentEditableWarning
+              onBlur={handleMapNameBlur}
+              onFocus={handleMapNameFocus}
+              onKeyDown={handleMapNameKeyDown}
+              className="text-lg font-semibold outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-1 -mx-1"
+              style={{ cursor: hasWriteAccess ? 'text' : 'default' }}
+            >
+              {map?.name || 'Untitled Map'}
+            </h1>
             {currentPerspective && (
               <>
                 <span className="text-muted-foreground">/</span>

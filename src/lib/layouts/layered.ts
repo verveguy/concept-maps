@@ -121,20 +121,33 @@ export async function applyLayeredLayout(
     }
   })
 
+  // Create a set of valid node IDs for validation
+  const validNodeIds = new Set(nodes.map(n => n.id))
+  
   // Convert React Flow edges to elkjs format
-  const elkEdges = edges.map((edge) => {
-    const labelWidth = getEdgeLabelWidth(edge)
-    
-    return {
-      id: edge.id,
-      sources: [edge.source],
-      targets: [edge.target],
-      // Add label width to help with spacing
-      ...(labelWidth > 0 && {
-        labels: [{ text: '', width: labelWidth, height: 20 }],
-      }),
-    }
-  })
+  // Filter out edges that reference nodes not in the graph
+  const elkEdges = edges
+    .filter((edge) => {
+      // Only include edges where both source and target nodes exist
+      const isValid = validNodeIds.has(edge.source) && validNodeIds.has(edge.target)
+      if (!isValid) {
+        console.warn(`Skipping edge ${edge.id}: source or target node not found in graph`)
+      }
+      return isValid
+    })
+    .map((edge) => {
+      const labelWidth = getEdgeLabelWidth(edge)
+      
+      return {
+        id: edge.id,
+        sources: [edge.source],
+        targets: [edge.target],
+        // Add label width to help with spacing
+        ...(labelWidth > 0 && {
+          labels: [{ text: '', width: labelWidth, height: 20 }],
+        }),
+      }
+    })
 
   // Map direction to elkjs direction
   const elkDirection = direction === 'UP' ? 'UP' :
@@ -169,7 +182,10 @@ export async function applyLayeredLayout(
   // Extract positions and update nodes
   return nodes.map((node) => {
     const elkNode = layoutedGraph.children?.find((n) => n.id === node.id)
-    if (elkNode && elkNode.x !== undefined && elkNode.y !== undefined) {
+    if (elkNode && 
+        typeof elkNode.x === 'number' && typeof elkNode.y === 'number' &&
+        !isNaN(elkNode.x) && !isNaN(elkNode.y) &&
+        isFinite(elkNode.x) && isFinite(elkNode.y)) {
       // elkjs positions nodes by their center, React Flow by top-left
       const nodeWidth = 150
       const nodeHeight = 50
@@ -180,6 +196,10 @@ export async function applyLayeredLayout(
           y: elkNode.y - nodeHeight / 2,
         },
       }
+    }
+    // If ELK didn't return a valid position, keep the original position
+    if (elkNode) {
+      console.warn(`ELK did not return a valid position for node ${node.id}, keeping original position`)
     }
     return node
   })

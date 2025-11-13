@@ -229,23 +229,51 @@ export function applyForceDirectedLayout(
         e => e.source === node.id || e.target === node.id
       )
       if (connectedEdges.length > 0) {
-        // Find average position of connected fixed nodes (nodes not in the neighborhood)
+        // Find all connected nodes (prefer fixed nodes, but use any if none are fixed)
         const connectedNodeIds = new Set<string>()
         connectedEdges.forEach(e => {
           if (e.source !== node.id) connectedNodeIds.add(e.source)
           if (e.target !== node.id) connectedNodeIds.add(e.target)
         })
         
-        const connectedFixedNodes = nodes.filter(
-          n => connectedNodeIds.has(n.id) && computedFixedNodeIds?.has(n.id)
+        // Prefer fixed nodes for positioning, but use any connected nodes if needed
+        const connectedNodes = nodes.filter(n => connectedNodeIds.has(n.id))
+        const connectedFixedNodes = connectedNodes.filter(
+          n => computedFixedNodeIds?.has(n.id)
         )
         
-        if (connectedFixedNodes.length > 0) {
-          const avgX = connectedFixedNodes.reduce((sum, n) => sum + n.position.x, 0) / connectedFixedNodes.length
-          const avgY = connectedFixedNodes.reduce((sum, n) => sum + n.position.y, 0) / connectedFixedNodes.length
-          // Position new node offset from average position
-          x = avgX + (adaptiveDistance * 0.8)
-          y = avgY + (adaptiveDistance * 0.8)
+        const nodesToUseForPositioning = connectedFixedNodes.length > 0 
+          ? connectedFixedNodes 
+          : connectedNodes
+        
+        if (nodesToUseForPositioning.length > 0) {
+          // Calculate average position of connected nodes
+          const avgX = nodesToUseForPositioning.reduce((sum, n) => sum + n.position.x, 0) / nodesToUseForPositioning.length
+          const avgY = nodesToUseForPositioning.reduce((sum, n) => sum + n.position.y, 0) / nodesToUseForPositioning.length
+          
+          // Position new node at optimal distance from connected nodes
+          // If multiple connected nodes, position in a direction that minimizes overlap
+          if (nodesToUseForPositioning.length === 1) {
+            // Single connection: position at ideal distance in a random direction
+            const angle = Math.random() * 2 * Math.PI
+            x = avgX + Math.cos(angle) * adaptiveDistance
+            y = avgY + Math.sin(angle) * adaptiveDistance
+          } else {
+            // Multiple connections: find a good position that's not too close to any
+            // Use the average position but offset perpendicular to the main connection vector
+            const firstNode = nodesToUseForPositioning[0]
+            const dx = avgX - firstNode.position.x
+            const dy = avgY - firstNode.position.y
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1
+            
+            // Perpendicular vector (rotate 90 degrees)
+            const perpX = -dy / dist
+            const perpY = dx / dist
+            
+            // Position at ideal distance along perpendicular
+            x = avgX + perpX * adaptiveDistance * 0.9
+            y = avgY + perpY * adaptiveDistance * 0.9
+          }
         }
       }
     }

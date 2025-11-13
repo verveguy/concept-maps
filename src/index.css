@@ -92,6 +92,14 @@
     z-index: 1;
   }
   
+  /* Ensure Lucide icons render correctly - no fill, use stroke only */
+  /* Target SVG elements in buttons that have stroke attributes (Lucide icons) */
+  button svg[stroke],
+  button svg path[stroke],
+  button svg[fill="none"] path {
+    fill: none !important;
+  }
+  
   /* Ensure popover backgrounds are fully opaque */
   .bg-popover {
     background-color: hsl(var(--popover)) !important;

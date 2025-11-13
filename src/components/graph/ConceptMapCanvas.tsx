@@ -52,7 +52,7 @@
  * ```
  */
 
-import { useMemo, useEffect, useRef, useImperativeHandle, forwardRef } from 'react'
+import { useMemo, useEffect, useRef, useImperativeHandle, forwardRef, useCallback } from 'react'
 import ReactFlow, {
   Background,
   Controls,
@@ -77,6 +77,7 @@ import { useCanvasDataSync } from '@/hooks/useCanvasDataSync'
 import { useCanvasCreation } from '@/hooks/useCanvasCreation'
 import { useCanvasDeepLinking } from '@/hooks/useCanvasDeepLinking'
 import { useCanvasPresence } from '@/hooks/useCanvasPresence'
+import { db, tx } from '@/lib/instant'
 import type { LayoutType } from '@/lib/layouts'
 import { useUIStore } from '@/stores/uiStore'
 import { useMapStore } from '@/stores/mapStore'
@@ -88,6 +89,7 @@ import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { LayoutSelector } from './LayoutSelector'
 import { CustomConnectionLine } from './CustomConnectionLine'
 import { CanvasContextMenu } from './CanvasContextMenu'
+import { useMap } from '@/hooks/useMap'
 
 /**
  * Props for ConceptMapCanvas component.
@@ -116,26 +118,26 @@ export interface ConceptMapCanvasRef {
  */
 const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasProps>(
   (_props, ref) => {
-  // Use refs to ensure nodeTypes and edgeTypes have stable references
-  // This prevents React Flow from detecting them as new objects on each render
-  const nodeTypesRef = useRef(nodeTypes)
-  const edgeTypesRef = useRef(edgeTypes)
-  
-  // Canvas store state - centralized canvas-specific state management
-  const {
-    contextMenuVisible,
-    setContextMenuVisible,
-    contextMenuPosition,
-    setContextMenuPosition,
-    resetCanvasState,
-    clearLaidOutNodeIds,
-  } = useCanvasStore()
-  
-  const currentMapId = useMapStore((state) => state.currentMapId)
-  const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
-  const isEditingPerspective = useMapStore((state) => state.isEditingPerspective)
-  const shouldAutoCenterConcept = useMapStore((state) => state.shouldAutoCenterConcept)
-  const setIsOptionKeyPressed = useCanvasStore((state) => state.setIsOptionKeyPressed)
+    // Use refs to ensure nodeTypes and edgeTypes have stable references
+    // This prevents React Flow from detecting them as new objects on each render
+    const nodeTypesRef = useRef(nodeTypes)
+    const edgeTypesRef = useRef(edgeTypes)
+    
+    // Canvas store state - centralized canvas-specific state management
+    const {
+      contextMenuVisible,
+      setContextMenuVisible,
+      contextMenuPosition,
+      setContextMenuPosition,
+      resetCanvasState,
+    } = useCanvasStore()
+    
+    const currentMapId = useMapStore((state) => state.currentMapId)
+    const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
+    const isEditingPerspective = useMapStore((state) => state.isEditingPerspective)
+    const shouldAutoCenterConcept = useMapStore((state) => state.shouldAutoCenterConcept)
+    const setIsOptionKeyPressed = useCanvasStore((state) => state.setIsOptionKeyPressed)
+    const { map } = useMap()
   
   // Ref for the React Flow wrapper div (used for event handlers)
   const reactFlowWrapperRef = useRef<HTMLDivElement>(null)
@@ -169,7 +171,6 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   useEffect(() => {
     if (!currentMapId) return
     
-    clearLaidOutNodeIds()
     resetCanvasState()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentMapId]) // Only depend on currentMapId - store actions are stable
@@ -305,22 +306,121 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     getNodes: getNodesFromFlow,
     setNodes: setNodesFromFlow,
   })
+  
+  // Handler to pin all nodes (set userPlaced: true on all concepts and comments)
+  const handlePinNodes = useCallback(async () => {
+    if (!currentMapId || !hasWriteAccess) return
+    
+    try {
+      // Build batch transaction to update all concepts and comments
+      const updates: Parameters<typeof db.transact>[0] = []
+      
+      // Update all concepts
+      concepts.forEach(concept => {
+        // Only update if not already pinned
+        if (concept.userPlaced !== true) {
+          updates.push(
+            tx.concepts[concept.id].update({
+              userPlaced: true,
+              updatedAt: Date.now(),
+            })
+          )
+        }
+      })
+      
+      // Update all comments
+      comments.forEach(comment => {
+        // Only update if not already pinned
+        if (comment.userPlaced !== true) {
+          updates.push(
+            tx.comments[comment.id].update({
+              userPlaced: true,
+              updatedAt: Date.now(),
+            })
+          )
+        }
+      })
+      
+      // Execute batch update
+      if (updates.length > 0) {
+        await db.transact(updates)
+      }
+    } catch (error) {
+      console.error('Failed to pin nodes:', error)
+      alert('Failed to pin nodes. Please try again.')
+    }
+  }, [currentMapId, hasWriteAccess, concepts, comments])
 
-  // Layout hook - handles layout application, sticky layout, and auto-apply
+  // Layout hook - handles layout application
   const {
-    applyLayout: handleApplyLayout,
+    applyLayout,
     applyLayoutSimple,
-    activeLayout,
+    applyIncrementalLayoutForNewNodes,
     selectedLayout,
     setSelectedLayout,
   } = useCanvasLayout({
     nodes,
     edges,
     conceptIds: concepts.map(c => c.id),
+    concepts,
+    comments,
     getNodes: getNodesFromFlow,
     getEdges: () => edges,
     fitView,
   })
+
+  // Load layout algorithm from map when map loads or changes
+  useEffect(() => {
+    if (!map) return
+    
+    // If map has a stored layout algorithm, use it; otherwise default to 'force-directed'
+    const storedLayout = (map.layoutAlgorithm || 'force-directed') as LayoutType
+    const currentLayout = useCanvasStore.getState().selectedLayout
+    
+    // Only update if the stored layout differs from the current selection
+    // This prevents unnecessary updates when we've just saved the layout
+    if (storedLayout !== currentLayout) {
+      setSelectedLayout(storedLayout)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map?.layoutAlgorithm, map?.id, setSelectedLayout]) // Depend on specific fields to avoid unnecessary re-runs
+  
+  // Wrapper to convert applyLayout signature (remove incremental parameter for button clicks)
+  const handleApplyLayout = useCallback(
+    (layoutType: LayoutType) => {
+      return applyLayout(layoutType, false) // Always full layout when clicking button
+    },
+    [applyLayout]
+  )
+  
+  // Store incremental layout function in canvas store so ConceptNode can access it
+  // Use a ref to store the function to avoid infinite loops from changing function references
+  const layoutFunctionRef = useRef(applyIncrementalLayoutForNewNodes)
+  const { setApplyIncrementalLayoutForNewNodes } = useCanvasStore()
+  
+  // Update ref when function changes
+  useEffect(() => {
+    layoutFunctionRef.current = applyIncrementalLayoutForNewNodes
+  }, [applyIncrementalLayoutForNewNodes])
+  
+  // Set function in store only once on mount/unmount to avoid infinite loops
+  useEffect(() => {
+    // Create a stable wrapper function that calls the current ref
+    const stableFunction = async (newNodeIds: Set<string>, layoutType?: LayoutType) => {
+      return layoutFunctionRef.current(newNodeIds, layoutType)
+    }
+    setApplyIncrementalLayoutForNewNodes(stableFunction)
+    return () => {
+      setApplyIncrementalLayoutForNewNodes(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run on mount/unmount
+  
+  // Expose layout handler via ref (must be after nodes/edges are initialized)
+  useImperativeHandle(ref, () => ({
+    applyLayout: applyLayoutSimple,
+    applyIncrementalLayoutForNewNodes,
+  }), [applyLayoutSimple, applyIncrementalLayoutForNewNodes])
 
   // Update newly created relationship edges to start in edit mode
   // Watch for when the relationship appears in the relationships array and update the corresponding edge
@@ -546,10 +646,6 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     })
   }, [currentMapId, hasReadAccess, nodes.length, shouldAutoCenterConcept, fitView, getNodesFromFlow, getViewport])
 
-  // Expose layout handler via ref (must be after nodes/edges are initialized)
-  useImperativeHandle(ref, () => ({
-    applyLayout: applyLayoutSimple,
-  }), [applyLayoutSimple])
   
   // Memoize concept nodes to avoid recreating the filter on every render
   const conceptNodes = useMemo(() => nodes.filter(n => n.type === 'concept'), [nodes])
@@ -569,6 +665,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         }}
         onAddConcept={handleContextMenuAddConcept}
         onAddComment={handleContextMenuAddComment}
+        onPinNodes={handlePinNodes}
         hasWriteAccess={hasWriteAccess}
       />
       
@@ -613,7 +710,6 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
           {/* Layout selector with slide-out menu */}
           <div className="h-px bg-border" />
           <LayoutSelector
-            activeLayout={activeLayout}
             selectedLayout={selectedLayout}
             onSelectLayout={setSelectedLayout}
             onApplyLayout={handleApplyLayout}

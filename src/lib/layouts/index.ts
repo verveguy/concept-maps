@@ -5,12 +5,10 @@
 
 export { applyForceDirectedLayout } from './forceDirected'
 export { applyHierarchicalLayout } from './hierarchical'
-export { applyCircularLayout } from './circular'
 export { applyLayeredLayout } from './layered'
-export { applyStressLayout } from './stress'
 
 /**
  * Available layout types for concept maps.
  */
-export type LayoutType = 'force-directed' | 'hierarchical' | 'circular' | 'layered' | 'stress' | 'manual'
+export type LayoutType = 'force-directed' | 'hierarchical' | 'layered' | 'manual'
 

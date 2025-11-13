@@ -13,6 +13,7 @@ import { useCallback } from 'react'
 import { useConceptActions, type CreateConceptData, type UpdateConceptData } from './useConceptActions'
 import { useRelationshipActions, type CreateRelationshipData, type UpdateRelationshipData } from './useRelationshipActions'
 import { useCommentActions, type CreateCommentData, type UpdateCommentData } from './useCommentActions'
+import { useMapActions } from './useMapActions'
 import { useUndoStore } from '@/stores/undoStore'
 import type {
   CreateConceptCommand,
@@ -20,12 +21,14 @@ import type {
   DeleteConceptCommand,
   CreateRelationshipCommand,
   UpdateRelationshipCommand,
+  ReverseRelationshipCommand,
   DeleteRelationshipCommand,
   CreateCommentCommand,
   UpdateCommentCommand,
   DeleteCommentCommand,
   LinkCommentToConceptCommand,
   UnlinkCommentFromConceptCommand,
+  UpdateMapCommand,
 } from '@/stores/undoStore'
 
 /**
@@ -46,6 +49,7 @@ export function useCanvasMutations() {
   const {
     createRelationship: createRelationshipAction,
     updateRelationship: updateRelationshipAction,
+    reverseRelationship: reverseRelationshipAction,
     deleteRelationship: deleteRelationshipAction,
   } = useRelationshipActions()
 
@@ -56,6 +60,10 @@ export function useCanvasMutations() {
     linkCommentToConcept: linkCommentToConceptAction,
     unlinkCommentFromConcept: unlinkCommentFromConceptAction,
   } = useCommentActions()
+
+  const {
+    updateMap: updateMapAction,
+  } = useMapActions()
 
   const {
     recordMutation,
@@ -196,6 +204,48 @@ export function useCanvasMutations() {
       }
     },
     [updateRelationshipAction, recordMutation]
+  )
+
+  /**
+   * Reverse a relationship's direction with undo tracking.
+   */
+  const reverseRelationship = useCallback(
+    async (
+      relationshipId: string,
+      relationship: {
+        fromConceptId: string
+        toConceptId: string
+        primaryLabel: string
+        reverseLabel: string
+      }
+    ) => {
+      try {
+        // Store previous state for undo
+        const previousState = {
+          fromConceptId: relationship.fromConceptId,
+          toConceptId: relationship.toConceptId,
+          primaryLabel: relationship.primaryLabel,
+          reverseLabel: relationship.reverseLabel,
+        }
+
+        await reverseRelationshipAction(relationshipId, relationship)
+
+        // Record mutation for undo
+        const command: ReverseRelationshipCommand = {
+          type: 'reverseRelationship',
+          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: Date.now(),
+          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          relationshipId,
+          previousState,
+        }
+        recordMutation(command)
+      } catch (error) {
+        console.error('Failed to reverse relationship:', error)
+        throw error
+      }
+    },
+    [reverseRelationshipAction, recordMutation]
   )
 
   /**
@@ -358,6 +408,37 @@ export function useCanvasMutations() {
     [unlinkCommentFromConceptAction, recordMutation]
   )
 
+  /**
+   * Update a map with undo tracking.
+   */
+  const updateMap = useCallback(
+    async (
+      mapId: string,
+      updates: { name?: string; layoutAlgorithm?: string },
+      previousState?: { name?: string; layoutAlgorithm?: string }
+    ) => {
+      try {
+        await updateMapAction(mapId, updates)
+        
+        // Record mutation for undo
+        const command: UpdateMapCommand = {
+          type: 'updateMap',
+          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: Date.now(),
+          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          mapId,
+          updates,
+          previousState,
+        }
+        recordMutation(command)
+      } catch (error) {
+        console.error('Failed to update map:', error)
+        throw error
+      }
+    },
+    [updateMapAction, recordMutation]
+  )
+
   return {
     // Concept mutations
     createConcept,
@@ -367,6 +448,7 @@ export function useCanvasMutations() {
     // Relationship mutations
     createRelationship,
     updateRelationship,
+    reverseRelationship,
     deleteRelationship,
     
     // Comment mutations
@@ -375,6 +457,9 @@ export function useCanvasMutations() {
     deleteComment,
     linkCommentToConcept,
     unlinkCommentFromConcept,
+    
+    // Map mutations
+    updateMap,
     
     // Operation management
     startOperation,

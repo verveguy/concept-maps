@@ -6,11 +6,13 @@
  */
 
 import { useState, useEffect } from 'react'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2, ArrowLeftRight } from 'lucide-react'
 import { useUIStore } from '@/stores/uiStore'
 import { useRelationshipActions } from '@/hooks/useRelationshipActions'
+import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { useUndoStore } from '@/stores/undoStore'
+import { useRelationships } from '@/hooks/useRelationships'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -374,9 +376,14 @@ export function EdgeToolbar({
 }: EdgeToolbarProps) {
       const { hasWriteAccess } = useMapPermissions()
       const { updateRelationship, deleteRelationship } = useRelationshipActions()
+      const { reverseRelationship } = useCanvasMutations()
       const setRelationshipEditorOpen = useUIStore((state) => state.setRelationshipEditorOpen)
       const setSelectedRelationshipId = useUIStore((state) => state.setSelectedRelationshipId)
       const recordDeletion = useUndoStore((state) => state.recordDeletion)
+      const relationships = useRelationships()
+      
+      // Get full relationship data from the relationships array
+      const fullRelationship = relationships.find((r) => r.id === relationship.id)
 
   // Get current style values - initialize from relationship metadata if available
   const relationshipMetadata = relationship?.metadata || {}
@@ -431,11 +438,29 @@ export function EdgeToolbar({
   }
 
   const handleEditClick = () => {
+    // Ensure the relationship is selected before opening the editor
+    if (relationship.id) {
+      setSelectedRelationshipId(relationship.id)
+      setRelationshipEditorOpen(true)
+    }
     if (onEdit) {
       onEdit()
-    } else {
-      setRelationshipEditorOpen(true)
-      // Keep selectedRelationshipId so UnifiedEditor knows which relationship to edit
+    }
+  }
+
+  const handleReverseClick = async () => {
+    if (!fullRelationship || !hasWriteAccess) return
+    
+    try {
+      await reverseRelationship(relationship.id, {
+        fromConceptId: fullRelationship.fromConceptId,
+        toConceptId: fullRelationship.toConceptId,
+        primaryLabel: fullRelationship.primaryLabel,
+        reverseLabel: fullRelationship.reverseLabel,
+      })
+    } catch (error) {
+      console.error('Failed to reverse relationship:', error)
+      alert('Failed to reverse relationship. Please try again.')
     }
   }
 
@@ -504,12 +529,22 @@ export function EdgeToolbar({
       <Button
         variant="ghost"
         size="icon"
+        onClick={handleReverseClick}
+        disabled={!hasWriteAccess || !fullRelationship}
+        className="h-8 w-8 p-0 hover:bg-accent [&_svg]:size-auto!"
+        title="Reverse Direction"
+      >
+        <ArrowLeftRight className="h-5 w-5" strokeWidth={1.5} />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
         onClick={handleEditClick}
         disabled={!hasWriteAccess}
         className="h-8 w-8 p-0 hover:bg-accent [&_svg]:size-auto!"
         title="Edit"
       >
-        <Pencil className="h-5 w-5" />
+        <Pencil className="h-5 w-5" strokeWidth={1.5} />
       </Button>
       <Button
         variant="ghost"
@@ -519,7 +554,7 @@ export function EdgeToolbar({
         className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 [&_svg]:size-auto!"
         title="Delete"
       >
-        <Trash2 className="h-5 w-5" />
+        <Trash2 className="h-5 w-5" strokeWidth={1.5} />
       </Button>
     </FloatingToolbar>
   )

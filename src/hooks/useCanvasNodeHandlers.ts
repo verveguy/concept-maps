@@ -298,6 +298,7 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
       setCursor(flowPosition)
 
       // Always save final position immediately on drag stop
+      // Mark node as user-placed since the user explicitly dragged it
       if (concept) {
         if (
           concept.position.x !== node.position.x ||
@@ -306,6 +307,7 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
           try {
             await updateConcept(node.id, {
               position: { x: node.position.x, y: node.position.y },
+              userPlaced: true, // User explicitly positioned this node
             })
             // Update last update time so we don't trigger another update unnecessarily
             setLastUpdateTime(node.id, Date.now())
@@ -321,6 +323,7 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
           try {
             await updateComment(node.id, {
               position: { x: node.position.x, y: node.position.y },
+              userPlaced: true, // User explicitly positioned this node
             })
             // Update last update time so we don't trigger another update unnecessarily
             setLastUpdateTime(node.id, Date.now())

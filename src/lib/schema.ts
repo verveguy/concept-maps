@@ -4,6 +4,8 @@
  * the codebase for type safety and data manipulation.
  */
 
+import type { LayoutType } from '@/lib/layouts'
+
 /**
  * Represents a concept map containing concepts and relationships.
  * 
@@ -23,6 +25,7 @@ export interface Map {
   id: string
   name: string
   createdBy: string
+  layoutAlgorithm?: LayoutType // Currently selected layout algorithm for this map
   createdAt: Date
   updatedAt: Date
   deletedAt: Date | null // Timestamp when soft-deleted, null if not deleted
@@ -61,6 +64,7 @@ export interface Concept {
   position: { x: number; y: number }
   notes: string // markdown
   metadata: Record<string, unknown> // flexible key-value pairs
+  userPlaced?: boolean // true if user explicitly positioned this node, false/undefined if placed by layout
   createdAt: Date
   updatedAt: Date
   deletedAt: Date | null // Timestamp when soft-deleted, null if not deleted
@@ -252,6 +256,7 @@ export interface Comment {
   creatorEmail?: string | null // Creator's email for avatar
   creatorImageURL?: string | null // Creator's image URL for avatar
   resolved: boolean // Whether the comment has been resolved
+  userPlaced?: boolean // true if user explicitly positioned this node, false/undefined if placed by layout
   createdAt: Date
   updatedAt: Date
   deletedAt: Date | null // Timestamp when soft-deleted, null if not deleted

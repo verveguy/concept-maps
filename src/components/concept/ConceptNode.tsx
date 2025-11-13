@@ -376,6 +376,7 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
         }
 
         // Create the "to" concept if it doesn't exist
+        // Set userPlaced: false since this will be positioned by layout algorithm
         if (!existingToConcept) {
           transactions.push(
             tx.concepts[toConceptId]
@@ -385,6 +386,7 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
                 positionY: newPosition.y,
                 notes: '',
                 metadata: JSON.stringify({}),
+                userPlaced: false, // Layout algorithm will position this node
                 createdAt: Date.now(),
                 updatedAt: Date.now(),
               })
@@ -413,8 +415,23 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
         // Execute all operations in a single transaction
         await db.transact(transactions)
 
-        // If we created a new concept, set shouldStartEditing flag to trigger edit mode
+        // If we created a new concept, apply incremental layout and set shouldStartEditing flag
         if (!existingToConcept) {
+          // Get incremental layout function from store
+          const applyIncrementalLayout = useCanvasStore.getState().applyIncrementalLayoutForNewNodes
+          
+          // Apply incremental layout if function is available and a layout is selected
+          if (applyIncrementalLayout) {
+            // Small delay to ensure the new node is fully created and edges are updated
+            setTimeout(async () => {
+              try {
+                await applyIncrementalLayout(new Set([toConceptId]))
+              } catch (error) {
+                console.error('Failed to apply incremental layout for new concept:', error)
+              }
+            }, 150) // Delay to ensure node and edges are created
+          }
+          
           // Wait a bit for the node to appear in React Flow
           setTimeout(() => {
             const nodes = getNodes()

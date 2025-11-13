@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react'
-import { Network, Layers, Circle, GitBranch, Zap } from 'lucide-react'
+import { Network, Layers, GitBranch } from 'lucide-react'
 import type { LayoutType } from '@/lib/layouts'
 
 /**
@@ -28,19 +28,9 @@ const LAYOUT_OPTIONS: LayoutOption[] = [
     title: 'Hierarchical Layout\nTop-to-bottom tree structure',
   },
   {
-    id: 'circular',
-    icon: Circle,
-    title: 'Circular Layout\nArranges nodes in a circle',
-  },
-  {
     id: 'layered',
     icon: GitBranch,
     title: 'Layered Layout (Sugiyama)\nMinimizes edge crossings, handles cycles',
-  },
-  {
-    id: 'stress',
-    icon: Zap,
-    title: 'Stress-Majorization Layout\nPreserves graph distances, minimizes crossings',
   },
 ]
 
@@ -48,14 +38,12 @@ const LAYOUT_OPTIONS: LayoutOption[] = [
  * Props for LayoutSelector component.
  */
 export interface LayoutSelectorProps {
-  /** Currently active layout (for sticky mode) */
-  activeLayout: LayoutType | null
   /** Currently selected layout (shown on main button) */
   selectedLayout: LayoutType
   /** Callback when layout is selected (just changes selection) */
   onSelectLayout: (layout: LayoutType) => void
   /** Callback when layout button is clicked (applies layout) */
-  onApplyLayout: (layout: LayoutType, makeSticky: boolean) => void
+  onApplyLayout: (layout: LayoutType) => void
   /** Whether controls are disabled */
   disabled?: boolean
 }
@@ -71,7 +59,6 @@ export interface LayoutSelectorProps {
  * @returns The layout selector JSX
  */
 export function LayoutSelector({
-  activeLayout,
   selectedLayout,
   onSelectLayout,
   onApplyLayout,
@@ -143,6 +130,8 @@ export function LayoutSelector({
   const handleOptionClick = (layoutId: LayoutType, event: React.MouseEvent) => {
     event.stopPropagation()
     onSelectLayout(layoutId)
+    // When selecting a layout, also apply it immediately (full layout)
+    onApplyLayout(layoutId)
     setIsHovered(false)
     setIsMenuHovered(false)
   }
@@ -150,8 +139,7 @@ export function LayoutSelector({
   // Handle main button click
   const handleMainButtonClick = (event: React.MouseEvent) => {
     if (disabled) return
-    const makeSticky = event.shiftKey
-    onApplyLayout(selectedLayout, makeSticky)
+    onApplyLayout(selectedLayout)
   }
 
   return (
@@ -165,9 +153,7 @@ export function LayoutSelector({
       <button
         onClick={handleMainButtonClick}
         disabled={disabled}
-        className={`react-flow__controls-button ${
-          activeLayout === selectedLayout ? '!bg-primary !text-primary-foreground' : ''
-        }`}
+        className="react-flow__controls-button"
         // Remove title to prevent tooltip interference with hover
       >
         <SelectedIcon className="h-4 w-4" />
@@ -198,7 +184,6 @@ export function LayoutSelector({
         {LAYOUT_OPTIONS.map((option) => {
           const OptionIcon = option.icon
           const isSelected = option.id === selectedLayout
-          const isActive = option.id === activeLayout
 
           return (
             <button
@@ -206,11 +191,7 @@ export function LayoutSelector({
               onClick={(e) => handleOptionClick(option.id, e)}
               disabled={disabled}
               className={`react-flow__controls-button ${
-                isSelected
-                  ? '!bg-primary !text-primary-foreground'
-                  : isActive
-                    ? '!bg-primary/20 !text-primary'
-                    : ''
+                isSelected ? '!bg-primary !text-primary-foreground' : ''
               }`}
               title={option.title}
             >

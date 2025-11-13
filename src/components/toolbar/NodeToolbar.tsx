@@ -564,7 +564,7 @@ export function NodeToolbar({
             className="h-8 w-8 p-0 hover:bg-accent [&_svg]:size-auto!"
             title="Edit"
           >
-            <Pencil className="h-4 w-4" />
+            <Pencil className="h-4 w-4" strokeWidth={1.5} />
           </Button>
           <Button
             variant="ghost"
@@ -574,7 +574,7 @@ export function NodeToolbar({
             className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950 [&_svg]:size-auto!"
             title="Delete"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-4 w-4" strokeWidth={1.5} />
           </Button>
         </>
       )}
@@ -589,7 +589,7 @@ export function NodeToolbar({
             className="h-8 w-8 p-0 hover:bg-accent [&_svg]:size-auto!"
             title="Edit"
           >
-            <Pencil className="h-4 w-4" />
+            <Pencil className="h-4 w-4" strokeWidth={1.5} />
           </Button>
           <Button
             variant="ghost"
@@ -603,7 +603,7 @@ export function NodeToolbar({
             }`}
             title={comment.resolved ? 'Resolved' : 'Resolve'}
           >
-            <Check className="h-4 w-4" />
+            <Check className="h-4 w-4" strokeWidth={1.5} />
           </Button>
           <Button
             variant="ghost"
@@ -613,7 +613,7 @@ export function NodeToolbar({
             className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950 [&_svg]:size-auto!"
             title="Delete"
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-4 w-4" strokeWidth={1.5} />
           </Button>
         </>
       )}
