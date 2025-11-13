@@ -392,15 +392,18 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   const layoutFunctionRef = useRef(applyIncrementalLayoutForNewNodes)
   const { setApplyIncrementalLayoutForNewNodes } = useCanvasStore()
   
-  // Update ref when function changes
+  // Update ref when function changes - this ensures we always call the latest function
   useEffect(() => {
     layoutFunctionRef.current = applyIncrementalLayoutForNewNodes
   }, [applyIncrementalLayoutForNewNodes])
   
-  // Set function in store, recreating wrapper when concepts/comments change to avoid stale data
+  // Set function in store only once on mount/unmount
+  // The ref-based approach ensures the wrapper always calls the latest function,
+  // which has access to fresh concepts/comments through closure
   useEffect(() => {
     // Create a stable wrapper function that calls the current ref
-    // This ensures the function always uses fresh concept/comment data
+    // Since applyIncrementalLayoutForNewNodes uses applyLayout which reads concepts/comments
+    // from the hook parameters, it will always have fresh data
     const stableFunction = async (newNodeIds: Set<string>, layoutType?: LayoutType) => {
       return layoutFunctionRef.current(newNodeIds, layoutType)
     }
@@ -408,7 +411,8 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     return () => {
       setApplyIncrementalLayoutForNewNodes(null)
     }
-  }, [concepts, comments, applyIncrementalLayoutForNewNodes, setApplyIncrementalLayoutForNewNodes])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run on mount/unmount - ref ensures we always call latest function
   
   // Expose layout handler via ref (must be after nodes/edges are initialized)
   useImperativeHandle(ref, () => ({
