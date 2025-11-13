@@ -438,13 +438,16 @@ export function EdgeToolbar({
   }
 
   const handleEditClick = () => {
-    // Ensure the relationship is selected before opening the editor
-    if (relationship.id) {
-      setSelectedRelationshipId(relationship.id)
-      setRelationshipEditorOpen(true)
-    }
+    // If custom onEdit handler is provided, use it (assumes it handles editor state)
+    // Otherwise, use default behavior: select relationship and open editor
     if (onEdit) {
       onEdit()
+    } else {
+      // Default behavior: ensure the relationship is selected and open the editor
+      if (relationship.id) {
+        setSelectedRelationshipId(relationship.id)
+        setRelationshipEditorOpen(true)
+      }
     }
   }
 

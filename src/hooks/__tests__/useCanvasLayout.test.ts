@@ -372,7 +372,7 @@ describe('useCanvasLayout', () => {
         await result.current.applyLayout('force-directed', true)
       })
 
-      // Should only update concept-2 (new node, not user-placed)
+      // Should only update concept-2 (layout-placed node, can be repositioned)
       expect(mockTransact).toHaveBeenCalled()
       const transactCall = mockTransact.mock.calls[0][0]
       // The updates array contains the result of tx.concepts[node.id].update()

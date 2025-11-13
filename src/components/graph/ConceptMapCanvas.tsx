@@ -77,7 +77,7 @@ import { useCanvasDataSync } from '@/hooks/useCanvasDataSync'
 import { useCanvasCreation } from '@/hooks/useCanvasCreation'
 import { useCanvasDeepLinking } from '@/hooks/useCanvasDeepLinking'
 import { useCanvasPresence } from '@/hooks/useCanvasPresence'
-import { db, tx } from '@/lib/instant'
+import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 import type { LayoutType } from '@/lib/layouts'
 import { useUIStore } from '@/stores/uiStore'
 import { useMapStore } from '@/stores/mapStore'
@@ -307,49 +307,43 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     setNodes: setNodesFromFlow,
   })
   
+  // Get mutation hooks for undo/redo tracking
+  const { updateConcept, updateComment, startOperation, endOperation } = useCanvasMutations()
+  
   // Handler to pin all nodes (set userPlaced: true on all concepts and comments)
   const handlePinNodes = useCallback(async () => {
     if (!currentMapId || !hasWriteAccess) return
     
     try {
-      // Build batch transaction to update all concepts and comments
-      const updates: Parameters<typeof db.transact>[0] = []
+      // Start operation to group all pin updates as a single undoable action
+      startOperation()
       
-      // Update all concepts
-      concepts.forEach(concept => {
-        // Only update if not already pinned
-        if (concept.userPlaced !== true) {
-          updates.push(
-            tx.concepts[concept.id].update({
-              userPlaced: true,
-              updatedAt: Date.now(),
-            })
-          )
-        }
-      })
+      // Update all concepts that aren't already pinned
+      const conceptUpdates = concepts
+        .filter(concept => concept.userPlaced !== true)
+        .map(concept => 
+          updateConcept(concept.id, { userPlaced: true })
+        )
       
-      // Update all comments
-      comments.forEach(comment => {
-        // Only update if not already pinned
-        if (comment.userPlaced !== true) {
-          updates.push(
-            tx.comments[comment.id].update({
-              userPlaced: true,
-              updatedAt: Date.now(),
-            })
-          )
-        }
-      })
+      // Update all comments that aren't already pinned
+      const commentUpdates = comments
+        .filter(comment => comment.userPlaced !== true)
+        .map(comment => 
+          updateComment(comment.id, { userPlaced: true })
+        )
       
-      // Execute batch update
-      if (updates.length > 0) {
-        await db.transact(updates)
-      }
+      // Execute all updates in parallel
+      await Promise.all([...conceptUpdates, ...commentUpdates])
+      
+      // End operation to complete the undoable action
+      endOperation()
     } catch (error) {
       console.error('Failed to pin nodes:', error)
       alert('Failed to pin nodes. Please try again.')
+      // End operation even on error to clean up
+      endOperation()
     }
-  }, [currentMapId, hasWriteAccess, concepts, comments])
+  }, [currentMapId, hasWriteAccess, concepts, comments, updateConcept, updateComment, startOperation, endOperation])
 
   // Layout hook - handles layout application
   const {
@@ -403,9 +397,10 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     layoutFunctionRef.current = applyIncrementalLayoutForNewNodes
   }, [applyIncrementalLayoutForNewNodes])
   
-  // Set function in store only once on mount/unmount to avoid infinite loops
+  // Set function in store, recreating wrapper when concepts/comments change to avoid stale data
   useEffect(() => {
     // Create a stable wrapper function that calls the current ref
+    // This ensures the function always uses fresh concept/comment data
     const stableFunction = async (newNodeIds: Set<string>, layoutType?: LayoutType) => {
       return layoutFunctionRef.current(newNodeIds, layoutType)
     }
@@ -413,8 +408,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
     return () => {
       setApplyIncrementalLayoutForNewNodes(null)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Only run on mount/unmount
+  }, [concepts, comments, applyIncrementalLayoutForNewNodes, setApplyIncrementalLayoutForNewNodes])
   
   // Expose layout handler via ref (must be after nodes/edges are initialized)
   useImperativeHandle(ref, () => ({

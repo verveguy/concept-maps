@@ -127,11 +127,16 @@ export function LayoutSelector({
   }, [])
 
   // Handle layout option click
-  const handleOptionClick = (layoutId: LayoutType, event: React.MouseEvent) => {
+  const handleOptionClick = async (layoutId: LayoutType, event: React.MouseEvent) => {
     event.stopPropagation()
-    onSelectLayout(layoutId)
-    // When selecting a layout, also apply it immediately (full layout)
-    onApplyLayout(layoutId)
+    try {
+      // Apply layout first, then update selection only on success
+      await onApplyLayout(layoutId)
+      onSelectLayout(layoutId)
+    } catch (error) {
+      // If layout application fails, don't update selection to keep UI consistent
+      console.error('Failed to apply layout:', error)
+    }
     setIsHovered(false)
     setIsMenuHovered(false)
   }

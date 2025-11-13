@@ -117,7 +117,7 @@ export function MapPage() {
       const newName = e.currentTarget.textContent?.trim() || ''
       const previousName = previousMapNameRef.current || map.name || 'Untitled Map'
 
-      // Only update if the name actually changed
+      // Only update if the name actually changed and is not empty/whitespace-only
       if (newName !== previousName && newName.length > 0) {
         try {
           await updateMap(
@@ -125,13 +125,15 @@ export function MapPage() {
             { name: newName },
             { name: previousName }
           )
+          // Update ref after successful save so Escape reverts to the new name
+          previousMapNameRef.current = newName
         } catch (error) {
           console.error('Failed to update map name:', error)
           // Revert to previous name on error
           e.currentTarget.textContent = previousName
         }
-      } else if (newName.length === 0) {
-        // If empty, revert to previous name
+      } else if (!newName || newName.trim().length === 0) {
+        // If empty or whitespace-only, revert to previous name
         e.currentTarget.textContent = previousName
       }
     },
