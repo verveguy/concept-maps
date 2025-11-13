@@ -23,6 +23,8 @@ vi.mock('@/lib/layouts', () => ({
 // Mock database - must be defined inside vi.mock factory
 vi.mock('@/lib/instant', () => ({
   db: {
+    useAuth: vi.fn(() => ({ user: null })),
+    useQuery: vi.fn(() => ({ data: null })),
     transact: vi.fn().mockResolvedValue(undefined),
   },
   tx: {
@@ -40,6 +42,7 @@ vi.mock('@/lib/instant', () => ({
       }
     ),
   },
+  id: vi.fn(() => 'mock-id'),
 }))
 
 // Import mocked functions after mocking
@@ -116,6 +119,14 @@ vi.mock('@/stores/mapStore', () => ({
     }
     return selector(state as any)
   }),
+}))
+
+// Mock useMapActions since useCanvasLayout now uses it
+const mockUpdateMap = vi.fn().mockResolvedValue(undefined)
+vi.mock('@/hooks/useMapActions', () => ({
+  useMapActions: vi.fn(() => ({
+    updateMap: mockUpdateMap,
+  })),
 }))
 
 describe('useCanvasLayout', () => {
