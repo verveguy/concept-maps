@@ -77,21 +77,6 @@ describe('canvasStore', () => {
   })
 
   describe('Layout state', () => {
-    it('should initialize with null active layout', () => {
-      expect(useCanvasStore.getState().activeLayout).toBeNull()
-    })
-
-    it('should set active layout', () => {
-      useCanvasStore.getState().setActiveLayout('force-directed')
-      expect(useCanvasStore.getState().activeLayout).toBe('force-directed')
-    })
-
-    it('should clear active layout', () => {
-      useCanvasStore.getState().setActiveLayout('force-directed')
-      useCanvasStore.getState().setActiveLayout(null)
-      expect(useCanvasStore.getState().activeLayout).toBeNull()
-    })
-
     it('should initialize with default selected layout', () => {
       expect(useCanvasStore.getState().selectedLayout).toBe('force-directed')
     })
@@ -99,28 +84,6 @@ describe('canvasStore', () => {
     it('should set selected layout', () => {
       useCanvasStore.getState().setSelectedLayout('hierarchical')
       expect(useCanvasStore.getState().selectedLayout).toBe('hierarchical')
-    })
-
-    it('should initialize with empty laid-out node IDs set', () => {
-      expect(useCanvasStore.getState().laidOutNodeIds.size).toBe(0)
-    })
-
-    it('should add laid-out node ID', () => {
-      useCanvasStore.getState().addLaidOutNodeId('node-1')
-      expect(useCanvasStore.getState().laidOutNodeIds.has('node-1')).toBe(true)
-    })
-
-    it('should remove laid-out node ID', () => {
-      useCanvasStore.getState().addLaidOutNodeId('node-1')
-      useCanvasStore.getState().removeLaidOutNodeId('node-1')
-      expect(useCanvasStore.getState().laidOutNodeIds.has('node-1')).toBe(false)
-    })
-
-    it('should clear all laid-out node IDs', () => {
-      useCanvasStore.getState().addLaidOutNodeId('node-1')
-      useCanvasStore.getState().addLaidOutNodeId('node-2')
-      useCanvasStore.getState().clearLaidOutNodeIds()
-      expect(useCanvasStore.getState().laidOutNodeIds.size).toBe(0)
     })
   })
 
@@ -279,8 +242,6 @@ describe('canvasStore', () => {
       useCanvasStore.getState().setConnectionMade(true)
       useCanvasStore.getState().setContextMenuVisible(true)
       useCanvasStore.getState().setContextMenuPosition({ x: 300, y: 400 })
-      useCanvasStore.getState().setActiveLayout('hierarchical')
-      useCanvasStore.getState().addLaidOutNodeId('node-1')
       useCanvasStore.getState().addNewlyCreatedRelationship('concept-1', 'rel-1')
       useCanvasStore.getState().setLastUpdateTime('node-1', Date.now())
       useCanvasStore.getState().setPendingConcept({
@@ -288,7 +249,7 @@ describe('canvasStore', () => {
         position: { x: 100, y: 200 },
       })
       useCanvasStore.getState().setPrevConceptIds(new Set(['concept-1']))
-      useCanvasStore.getState().setSelectedLayout('circular')
+      useCanvasStore.getState().setSelectedLayout('layered')
       useCanvasStore.getState().markInitialConceptChecked('map-1')
 
       // Reset
@@ -299,15 +260,13 @@ describe('canvasStore', () => {
       expect(useCanvasStore.getState().connectionMade).toBe(false)
       expect(useCanvasStore.getState().contextMenuVisible).toBe(false)
       expect(useCanvasStore.getState().contextMenuPosition).toBeNull()
-      expect(useCanvasStore.getState().activeLayout).toBeNull()
-      expect(useCanvasStore.getState().laidOutNodeIds.size).toBe(0)
       expect(useCanvasStore.getState().newlyCreatedRelationshipIds.size).toBe(0)
       expect(useCanvasStore.getState().lastUpdateTime.size).toBe(0)
       expect(useCanvasStore.getState().pendingConcept).toBeNull()
       expect(useCanvasStore.getState().prevConceptIds.size).toBe(0)
 
       // Verify preserved state
-      expect(useCanvasStore.getState().selectedLayout).toBe('circular')
+      expect(useCanvasStore.getState().selectedLayout).toBe('layered')
       expect(
         useCanvasStore.getState().hasCheckedInitialConcept.has('map-1')
       ).toBe(true)

@@ -21,6 +21,7 @@ const _schema = i.schema({
       resolved: i.boolean().optional(),
       text: i.string(),
       updatedAt: i.number().indexed(),
+      userPlaced: i.boolean().optional(),
     }),
     concepts: i.entity({
       createdAt: i.number().indexed(),
@@ -31,10 +32,12 @@ const _schema = i.schema({
       positionX: i.number(),
       positionY: i.number(),
       updatedAt: i.number().indexed(),
+      userPlaced: i.boolean().optional(),
     }),
     maps: i.entity({
       createdAt: i.number().indexed(),
       deletedAt: i.number().optional(),
+      layoutAlgorithm: i.string().optional(),
       name: i.string().indexed(),
       updatedAt: i.number().indexed(),
     }),

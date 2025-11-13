@@ -564,6 +564,7 @@ describe('useCanvasNodeHandlers', () => {
 
       expect(mockUpdateConcept).toHaveBeenCalledWith('concept-1', {
         position: { x: 150, y: 250 },
+        userPlaced: true,
       })
       expect(mockSetLastUpdateTime).toHaveBeenCalledWith('concept-1', expect.any(Number))
     })

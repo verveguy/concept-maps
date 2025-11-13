@@ -20,6 +20,8 @@ export interface CreateConceptData {
   notes?: string
   /** Optional metadata as key-value pairs */
   metadata?: Record<string, unknown>
+  /** Whether the concept was placed by the user (vs. layout algorithm) */
+  userPlaced?: boolean
 }
 
 /**
@@ -34,6 +36,8 @@ export interface UpdateConceptData {
   notes?: string
   /** New metadata */
   metadata?: Record<string, unknown>
+  /** Whether this node was placed by the user (true) or by layout algorithm (false) */
+  userPlaced?: boolean
 }
 
 /**
@@ -120,6 +124,9 @@ export function useConceptActions() {
           positionY: concept.position.y,
           notes: concept.notes || '',
           metadata: JSON.stringify(concept.metadata || {}),
+          // Default to userPlaced: true for explicit user placement (right-click, drag-to-create)
+          // Can be set to false for layout-placed nodes (triple entry)
+          userPlaced: concept.userPlaced !== undefined ? concept.userPlaced : true,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         })
@@ -184,6 +191,7 @@ export function useConceptActions() {
     if (updates.metadata !== undefined) {
       updateData.metadata = JSON.stringify(updates.metadata)
     }
+    if (updates.userPlaced !== undefined) updateData.userPlaced = updates.userPlaced
 
     await db.transact([tx.concepts[conceptId].update(updateData)])
   }

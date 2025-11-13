@@ -286,10 +286,76 @@ export function useRelationshipActions() {
     }
   }
 
+  /**
+   * Reverse a relationship's direction.
+   * 
+   * Swaps the source and target concepts, and swaps the primary and reverse labels.
+   * This effectively reverses the arrow direction and changes which label is displayed.
+   * 
+   * **What Gets Swapped:**
+   * - `fromConceptId` ↔ `toConceptId`
+   * - `primaryLabel` ↔ `reverseLabel`
+   * 
+   * **Use Cases:**
+   * - Correcting relationship direction after creation
+   * - Changing perspective on how concepts relate
+   * - Making the relationship read naturally in the opposite direction
+   * 
+   * @param relationshipId - ID of the relationship to reverse
+   * @param relationship - Full relationship data containing current fromConceptId, toConceptId, primaryLabel, and reverseLabel
+   * 
+   * @throws Error if the relationship doesn't exist or the transaction fails
+   * 
+   * @example
+   * ```tsx
+   * const { reverseRelationship } = useRelationshipActions()
+   * 
+   * // Reverse a relationship
+   * await reverseRelationship(relationshipId, {
+   *   fromConceptId: 'concept-1',
+   *   toConceptId: 'concept-2',
+   *   primaryLabel: 'explains',
+   *   reverseLabel: 'explained by'
+   * })
+   * // After reversal:
+   * // fromConceptId: 'concept-2', toConceptId: 'concept-1'
+   * // primaryLabel: 'explained by', reverseLabel: 'explains'
+   * ```
+   */
+  const reverseRelationship = async (
+    relationshipId: string,
+    relationship: {
+      fromConceptId: string
+      toConceptId: string
+      primaryLabel: string
+      reverseLabel: string
+    }
+  ) => {
+    // Swap concepts and labels
+    const newFromConceptId = relationship.toConceptId
+    const newToConceptId = relationship.fromConceptId
+    const newPrimaryLabel = relationship.reverseLabel
+    const newReverseLabel = relationship.primaryLabel
+
+    await db.transact([
+      tx.relationships[relationshipId]
+        .update({
+          primaryLabel: newPrimaryLabel,
+          reverseLabel: newReverseLabel,
+          updatedAt: Date.now(),
+        })
+        .link({
+          fromConcept: newFromConceptId,
+          toConcept: newToConceptId,
+        }),
+    ])
+  }
+
   return {
     createRelationship,
     updateRelationship,
     deleteRelationship,
     undeleteRelationship,
+    reverseRelationship,
   }
 }

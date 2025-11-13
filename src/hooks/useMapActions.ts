@@ -94,15 +94,17 @@ export function useMapActions() {
   /**
    * Update an existing map.
    * 
-   * Performs a partial update on a map. Currently only supports updating the
-   * map name. The `updatedAt` timestamp is automatically set to the current time.
+   * Performs a partial update on a map. Supports updating the map name and layout algorithm.
+   * The `updatedAt` timestamp is automatically set to the current time.
    * 
    * **Supported Updates:**
    * - `name`: Change the map's display name
+   * - `layoutAlgorithm`: Set the currently selected layout algorithm for this map
    * 
    * @param mapId - ID of the map to update
    * @param updates - Partial map data to update
    * @param updates.name - New display name (optional)
+   * @param updates.layoutAlgorithm - New layout algorithm (optional)
    * 
    * @throws Error if the map doesn't exist or the transaction fails
    * 
@@ -112,14 +114,18 @@ export function useMapActions() {
    * 
    * // Update the map name
    * await updateMap(mapId, { name: 'Updated Map Name' })
+   * 
+   * // Update the layout algorithm
+   * await updateMap(mapId, { layoutAlgorithm: 'force-directed' })
    * ```
    */
-  const updateMap = async (mapId: string, updates: { name?: string }) => {
+  const updateMap = async (mapId: string, updates: { name?: string; layoutAlgorithm?: string }) => {
     const updateData: Record<string, unknown> = {
       updatedAt: Date.now(),
     }
 
     if (updates.name !== undefined) updateData.name = updates.name
+    if (updates.layoutAlgorithm !== undefined) updateData.layoutAlgorithm = updates.layoutAlgorithm
 
     await db.transact([tx.maps[mapId].update(updateData)])
   }

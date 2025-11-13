@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef } from 'react'
-import { MessageSquare, Plus } from 'lucide-react'
+import { MessageSquare, Plus, Pin } from 'lucide-react'
 
 export interface CanvasContextMenuProps {
   /** Whether the menu is visible */
@@ -17,6 +17,8 @@ export interface CanvasContextMenuProps {
   onAddConcept: () => void
   /** Callback when "Add Comment" is clicked */
   onAddComment: () => void
+  /** Callback when "Pin nodes" is clicked */
+  onPinNodes: () => void
   /** Whether user has write access (disables menu if false) */
   hasWriteAccess: boolean
 }
@@ -37,6 +39,7 @@ export function CanvasContextMenu({
   onClose,
   onAddConcept,
   onAddComment,
+  onPinNodes,
   hasWriteAccess,
 }: CanvasContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
@@ -86,6 +89,11 @@ export function CanvasContextMenu({
     onClose()
   }
 
+  const handlePinNodes = () => {
+    onPinNodes()
+    onClose()
+  }
+
   return (
     <div
       ref={menuRef}
@@ -109,6 +117,14 @@ export function CanvasContextMenu({
       >
         <MessageSquare className="h-4 w-4" />
         <span>Add Comment</span>
+      </button>
+      <div className="h-px bg-border my-1" />
+      <button
+        onClick={handlePinNodes}
+        className="w-full px-4 py-2 text-left text-sm text-popover-foreground hover:bg-accent flex items-center gap-2 transition-colors"
+      >
+        <Pin className="h-4 w-4" />
+        <span>Pin Nodes</span>
       </button>
     </div>
   )

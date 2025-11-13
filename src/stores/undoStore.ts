@@ -27,12 +27,14 @@ export type MutationType =
   | 'deleteConcept'
   | 'createRelationship'
   | 'updateRelationship'
+  | 'reverseRelationship'
   | 'deleteRelationship'
   | 'createComment'
   | 'updateComment'
   | 'deleteComment'
   | 'linkCommentToConcept'
   | 'unlinkCommentFromConcept'
+  | 'updateMap'
 
 /**
  * Base mutation command interface.
@@ -66,6 +68,7 @@ export interface UpdateConceptCommand extends MutationCommand {
     position?: { x: number; y: number }
     notes?: string
     metadata?: Record<string, unknown>
+    userPlaced?: boolean
   }
 }
 
@@ -95,6 +98,17 @@ export interface UpdateRelationshipCommand extends MutationCommand {
   }
 }
 
+export interface ReverseRelationshipCommand extends MutationCommand {
+  type: 'reverseRelationship'
+  relationshipId: string
+  previousState: {
+    fromConceptId: string
+    toConceptId: string
+    primaryLabel: string
+    reverseLabel: string
+  }
+}
+
 export interface DeleteRelationshipCommand extends MutationCommand {
   type: 'deleteRelationship'
   relationshipId: string
@@ -116,6 +130,7 @@ export interface UpdateCommentCommand extends MutationCommand {
   previousState?: {
     text?: string
     position?: { x: number; y: number }
+    userPlaced?: boolean
   }
 }
 
@@ -137,6 +152,19 @@ export interface UnlinkCommentFromConceptCommand extends MutationCommand {
 }
 
 /**
+ * Map mutation commands.
+ */
+export interface UpdateMapCommand extends MutationCommand {
+  type: 'updateMap'
+  mapId: string
+  updates: { name?: string; layoutAlgorithm?: string }
+  previousState?: {
+    name?: string
+    layoutAlgorithm?: string
+  }
+}
+
+/**
  * Union type of all mutation commands.
  */
 export type MutationCommandUnion =
@@ -145,12 +173,14 @@ export type MutationCommandUnion =
   | DeleteConceptCommand
   | CreateRelationshipCommand
   | UpdateRelationshipCommand
+  | ReverseRelationshipCommand
   | DeleteRelationshipCommand
   | CreateCommentCommand
   | UpdateCommentCommand
   | DeleteCommentCommand
   | LinkCommentToConceptCommand
   | UnlinkCommentFromConceptCommand
+  | UpdateMapCommand
 
 /**
  * Represents a deletion entry in the undo history.

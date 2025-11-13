@@ -60,10 +60,6 @@ export interface CanvasState {
   setContextMenuPosition: (position: { x: number; y: number } | null) => void
 
   // Layout state
-  /** Currently active layout (null if no layout is active) */
-  activeLayout: LayoutType | null
-  /** Set active layout */
-  setActiveLayout: (layout: LayoutType | null) => void
   /** Selected layout (shown on layout selector button) */
   selectedLayout: LayoutType
   /** Set selected layout */
@@ -76,6 +72,10 @@ export interface CanvasState {
   removeLaidOutNodeId: (nodeId: string) => void
   /** Clear all laid-out node IDs */
   clearLaidOutNodeIds: () => void
+  /** Function to apply incremental layout for newly created nodes */
+  applyIncrementalLayoutForNewNodes: ((newNodeIds: Set<string>, layoutType?: LayoutType) => Promise<void>) | null
+  /** Set the incremental layout function */
+  setApplyIncrementalLayoutForNewNodes: (fn: ((newNodeIds: Set<string>, layoutType?: LayoutType) => Promise<void>) | null) => void
 
   // Creation tracking
   /** Map of concept ID to relationship ID for newly created relationships */
@@ -142,12 +142,12 @@ const INITIAL_RESETTABLE_STATE = {
   connectionMade: false,
   contextMenuVisible: false,
   contextMenuPosition: null as { x: number; y: number } | null,
-  activeLayout: null as LayoutType | null,
   laidOutNodeIds: new Set<string>(),
   newlyCreatedRelationshipIds: new Map<string, string>(),
   lastUpdateTime: new Map<string, number>(),
   pendingConcept: null as PendingConcept | null,
   prevConceptIds: new Set<string>(),
+  applyIncrementalLayoutForNewNodes: null as ((newNodeIds: Set<string>, layoutType?: LayoutType) => Promise<void>) | null,
 } as const
 
 /**
@@ -168,8 +168,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setContextMenuPosition: (position) => set({ contextMenuPosition: position }),
 
   // Layout state
-  activeLayout: INITIAL_RESETTABLE_STATE.activeLayout,
-  setActiveLayout: (layout) => set({ activeLayout: layout }),
   selectedLayout: 'force-directed',
   setSelectedLayout: (layout) => set({ selectedLayout: layout }),
   laidOutNodeIds: INITIAL_RESETTABLE_STATE.laidOutNodeIds,
@@ -184,6 +182,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       return { laidOutNodeIds: newSet }
     }),
   clearLaidOutNodeIds: () => set({ laidOutNodeIds: INITIAL_RESETTABLE_STATE.laidOutNodeIds }),
+  applyIncrementalLayoutForNewNodes: INITIAL_RESETTABLE_STATE.applyIncrementalLayoutForNewNodes,
+  setApplyIncrementalLayoutForNewNodes: (fn) => set({ applyIncrementalLayoutForNewNodes: fn }),
 
   // Creation tracking
   newlyCreatedRelationshipIds: INITIAL_RESETTABLE_STATE.newlyCreatedRelationshipIds,
@@ -258,12 +258,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       connectionMade: INITIAL_RESETTABLE_STATE.connectionMade,
       contextMenuVisible: INITIAL_RESETTABLE_STATE.contextMenuVisible,
       contextMenuPosition: INITIAL_RESETTABLE_STATE.contextMenuPosition,
-      activeLayout: INITIAL_RESETTABLE_STATE.activeLayout,
       laidOutNodeIds: new Set<string>(),
       newlyCreatedRelationshipIds: new Map<string, string>(),
       lastUpdateTime: new Map<string, number>(),
       pendingConcept: INITIAL_RESETTABLE_STATE.pendingConcept,
       prevConceptIds: new Set<string>(),
+      applyIncrementalLayoutForNewNodes: INITIAL_RESETTABLE_STATE.applyIncrementalLayoutForNewNodes,
       // Preserve user preferences
       selectedLayout: currentState.selectedLayout,
       hasCheckedInitialConcept: currentState.hasCheckedInitialConcept,

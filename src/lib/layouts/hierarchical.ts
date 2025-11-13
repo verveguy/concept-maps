@@ -154,8 +154,18 @@ export function applyHierarchicalLayout(
     })
   })
 
+  // Create a set of valid node IDs for validation
+  const validNodeIds = new Set(nodes.map(n => n.id))
+  
   // Add edges to dagre graph with label information
+  // Filter out edges that reference nodes not in the graph
   edges.forEach((edge) => {
+    // Only add edges where both source and target nodes exist
+    if (!validNodeIds.has(edge.source) || !validNodeIds.has(edge.target)) {
+      console.warn(`Skipping edge ${edge.id}: source or target node not found in graph`)
+      return
+    }
+    
     // Get edge label from edge data
     const edgeLabel = (edge.data as any)?.relationship?.primaryLabel || ''
     
@@ -170,13 +180,21 @@ export function applyHierarchicalLayout(
   // Extract positions and update nodes
   return nodes.map((node) => {
     const nodeWithPosition = dagreGraph.node(node.id)
-    return {
-      ...node,
-      position: {
-        x: nodeWithPosition.x - nodeWidth / 2,
-        y: nodeWithPosition.y - nodeHeight / 2,
-      },
+    // Validate that dagre returned a valid position
+    if (nodeWithPosition && typeof nodeWithPosition.x === 'number' && typeof nodeWithPosition.y === 'number' && 
+        !isNaN(nodeWithPosition.x) && !isNaN(nodeWithPosition.y) &&
+        isFinite(nodeWithPosition.x) && isFinite(nodeWithPosition.y)) {
+      return {
+        ...node,
+        position: {
+          x: nodeWithPosition.x - nodeWidth / 2,
+          y: nodeWithPosition.y - nodeHeight / 2,
+        },
+      }
     }
+    // If dagre didn't return a valid position, keep the original position
+    console.warn(`Dagre did not return a valid position for node ${node.id}, keeping original position`)
+    return node
   })
 }
 
