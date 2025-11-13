@@ -137,7 +137,7 @@ export function LayoutSelector({
   }
 
   // Handle main button click
-  const handleMainButtonClick = (event: React.MouseEvent) => {
+  const handleMainButtonClick = () => {
     if (disabled) return
     onApplyLayout(selectedLayout)
   }

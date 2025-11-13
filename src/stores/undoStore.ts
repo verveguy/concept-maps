@@ -173,6 +173,7 @@ export type MutationCommandUnion =
   | DeleteConceptCommand
   | CreateRelationshipCommand
   | UpdateRelationshipCommand
+  | ReverseRelationshipCommand
   | DeleteRelationshipCommand
   | CreateCommentCommand
   | UpdateCommentCommand

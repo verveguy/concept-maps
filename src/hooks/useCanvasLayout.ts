@@ -8,7 +8,7 @@
  * This hook centralizes all layout logic, making it easier to test and maintain.
  */
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback } from 'react'
 import type { Node, Edge } from 'reactflow'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { useMapStore } from '@/stores/mapStore'
@@ -57,7 +57,6 @@ export interface UseCanvasLayoutOptions {
  */
 export function useCanvasLayout(options: UseCanvasLayoutOptions) {
   const {
-    conceptIds,
     concepts,
     comments,
     getNodes,

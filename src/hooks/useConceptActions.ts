@@ -20,6 +20,8 @@ export interface CreateConceptData {
   notes?: string
   /** Optional metadata as key-value pairs */
   metadata?: Record<string, unknown>
+  /** Whether the concept was placed by the user (vs. layout algorithm) */
+  userPlaced?: boolean
 }
 
 /**
