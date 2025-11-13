@@ -57,6 +57,7 @@ export interface UseCanvasLayoutOptions {
  */
 export function useCanvasLayout(options: UseCanvasLayoutOptions) {
   const {
+    conceptIds: _conceptIds, // Used by callers for tracking, but not needed in hook implementation
     concepts,
     comments,
     getNodes,
