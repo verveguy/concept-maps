@@ -4,10 +4,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { ReactFlowProvider } from 'reactflow'
 import { ConceptNode } from '../ConceptNode'
 import type { ConceptNodeData } from '@/lib/reactFlowTypes'
+import type { Concept } from '@/lib/schema'
 
 // Mock all the hooks and stores
 vi.mock('@/stores/uiStore', () => ({
@@ -123,12 +124,17 @@ vi.mock('../ConceptNodePreviewIndicator', () => ({
 }))
 
 describe('ConceptNode Integration', () => {
-  const mockConcept = {
+  const mockConcept: Concept = {
     id: 'concept-1',
+    mapId: 'map-1',
     label: 'Test Concept',
+    position: { x: 100, y: 100 },
     notes: 'Test notes',
     metadata: {},
     showNotesAndMetadata: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    deletedAt: null,
   }
 
   const mockNodeData: ConceptNodeData = {
@@ -146,7 +152,7 @@ describe('ConceptNode Integration', () => {
   it('should render concept node with label', () => {
     render(
       <ReactFlowProvider>
-        <ConceptNode data={mockNodeData} selected={false} id="concept-1" />
+        <ConceptNode data={mockNodeData} selected={false} id="concept-1" type="concept" zIndex={0} isConnectable={true} xPos={100} yPos={100} dragging={false} />
       </ReactFlowProvider>
     )
 
@@ -157,7 +163,7 @@ describe('ConceptNode Integration', () => {
   it('should render notes when showNotesAndMetadata is true', () => {
     render(
       <ReactFlowProvider>
-        <ConceptNode data={mockNodeData} selected={false} id="concept-1" />
+        <ConceptNode data={mockNodeData} selected={false} id="concept-1" type="concept" zIndex={0} isConnectable={true} xPos={100} yPos={100} dragging={false} />
       </ReactFlowProvider>
     )
 
@@ -168,7 +174,7 @@ describe('ConceptNode Integration', () => {
   it('should render handles', () => {
     render(
       <ReactFlowProvider>
-        <ConceptNode data={mockNodeData} selected={false} id="concept-1" />
+        <ConceptNode data={mockNodeData} selected={false} id="concept-1" type="concept" zIndex={0} isConnectable={true} xPos={100} yPos={100} dragging={false} />
       </ReactFlowProvider>
     )
 
@@ -178,7 +184,7 @@ describe('ConceptNode Integration', () => {
   it('should apply selected styling when selected', () => {
     const { container } = render(
       <ReactFlowProvider>
-        <ConceptNode data={mockNodeData} selected={true} id="concept-1" />
+        <ConceptNode data={mockNodeData} selected={true} id="concept-1" type="concept" zIndex={0} isConnectable={true} xPos={100} yPos={100} dragging={false} />
       </ReactFlowProvider>
     )
 
@@ -191,7 +197,7 @@ describe('ConceptNode Integration', () => {
   it('should handle double click to start editing', () => {
     render(
       <ReactFlowProvider>
-        <ConceptNode data={mockNodeData} selected={false} id="concept-1" />
+        <ConceptNode data={mockNodeData} selected={false} id="concept-1" type="concept" zIndex={0} isConnectable={true} xPos={100} yPos={100} dragging={false} />
       </ReactFlowProvider>
     )
 
@@ -205,7 +211,7 @@ describe('ConceptNode Integration', () => {
   })
 
   it('should render with custom metadata styles', () => {
-    const conceptWithStyles = {
+    const conceptWithStyles: Concept = {
       ...mockConcept,
       metadata: {
         fillColor: '#ff0000',
@@ -222,7 +228,7 @@ describe('ConceptNode Integration', () => {
 
     const { container } = render(
       <ReactFlowProvider>
-        <ConceptNode data={nodeDataWithStyles} selected={false} id="concept-1" />
+        <ConceptNode data={nodeDataWithStyles} selected={false} id="concept-1" type="concept" zIndex={0} isConnectable={true} xPos={100} yPos={100} dragging={false} />
       </ReactFlowProvider>
     )
 

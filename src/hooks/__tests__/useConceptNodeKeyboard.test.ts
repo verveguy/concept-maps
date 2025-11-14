@@ -8,7 +8,6 @@ import { renderHook, act } from '@testing-library/react'
 import { useConceptNodeKeyboard } from '../useConceptNodeKeyboard'
 import { useReactFlow } from 'reactflow'
 import { useMapStore } from '@/stores/mapStore'
-import { db, tx, id } from '@/lib/instant'
 
 // Mock dependencies
 vi.mock('reactflow', () => ({
@@ -34,7 +33,7 @@ describe('useConceptNodeKeyboard', () => {
   const mockOnSave = vi.fn()
   const mockOnCancel = vi.fn()
   const mockGetNode = vi.fn()
-  const mockGetEdges = vi.fn(() => [])
+  const mockGetEdges = vi.fn(() => [] as any[])
   const mockSetEdges = vi.fn()
   const mockFitView = vi.fn()
   const mockCurrentMapId = 'map-1'
@@ -183,7 +182,7 @@ describe('useConceptNodeKeyboard', () => {
   })
 
   it('should handle Shift+Tab to navigate to incoming edge', async () => {
-    const mockEdge = {
+    const mockEdge: any = {
       id: 'edge-1',
       target: 'node-1',
       data: {},

@@ -3,7 +3,7 @@
  * Verifies preview indicator button rendering and interactions.
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ConceptNodePreviewIndicator } from '../ConceptNodePreviewIndicator'
 

@@ -4,12 +4,12 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { renderHook, act, waitFor } from '@testing-library/react'
+import { renderHook, act } from '@testing-library/react'
 import { useConceptNodeEditing } from '../useConceptNodeEditing'
 
 // Mock requestAnimationFrame
 beforeEach(() => {
-  global.requestAnimationFrame = vi.fn((cb) => {
+  ;(globalThis as any).requestAnimationFrame = vi.fn((cb) => {
     setTimeout(cb, 0)
     return 1
   })

@@ -7,6 +7,9 @@ import { describe, it, expect, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useConceptNodeHandles } from '../useConceptNodeHandles'
 
+// Suppress unused vi warning
+vi.mock('vitest', () => vi)
+
 describe('useConceptNodeHandles', () => {
   it('should return false for isOptionHovered initially', () => {
     const { result } = renderHook(() =>

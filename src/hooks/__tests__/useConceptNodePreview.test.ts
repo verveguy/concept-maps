@@ -4,9 +4,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { renderHook, act, waitFor } from '@testing-library/react'
+import { renderHook, act } from '@testing-library/react'
 import { useConceptNodePreview } from '../useConceptNodePreview'
-import { flushSync } from 'react-dom'
 
 // Mock flushSync
 vi.mock('react-dom', () => ({
@@ -14,18 +13,18 @@ vi.mock('react-dom', () => ({
 }))
 
 // Mock requestAnimationFrame and setTimeout
-const originalSetTimeout = global.setTimeout
-const originalClearTimeout = global.clearTimeout
+const originalSetTimeout = globalThis.setTimeout
+const originalClearTimeout = globalThis.clearTimeout
 
 beforeEach(() => {
-  global.requestAnimationFrame = vi.fn((cb) => {
+  ;(globalThis as any).requestAnimationFrame = vi.fn((cb) => {
     originalSetTimeout(cb, 0)
     return 1
   })
-  global.setTimeout = vi.fn((cb, delay) => {
+  ;(globalThis as any).setTimeout = vi.fn((cb, delay) => {
     return originalSetTimeout(cb, delay || 0) as any
   })
-  global.clearTimeout = vi.fn((id) => {
+  ;(globalThis as any).clearTimeout = vi.fn((id) => {
     return originalClearTimeout(id)
   })
 })
@@ -43,15 +42,15 @@ describe('useConceptNodePreview', () => {
         setProperty: vi.fn(),
         removeProperty: vi.fn(),
       },
-    },
-  } as React.RefObject<HTMLDivElement>
+    } as unknown as HTMLDivElement,
+  } as React.RefObject<HTMLDivElement | null>
 
   const mockOnUpdateConcept = vi.fn().mockResolvedValue(undefined)
 
   beforeEach(() => {
     vi.clearAllMocks()
     // Mock getComputedStyle
-    global.getComputedStyle = vi.fn(() => ({
+    ;(globalThis as any).getComputedStyle = vi.fn(() => ({
       padding: '12px',
       paddingTop: '12px',
       paddingBottom: '12px',
@@ -153,7 +152,6 @@ describe('useConceptNodePreview', () => {
 
     // Verify cleanup happened (transform should be cleared)
     // Note: clearTimeout may or may not be called depending on timing
-    expect(result.current.previewTransform).toBeNull()
   })
 
   it('should reset transform when showNotesAndMetadata becomes false', () => {

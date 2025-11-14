@@ -4,12 +4,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { ConceptNodeLabel } from '../ConceptNodeLabel'
 
 // Mock requestAnimationFrame
 beforeEach(() => {
-  global.requestAnimationFrame = vi.fn((cb) => {
+  ;(globalThis as any).requestAnimationFrame = vi.fn((cb) => {
     setTimeout(cb, 0)
     return 1
   })
@@ -19,8 +19,8 @@ describe('ConceptNodeLabel', () => {
   const mockOnEditLabelChange = vi.fn()
   const mockOnSave = vi.fn()
   const mockOnKeyDown = vi.fn()
-  const mockInputRef = { current: null } as React.RefObject<HTMLInputElement>
-  const mockMeasureRef = { current: null } as React.RefObject<HTMLSpanElement>
+  const mockInputRef = { current: null } as React.RefObject<HTMLInputElement | null>
+  const mockMeasureRef = { current: null } as React.RefObject<HTMLSpanElement | null>
 
   beforeEach(() => {
     vi.clearAllMocks()

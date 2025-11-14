@@ -4,9 +4,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook } from '@testing-library/react'
 import { useConceptNodeTripleEntry } from '../useConceptNodeTripleEntry'
-import { db, tx } from '@/lib/instant'
 import { useReactFlow } from 'reactflow'
 import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 import { useConcepts } from '@/hooks/useConcepts'
@@ -53,7 +52,7 @@ describe('useConceptNodeTripleEntry', () => {
   const mockGetNodes = vi.fn(() => [])
   const mockSetNodes = vi.fn()
   const mockUpdateConcept = vi.fn()
-  const mockConcepts = []
+  const mockConcepts: any[] = []
   const mockCurrentMapId = 'map-1'
 
   beforeEach(() => {
@@ -69,7 +68,7 @@ describe('useConceptNodeTripleEntry', () => {
     vi.mocked(useCanvasMutations).mockReturnValue({
       updateConcept: mockUpdateConcept,
     } as any)
-    vi.mocked(useConcepts).mockReturnValue(mockConcepts)
+    vi.mocked(useConcepts).mockReturnValue(mockConcepts as any)
     vi.mocked(useMapStore).mockReturnValue(mockCurrentMapId)
   })
 

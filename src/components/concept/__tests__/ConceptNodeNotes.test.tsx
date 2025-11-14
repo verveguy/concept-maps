@@ -27,9 +27,9 @@ describe('ConceptNodeNotes', () => {
   const mockOnEdit = vi.fn()
   const mockOnSave = vi.fn()
   const mockOnKeyDown = vi.fn()
-  const mockNotesTextareaRef = { current: null } as React.RefObject<HTMLTextAreaElement>
-  const mockNotesDisplayRef = { current: null } as React.RefObject<HTMLDivElement>
-  const mockNotesMeasureRef = { current: null } as React.RefObject<HTMLSpanElement>
+  const mockNotesTextareaRef = { current: null } as React.RefObject<HTMLTextAreaElement | null>
+  const mockNotesDisplayRef = { current: null } as React.RefObject<HTMLDivElement | null>
+  const mockNotesMeasureRef = { current: null } as React.RefObject<HTMLSpanElement | null>
 
   beforeEach(() => {
     vi.clearAllMocks()
