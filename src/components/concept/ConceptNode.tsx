@@ -751,7 +751,8 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   const showNotesAndMetadata = data.concept.showNotesAndMetadata ?? true
   const hasNotes = data.concept.notes && data.concept.notes.trim().length > 0
   const hasMetadata = Object.keys(getNonStyleMetadata(data.concept.metadata || {})).length > 0
-  const shouldShowIndicator = !showNotesAndMetadata && (hasNotes || hasMetadata)
+  // Don't show indicator if we're in temporary preview mode (isPreviewingNotes)
+  const shouldShowIndicator = !showNotesAndMetadata && !isPreviewingNotes && (hasNotes || hasMetadata)
   
   // Determine if notes/metadata should be visible (either saved state or preview mode)
   const shouldShowNotesAndMetadata = showNotesAndMetadata || isPreviewingNotes
@@ -909,12 +910,21 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
     }
   }
 
-  const handlePreviewLeave = () => {
+  const handlePreviewLeave = async () => {
     // Clear timeout if user leaves before delay completes
     if (previewTimeoutRef.current) {
       clearTimeout(previewTimeoutRef.current)
       previewTimeoutRef.current = null
     }
+    
+    // If in editing mode, save changes before closing preview (treat as blur)
+    if (isEditingNotes) {
+      await handleSaveNotes()
+    }
+    if (isEditing) {
+      await handleSave()
+    }
+    
     // Set clearing flag to disable transition in style prop
     setIsClearingPreview(true)
     // Clear transform and preview state synchronously
