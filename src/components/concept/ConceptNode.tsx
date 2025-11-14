@@ -125,6 +125,7 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   const [previewTransform, setPreviewTransform] = useState<{ x: number; y: number } | null>(null)
   const [isClearingPreview, setIsClearingPreview] = useState(false)
   const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isPermanentExpansionRef = useRef(false)
   const collapsedHeightRef = useRef<number | null>(null)
   const collapsedWidthRef = useRef<number | null>(null)
   const nodeRef = useRef<HTMLDivElement>(null)
@@ -761,10 +762,129 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   const handleShowNotesAndMetadata = async (e: React.MouseEvent) => {
     e.stopPropagation() // Prevent node click events
     if (!hasWriteAccess) return
+    
+    // Measure collapsed dimensions before expansion if not already measured
+    if (nodeRef.current) {
+      if (!collapsedHeightRef.current) {
+        collapsedHeightRef.current = nodeRef.current.offsetHeight
+      }
+      if (!collapsedWidthRef.current) {
+        collapsedWidthRef.current = nodeRef.current.offsetWidth
+      }
+    }
+    
+    // Measure expanded content BEFORE updating database
+    // This allows us to apply transform before React renders expanded content
+    let translateX = 0
+    let translateY = 0
+    
+    if (nodeRef.current && collapsedHeightRef.current && collapsedWidthRef.current) {
+      const tempDiv = document.createElement('div')
+      const computedStyle = window.getComputedStyle(nodeRef.current)
+      
+      tempDiv.style.position = 'absolute'
+      tempDiv.style.visibility = 'hidden'
+      tempDiv.style.opacity = '0'
+      tempDiv.style.pointerEvents = 'none'
+      tempDiv.style.top = '-9999px'
+      tempDiv.style.left = '-9999px'
+      tempDiv.style.padding = computedStyle.padding
+      tempDiv.style.paddingTop = computedStyle.paddingTop
+      tempDiv.style.paddingBottom = computedStyle.paddingBottom
+      tempDiv.style.paddingLeft = computedStyle.paddingLeft
+      tempDiv.style.paddingRight = computedStyle.paddingRight
+      tempDiv.style.fontSize = computedStyle.fontSize
+      tempDiv.style.fontFamily = computedStyle.fontFamily
+      tempDiv.style.fontWeight = computedStyle.fontWeight
+      tempDiv.style.lineHeight = computedStyle.lineHeight
+      tempDiv.style.boxSizing = 'border-box'
+      tempDiv.style.minWidth = computedStyle.minWidth
+      tempDiv.style.maxWidth = '500px'
+      
+      const label = data.label
+      const notes = data.concept.notes || ''
+      const hasMetadata = Object.keys(getNonStyleMetadata(data.concept.metadata || {})).length > 0
+      
+      const labelDiv = document.createElement('div')
+      labelDiv.style.fontWeight = '600'
+      labelDiv.style.fontSize = '0.875rem'
+      labelDiv.style.marginBottom = '0.25rem'
+      labelDiv.textContent = label
+      tempDiv.appendChild(labelDiv)
+      
+      if (notes) {
+        const notesDiv = document.createElement('div')
+        notesDiv.style.fontSize = '0.75rem'
+        notesDiv.style.marginTop = '0.25rem'
+        notesDiv.style.whiteSpace = 'pre-wrap'
+        notesDiv.style.lineHeight = '1.5'
+        notesDiv.textContent = notes
+        tempDiv.appendChild(notesDiv)
+      }
+      
+      if (hasMetadata) {
+        const metadataDiv = document.createElement('div')
+        metadataDiv.style.fontSize = '0.75rem'
+        metadataDiv.style.marginTop = '0.5rem'
+        metadataDiv.textContent = `${Object.keys(getNonStyleMetadata(data.concept.metadata || {})).length} metadata field(s)`
+        tempDiv.appendChild(metadataDiv)
+      }
+      
+      document.body.appendChild(tempDiv)
+      void tempDiv.offsetHeight
+      
+      const expandedHeight = tempDiv.offsetHeight
+      const expandedWidth = Math.max(tempDiv.scrollWidth || tempDiv.offsetWidth, collapsedWidthRef.current)
+      
+      document.body.removeChild(tempDiv)
+      
+      const collapsedWidth = collapsedWidthRef.current
+      const collapsedHeight = collapsedHeightRef.current
+      
+      if (expandedHeight > collapsedHeight || expandedWidth > collapsedWidth) {
+        const widthDiff = expandedWidth - collapsedWidth
+        const heightDiff = expandedHeight - collapsedHeight
+        translateX = -widthDiff / 2
+        translateY = -heightDiff / 2
+      }
+    }
+    
+    // Apply transform BEFORE updating database (so it's in place when React renders)
+    if (translateX !== 0 || translateY !== 0) {
+      // Disable transition and apply transform directly to DOM
+      if (nodeRef.current) {
+        nodeRef.current.style.setProperty('transition', 'none', 'important')
+        nodeRef.current.style.setProperty('transform', `translate(${translateX}px, ${translateY}px)`, 'important')
+      }
+      
+      // Set transform in React state
+      flushSync(() => {
+        setPreviewTransform({ x: translateX, y: translateY })
+      })
+    }
+    
     try {
+      // Mark as permanent expansion before updating database
+      isPermanentExpansionRef.current = true
+      
+      // Now update database - transform is already applied
       await updateConcept(data.concept.id, { showNotesAndMetadata: true })
+      
+      // Re-enable transition after database update completes
+      requestAnimationFrame(() => {
+        if (nodeRef.current) {
+          nodeRef.current.style.removeProperty('transition')
+        }
+      })
     } catch (error) {
       console.error('Failed to show notes and metadata:', error)
+      // On error, clear transform and reset flag
+      isPermanentExpansionRef.current = false
+      if (nodeRef.current) {
+        nodeRef.current.style.removeProperty('transform')
+        nodeRef.current.style.removeProperty('transition')
+      }
+      setPreviewTransform(null)
     }
   }
 
@@ -911,6 +1031,13 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   }
 
   const handlePreviewLeave = async () => {
+    // Only handle preview leave if we're actually in temporary preview mode
+    // If this is a permanent expansion (from clicking indicator), don't clear transform
+    // Use ref to avoid stale closure issues
+    if (!isPreviewingNotes || isPermanentExpansionRef.current) {
+      return
+    }
+    
     // Clear timeout if user leaves before delay completes
     if (previewTimeoutRef.current) {
       clearTimeout(previewTimeoutRef.current)
@@ -939,15 +1066,25 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   }
 
 
-  // Clear transform when preview ends
+  // Clear transform when preview ends (but not for permanent expansion)
   useEffect(() => {
-    if (!isPreviewingNotes) {
+    if (!isPreviewingNotes && !isPermanentExpansionRef.current) {
       setPreviewTransform(null)
       // Reset collapsed dimensions for next preview
       collapsedHeightRef.current = null
       collapsedWidthRef.current = null
     }
   }, [isPreviewingNotes])
+  
+  // Reset permanent expansion flag when notes/metadata are hidden
+  useEffect(() => {
+    const showNotesAndMetadata = data.concept.showNotesAndMetadata ?? true
+    if (!showNotesAndMetadata) {
+      isPermanentExpansionRef.current = false
+      // Clear transform when permanently hiding notes/metadata
+      setPreviewTransform(null)
+    }
+  }, [data.concept.showNotesAndMetadata])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -1167,7 +1304,7 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
           ) : (
             <div 
               ref={notesDisplayRef}
-              className={`text-xs [&_*]:text-inherit [&_*]:text-xs [&_strong]:font-bold [&_em]:italic [&_code]:font-mono [&_a]:underline [&_p]:m-0 [&_p]:leading-[1.5] ${hasWriteAccess ? 'cursor-text hover:opacity-100' : ''} transition-opacity w-full overflow-hidden`}
+              className={`text-xs **:text-inherit [&_strong]:font-bold [&_em]:italic [&_code]:font-mono [&_a]:underline [&_p]:m-0 [&_p]:leading-normal ${hasWriteAccess ? 'cursor-text hover:opacity-100' : ''} transition-opacity w-full overflow-hidden`}
               style={{ color: nodeStyle.textColor, opacity: 0.7, lineHeight: '1.5' }}
               onClick={(e) => {
                 if (hasWriteAccess) {
