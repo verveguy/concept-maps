@@ -13,7 +13,7 @@ import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { useUndoStore } from '@/stores/undoStore'
 import { useRelationships } from '@/hooks/useRelationships'
-import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/IconButton'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { FloatingToolbar } from './FloatingToolbar'
@@ -157,11 +157,9 @@ function EdgeColorPickerIcon({
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
+        <IconButton
           disabled={disabled}
-          className="h-8 w-8 p-0 hover:bg-accent [&_svg]:size-auto!"
+          className="h-8 w-8 p-0 [&_svg]:size-auto!"
           title="Edge color"
         >
           {/* Horizontal line icon showing edge color - match dropdown style but larger */}
@@ -207,7 +205,7 @@ function EdgeColorPickerIcon({
               <div className="h-0.5 w-7 border-t-2" style={{ borderColor: value }} />
             )}
           </div>
-        </Button>
+        </IconButton>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-2">
         <div className="flex gap-2">
@@ -529,36 +527,30 @@ export function EdgeToolbar({
         }}
         disabled={!hasWriteAccess}
       />
-      <Button
-        variant="ghost"
-        size="icon"
+      <IconButton
         onClick={handleReverseClick}
         disabled={!hasWriteAccess || !fullRelationship}
-        className="h-8 w-8 p-0 hover:bg-accent [&_svg]:size-auto!"
+        className="h-8 w-8 p-0 [&_svg]:size-auto!"
         title="Reverse Direction"
       >
         <ArrowLeftRight className="h-5 w-5" strokeWidth={1.5} />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
+      </IconButton>
+      <IconButton
         onClick={handleEditClick}
         disabled={!hasWriteAccess}
-        className="h-8 w-8 p-0 hover:bg-accent [&_svg]:size-auto!"
+        className="h-8 w-8 p-0 [&_svg]:size-auto!"
         title="Edit"
       >
         <Pencil className="h-5 w-5" strokeWidth={1.5} />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
+      </IconButton>
+      <IconButton
         onClick={handleDeleteClick}
         disabled={!hasWriteAccess}
         className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 [&_svg]:size-auto!"
         title="Delete"
       >
         <Trash2 className="h-5 w-5" strokeWidth={1.5} />
-      </Button>
+      </IconButton>
     </FloatingToolbar>
   )
 }

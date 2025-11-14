@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/IconButton'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { EdgeTypeIcon } from './EdgeToolbar'
 
@@ -100,17 +100,15 @@ export function LineSettingsDropdown({
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
+        <IconButton
           disabled={disabled}
-          className="h-8 w-8 p-0 hover:bg-accent [&_svg]:size-auto!"
+          className="h-8 w-8 p-0 [&_svg]:size-auto!"
           title={title}
         >
           <div className="flex items-center justify-center w-full h-full">
             {getButtonIcon()}
           </div>
-        </Button>
+        </IconButton>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-1.5" align="start">
         <div className="space-y-1.5">

@@ -15,6 +15,7 @@ import { ShareDialog } from '@/components/share/ShareDialog'
 import { InvitationAcceptScreen } from '@/components/invitation/InvitationAcceptScreen'
 import { SearchBox } from '@/components/layout/SearchBox'
 import { UndoButton } from '@/components/ui/UndoButton'
+import { IconButton } from '@/components/ui/IconButton'
 import { PresenceHeader } from '@/components/presence/PresenceHeader'
 import { useMapStore } from '@/stores/mapStore'
 import { useUIStore } from '@/stores/uiStore'
@@ -285,14 +286,14 @@ export function MapPage() {
         <div className="border-b bg-card px-4 py-2 flex items-center gap-2">
           {/* Sidebar toggle button - only show when sidebar is closed */}
           {!sidebarOpen && (
-            <button
+            <IconButton
               onClick={() => setSidebarOpen(true)}
-              className="p-1.5 rounded-md hover:bg-accent transition-colors -ml-1"
+              className="-ml-1"
               title="Open sidebar"
               aria-label="Open sidebar"
             >
               <PanelLeft className="h-4 w-4" />
-            </button>
+            </IconButton>
           )}
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <h1
@@ -341,22 +342,12 @@ export function MapPage() {
               Edit Perspective
             </button>
           )}
-          <button
+          <IconButton
             onClick={() => setShowShareDialog(true)}
-            className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 flex items-center gap-2"
             title="Share map"
           >
             <Share2 className="h-4 w-4" />
-            Share
-          </button>
-          <button
-            onClick={() => handleCreateConcept({ x: 250, y: 250 })}
-            disabled={isCreatingConcept}
-            className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            {isCreatingConcept ? 'Creating...' : 'Add Concept'}
-          </button>
+          </IconButton>
         </div>
 
         {/* Create Concept Dialog */}

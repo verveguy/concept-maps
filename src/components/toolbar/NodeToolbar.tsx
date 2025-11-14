@@ -12,7 +12,7 @@ import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 import { useCommentActions } from '@/hooks/useCommentActions'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { useUndoStore } from '@/stores/undoStore'
-import { Button } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/IconButton'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { FloatingToolbar } from './FloatingToolbar'
@@ -325,15 +325,13 @@ function ColorPickerIcon({
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
+        <IconButton
           disabled={disabled}
-          className="h-8 w-8 p-0 hover:bg-accent [&_svg]:size-auto!"
+          className="h-8 w-8 p-0 [&_svg]:size-auto!"
           title={type === 'fill' ? 'Fill color' : type === 'border' ? 'Border color' : 'Text color'}
         >
           {getIcon()}
-        </Button>
+        </IconButton>
       </PopoverTrigger>
       <PopoverContent className="w-48 p-2">
         <div className="flex gap-2">
@@ -573,12 +571,10 @@ export function NodeToolbar({
             }}
             disabled={!hasWriteAccess}
           />
-          <Button
-            variant="ghost"
-            size="icon"
+          <IconButton
             onClick={handleToggleNotesAndMetadata}
             disabled={!hasWriteAccess}
-            className={`h-8 w-8 p-0 hover:bg-accent [&_svg]:size-auto! ${
+            className={`h-8 w-8 p-0 [&_svg]:size-auto! ${
               !showNotesAndMetadata
                 ? 'text-muted-foreground'
                 : ''
@@ -590,48 +586,40 @@ export function NodeToolbar({
             ) : (
               <EyeOff className="h-4 w-4" strokeWidth={1.5} />
             )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
+          </IconButton>
+          <IconButton
             onClick={handleEditClick}
             disabled={!hasWriteAccess}
-            className="h-8 w-8 p-0 hover:bg-accent [&_svg]:size-auto!"
+            className="h-8 w-8 p-0 [&_svg]:size-auto!"
             title="Edit"
           >
             <Pencil className="h-4 w-4" strokeWidth={1.5} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
+          </IconButton>
+          <IconButton
             onClick={handleConceptDeleteClick}
             disabled={!hasWriteAccess}
             className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950 [&_svg]:size-auto!"
             title="Delete"
           >
             <Trash2 className="h-4 w-4" strokeWidth={1.5} />
-          </Button>
+          </IconButton>
         </>
       )}
 
       {type === 'comment' && comment && (
         <>
-          <Button
-            variant="ghost"
-            size="icon"
+          <IconButton
             onClick={handleEditClick}
             disabled={!hasWriteAccess}
-            className="h-8 w-8 p-0 hover:bg-accent [&_svg]:size-auto!"
+            className="h-8 w-8 p-0 [&_svg]:size-auto!"
             title="Edit"
           >
             <Pencil className="h-4 w-4" strokeWidth={1.5} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
+          </IconButton>
+          <IconButton
             onClick={handleResolveClick}
             disabled={!hasWriteAccess}
-            className={`h-8 w-8 p-0 hover:bg-accent [&_svg]:size-auto! ${
+            className={`h-8 w-8 p-0 [&_svg]:size-auto! ${
               comment.resolved
                 ? 'text-green-600 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-950'
                 : ''
@@ -639,17 +627,15 @@ export function NodeToolbar({
             title={comment.resolved ? 'Resolved' : 'Resolve'}
           >
             <Check className="h-4 w-4" strokeWidth={1.5} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
+          </IconButton>
+          <IconButton
             onClick={handleDeleteClick}
             disabled={!hasWriteAccess}
             className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950 [&_svg]:size-auto!"
             title="Delete"
           >
             <Trash2 className="h-4 w-4" strokeWidth={1.5} />
-          </Button>
+          </IconButton>
         </>
       )}
     </FloatingToolbar>
