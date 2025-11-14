@@ -23,6 +23,7 @@ import { memo, useState, useRef, useEffect } from 'react'
 import { Handle, Position, type NodeProps } from 'reactflow'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 import { Check } from 'lucide-react'
 import { useCommentActions } from '@/hooks/useCommentActions'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
@@ -132,7 +133,11 @@ export const CommentNode = memo(({ data, selected }: NodeProps<CommentNodeData>)
   const [editText, setEditText] = useState(data.comment.text)
   const [isHovered, setIsHovered] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [displayHeight, setDisplayHeight] = useState<number | null>(null)
+  const [displayWidth, setDisplayWidth] = useState<number | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const displayRef = useRef<HTMLDivElement>(null)
+  const measureRef = useRef<HTMLSpanElement>(null)
   const hasTriggeredEditRef = useRef(false)
   const nodeRef = useRef<HTMLDivElement>(null)
   const dragStartPositionRef = useRef<{ x: number; y: number } | null>(null)
@@ -239,6 +244,23 @@ export const CommentNode = memo(({ data, selected }: NodeProps<CommentNodeData>)
     }
   }, [data.comment.text, isEditing])
 
+  // Measure display height and width when it's rendered (before editing starts)
+  useEffect(() => {
+    if (!isEditing && displayRef.current && data.comment.text) {
+      const element = displayRef.current
+      // Use scrollHeight to get full content height
+      const height = element.scrollHeight || element.offsetHeight
+      // Measure width to constrain textarea
+      const width = element.offsetWidth || element.clientWidth
+      setDisplayHeight(height)
+      setDisplayWidth(width)
+    } else if (!data.comment.text) {
+      // Reset measurements when text is cleared
+      setDisplayHeight(null)
+      setDisplayWidth(null)
+    }
+  }, [data.comment.text, isEditing])
+
   // Reset the trigger ref when shouldStartEditing becomes false
   useEffect(() => {
     if (!data.shouldStartEditing) {
@@ -260,10 +282,11 @@ export const CommentNode = memo(({ data, selected }: NodeProps<CommentNodeData>)
     if (isEditing && textareaRef.current) {
       requestAnimationFrame(() => {
         if (textareaRef.current) {
-          // Set initial height based on content
+          // Let textarea find its natural height based on content
           textareaRef.current.style.height = 'auto'
-          const scrollHeight = textareaRef.current.scrollHeight
-          textareaRef.current.style.height = `${scrollHeight}px`
+          const naturalHeight = textareaRef.current.scrollHeight
+          const minHeight = displayHeight || 20 // Use measured height as minimum
+          textareaRef.current.style.height = `${Math.max(naturalHeight, minHeight)}px`
           textareaRef.current.focus()
           // Place cursor at end of text instead of selecting all
           const length = textareaRef.current.value.length
@@ -271,7 +294,7 @@ export const CommentNode = memo(({ data, selected }: NodeProps<CommentNodeData>)
         }
       })
     }
-  }, [isEditing])
+  }, [isEditing, displayHeight])
 
   const handleClick = (_e: React.MouseEvent) => {
     // Clear other selections
@@ -454,9 +477,18 @@ export const CommentNode = memo(({ data, selected }: NodeProps<CommentNodeData>)
         </div>
       )}
 
+      {/* Hidden span for measuring text width */}
+      {isEditing && (
+        <span
+          ref={measureRef}
+          className="absolute invisible whitespace-nowrap"
+          style={{ top: '-9999px', left: '-9999px' }}
+        />
+      )}
+
       {/* Sticky note container */}
       <div
-        className={`px-3 py-2 shadow-md transition-all hover:shadow-lg min-w-[120px] max-w-[200px] relative sticky-note ${isEditing ? 'cursor-text' : 'cursor-pointer'}`}
+        className={`px-3 py-2 shadow-md transition-all hover:shadow-lg min-w-[120px] relative sticky-note ${isEditing ? 'cursor-text' : 'cursor-pointer'} ${isEditing ? 'overflow-visible' : ''}`}
         style={{
           backgroundColor: backgroundColor,
           boxShadow: selected
@@ -515,11 +547,35 @@ export const CommentNode = memo(({ data, selected }: NodeProps<CommentNodeData>)
             value={editText}
             onChange={(e) => {
               setEditText(e.target.value)
-              // Auto-resize textarea as user types
-              if (textareaRef.current) {
-                textareaRef.current.style.height = 'auto'
-                textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+              const textarea = e.target
+              // Auto-resize height
+              textarea.style.height = 'auto'
+              const minHeight = displayHeight || 20
+              const newHeight = Math.max(textarea.scrollHeight, minHeight)
+              textarea.style.height = `${newHeight}px`
+              // Auto-expand width based on content (measure longest line using hidden element)
+              const minWidth = displayWidth || 100
+              let maxLineWidth = minWidth
+              if (measureRef.current) {
+                // Split by newlines and measure each line
+                const lines = e.target.value.split('\n')
+                measureRef.current.style.fontSize = window.getComputedStyle(textarea).fontSize
+                measureRef.current.style.fontFamily = window.getComputedStyle(textarea).fontFamily
+                measureRef.current.style.fontWeight = window.getComputedStyle(textarea).fontWeight
+                measureRef.current.style.letterSpacing = window.getComputedStyle(textarea).letterSpacing
+                measureRef.current.style.whiteSpace = 'nowrap'
+                measureRef.current.style.visibility = 'hidden'
+                measureRef.current.style.position = 'absolute'
+                measureRef.current.style.top = '-9999px'
+                
+                lines.forEach((line) => {
+                  measureRef.current!.textContent = line || ' '
+                  const lineWidth = measureRef.current!.offsetWidth
+                  maxLineWidth = Math.max(maxLineWidth, lineWidth)
+                })
               }
+              const newWidth = Math.max(maxLineWidth, minWidth)
+              textarea.style.width = `${newWidth}px`
             }}
             onBlur={handleSave}
             onKeyDown={handleKeyDown}
@@ -547,18 +603,31 @@ export const CommentNode = memo(({ data, selected }: NodeProps<CommentNodeData>)
               // Prevent node drag after text selection
               e.stopPropagation()
             }}
-            className="w-full text-sm bg-transparent border-0 outline-none resize-none font-mono"
+            className="text-sm bg-transparent border-0 outline-none resize-none block"
             style={{
-              minHeight: '20px',
               fontFamily: 'inherit',
               color: '#111827', // Keep text black in both light and dark mode
-              overflowY: 'hidden', // Hide scrollbar, let it grow naturally
+              lineHeight: '1.5',
+              whiteSpace: 'pre',
+              wordBreak: 'normal',
+              overflowWrap: 'normal',
+              boxSizing: 'border-box',
+              minWidth: displayWidth ? `${displayWidth}px` : '100%',
+              width: displayWidth ? `${displayWidth}px` : '100%',
+              overflowX: 'visible',
+              overflowY: 'hidden',
+              padding: 0,
+              margin: 0,
             }}
             onClick={(e) => e.stopPropagation()}
           />
         ) : (
-          <div className="text-sm prose prose-sm max-w-none text-gray-900">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <div 
+            ref={displayRef}
+            className="text-sm [&_*]:text-inherit [&_*]:text-sm [&_strong]:font-bold [&_em]:italic [&_code]:font-mono [&_a]:underline [&_p]:m-0 [&_p]:leading-[1.5] text-gray-900"
+            style={{ lineHeight: '1.5' }}
+          >
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
               {data.comment.text}
             </ReactMarkdown>
           </div>

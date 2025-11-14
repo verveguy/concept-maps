@@ -36,6 +36,8 @@ export interface UpdateConceptData {
   notes?: string
   /** New metadata */
   metadata?: Record<string, unknown>
+  /** Whether to show notes and metadata sections */
+  showNotesAndMetadata?: boolean
   /** Whether this node was placed by the user (true) or by layout algorithm (false) */
   userPlaced?: boolean
 }
@@ -191,6 +193,7 @@ export function useConceptActions() {
     if (updates.metadata !== undefined) {
       updateData.metadata = JSON.stringify(updates.metadata)
     }
+    if (updates.showNotesAndMetadata !== undefined) updateData.showNotesAndMetadata = updates.showNotesAndMetadata
     if (updates.userPlaced !== undefined) updateData.userPlaced = updates.userPlaced
 
     await db.transact([tx.concepts[conceptId].update(updateData)])

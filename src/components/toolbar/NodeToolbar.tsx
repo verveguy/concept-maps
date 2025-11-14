@@ -6,9 +6,9 @@
  */
 
 import { useState, useEffect } from 'react'
-import { Pencil, Check, Trash2, Circle } from 'lucide-react'
+import { Pencil, Check, Trash2, Circle, Eye, EyeOff } from 'lucide-react'
 import { useUIStore } from '@/stores/uiStore'
-import { useConceptActions } from '@/hooks/useConceptActions'
+import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 import { useCommentActions } from '@/hooks/useCommentActions'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { useUndoStore } from '@/stores/undoStore'
@@ -381,6 +381,7 @@ interface NodeToolbarProps {
   concept?: {
     id: string
     metadata?: Record<string, unknown>
+    showNotesAndMetadata?: boolean
   }
   /** Comment data (if type is 'comment') */
   comment?: {
@@ -400,7 +401,7 @@ export function NodeToolbar({
   onEdit,
 }: NodeToolbarProps) {
   const { hasWriteAccess } = useMapPermissions()
-  const { updateConcept, deleteConcept } = useConceptActions()
+  const { updateConcept, deleteConcept } = useCanvasMutations()
   const { resolveComment, unresolveComment, deleteComment } = useCommentActions()
   const setConceptEditorOpen = useUIStore((state) => state.setConceptEditorOpen)
   const setSelectedCommentId = useUIStore((state) => state.setSelectedCommentId)
@@ -413,6 +414,7 @@ export function NodeToolbar({
   const [borderStyle, setBorderStyle] = useState<'solid' | 'dashed' | 'dotted' | 'long-dash'>('solid')
   const [borderThickness, setBorderThickness] = useState<number>(2)
   const [textColor, setTextColor] = useState<string>('#111827')
+  const [showNotesAndMetadata, setShowNotesAndMetadata] = useState<boolean>(true)
 
   // Update local state when concept changes
   useEffect(() => {
@@ -423,11 +425,13 @@ export function NodeToolbar({
       const style = (metadata.borderStyle as 'solid' | 'dashed' | 'dotted' | 'long-dash') || 'solid'
       const thickness = (metadata.borderThickness as number) || 2
       const text = (metadata.textColor as string) || '#111827'
+      const showNotes = concept.showNotesAndMetadata ?? true // Default to true if not set
       setFillColor(fill)
       setBorderColor(border)
       setBorderStyle(style)
       setBorderThickness(thickness)
       setTextColor(text)
+      setShowNotesAndMetadata(showNotes)
     }
   }, [concept])
 
@@ -507,6 +511,19 @@ export function NodeToolbar({
     }
   }
 
+  const handleToggleNotesAndMetadata = async () => {
+    if (!concept || !hasWriteAccess) return
+    const newValue = !showNotesAndMetadata
+    setShowNotesAndMetadata(newValue)
+    try {
+      await updateConcept(concept.id, { showNotesAndMetadata: newValue })
+    } catch (error) {
+      console.error('Failed to toggle notes and metadata display:', error)
+      // Revert on error
+      setShowNotesAndMetadata(!newValue)
+    }
+  }
+
   return (
     <FloatingToolbar
       visible={visible}
@@ -556,6 +573,24 @@ export function NodeToolbar({
             }}
             disabled={!hasWriteAccess}
           />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleToggleNotesAndMetadata}
+            disabled={!hasWriteAccess}
+            className={`h-8 w-8 p-0 hover:bg-accent [&_svg]:size-auto! ${
+              !showNotesAndMetadata
+                ? 'text-muted-foreground'
+                : ''
+            }`}
+            title={showNotesAndMetadata ? 'Hide notes and metadata' : 'Show notes and metadata'}
+          >
+            {showNotesAndMetadata ? (
+              <Eye className="h-4 w-4" strokeWidth={1.5} />
+            ) : (
+              <EyeOff className="h-4 w-4" strokeWidth={1.5} />
+            )}
+          </Button>
           <Button
             variant="ghost"
             size="icon"

@@ -81,7 +81,7 @@ export function useCanvasDataSync(options: UseCanvasDataSyncOptions) {
 
   // Sync nodes when concepts/comments/perspective changes
   useEffect(() => {
-    // Only update if concepts actually changed (by ID, position, label, notes, or metadata)
+    // Only update if concepts actually changed (by ID, position, label, notes, metadata, or showNotesAndMetadata)
     const conceptsChanged =
       concepts.length !== prevConceptsRef.current.length ||
       concepts.some((c, i) => {
@@ -93,6 +93,8 @@ export function useCanvasDataSync(options: UseCanvasDataSyncOptions) {
         if (c.label !== prev.label) return true
         // Check if notes changed
         if ((c.notes || '') !== (prev.notes || '')) return true
+        // Check if showNotesAndMetadata changed
+        if (c.showNotesAndMetadata !== prev.showNotesAndMetadata) return true
         // Check if metadata changed (compare JSON strings)
         const metadataChanged =
           JSON.stringify(c.metadata || {}) !== JSON.stringify(prev.metadata || {})

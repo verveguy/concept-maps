@@ -10,8 +10,8 @@ Concepts are the fundamental building blocks of concept maps. They represent ide
 
 ### In Graph View
 
-- **Double-click** anywhere on the canvas to create a new concept
-- Or click the **"Add Concept"** button in the toolbar
+- **Right-click** anywhere on the canvas and select **"Add Concept"** from the context menu
+- Or **double-click** anywhere on the canvas to create a new concept
 
 ### In Text View
 

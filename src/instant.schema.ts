@@ -31,6 +31,7 @@ const _schema = i.schema({
       notes: i.string().optional(),
       positionX: i.number(),
       positionY: i.number(),
+      showNotesAndMetadata: i.boolean().optional(),
       updatedAt: i.number().indexed(),
       userPlaced: i.boolean().optional(),
     }),

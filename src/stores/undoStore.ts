@@ -68,6 +68,7 @@ export interface UpdateConceptCommand extends MutationCommand {
     position?: { x: number; y: number }
     notes?: string
     metadata?: Record<string, unknown>
+    showNotesAndMetadata?: boolean
     userPlaced?: boolean
   }
 }

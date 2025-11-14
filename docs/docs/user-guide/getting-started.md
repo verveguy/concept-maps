@@ -23,7 +23,8 @@ This guide will help you get started with the Concept Mapping Tool.
    - Click "Create"
 
 3. **Add Your First Concept**
-   - Double-click on the canvas to create a concept
+   - **Right-click** on the canvas and select **"Add Concept"** from the context menu
+   - Or **double-click** on the canvas to create a concept
    - Type the concept name
    - Press Enter to confirm
 

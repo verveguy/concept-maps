@@ -64,6 +64,7 @@ export interface Concept {
   position: { x: number; y: number }
   notes: string // markdown
   metadata: Record<string, unknown> // flexible key-value pairs
+  showNotesAndMetadata?: boolean // whether to show notes and metadata sections
   userPlaced?: boolean // true if user explicitly positioned this node, false/undefined if placed by layout
   createdAt: Date
   updatedAt: Date
