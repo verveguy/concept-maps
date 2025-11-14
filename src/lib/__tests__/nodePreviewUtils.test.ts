@@ -160,13 +160,19 @@ describe('calculatePreviewTransform', () => {
   it('should calculate transform for width-only expansion', () => {
     const transform = calculatePreviewTransform(120, 50, 200, 50)
     
-    expect(transform).toEqual({ x: -40, y: 0 })
+    expect(transform).not.toBeNull()
+    expect(transform?.x).toBe(-40)
+    // Check that y is 0 (accepts both +0 and -0 since -0 === 0)
+    expect(transform?.y === 0).toBe(true)
   })
   
   it('should calculate transform for height-only expansion', () => {
     const transform = calculatePreviewTransform(120, 50, 120, 100)
     
-    expect(transform).toEqual({ x: 0, y: -25 })
+    expect(transform).not.toBeNull()
+    // Check that x is 0 (accepts both +0 and -0 since -0 === 0)
+    expect(transform?.x === 0).toBe(true)
+    expect(transform?.y).toBe(-25)
   })
   
   it('should calculate transform for both width and height expansion', () => {

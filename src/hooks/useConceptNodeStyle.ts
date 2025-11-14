@@ -70,10 +70,12 @@ export function useConceptNodeStyle(
   }, [])
   
   // Memoize style calculation based on metadata, selected state, and theme
-  const metadataKey = metadata ? JSON.stringify(metadata) : ''
+  // Note: We use metadata directly as a dependency. If metadata object reference changes,
+  // the style will recalculate. This is acceptable as metadata changes should trigger
+  // style updates anyway.
   const nodeStyle = useMemo(() => {
     return calculateNodeStyle(metadata || {}, isDarkMode, selected)
-  }, [metadataKey, selected, isDarkMode])
+  }, [metadata, selected, isDarkMode])
   
   return nodeStyle
 }

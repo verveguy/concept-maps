@@ -138,41 +138,51 @@ export function useConceptNodeKeyboard(params: UseConceptNodeKeyboardParams) {
             }),
         ])
         
-        // Wait a bit for the node and edge to appear, then set shouldStartEditing flag and fit view
-        setTimeout(() => {
-          const edges = getEdges()
-          const newEdge = edges.find((edge) => edge.id === newRelationshipId)
-          if (newEdge) {
-            const updatedEdges = edges.map((edge) => {
-              if (edge.id === newRelationshipId) {
-                return {
-                  ...edge,
-                  data: {
-                    ...edge.data,
-                    shouldStartEditing: true,
-                  },
+        // Poll for edge and node existence before setting flags and fitting view
+        const pollForEdgeAndNode = () => {
+          const maxAttempts = 40 // 40 * 50ms = 2000ms
+          let attempts = 0
+          const poll = () => {
+            const edges = getEdges()
+            const newEdge = edges.find((edge) => edge.id === newRelationshipId)
+            const newNode = getNode(newConceptId)
+            
+            if (newEdge && newNode) {
+              // Set shouldStartEditing flag on edge
+              const updatedEdges = edges.map((edge) => {
+                if (edge.id === newRelationshipId) {
+                  return {
+                    ...edge,
+                    data: {
+                      ...edge.data,
+                      shouldStartEditing: true,
+                    },
+                  }
                 }
-              }
-              return edge
-            })
-            setEdges(updatedEdges)
-          }
-          
-          // Fit view to include the new node
-          const newNode = getNode(newConceptId)
-          if (newNode) {
-            // Use fitView to ensure the new node is visible
-            // Small delay to ensure React Flow has updated its internal state
-            setTimeout(() => {
+                return edge
+              })
+              setEdges(updatedEdges)
+              
+              // Fit view to include the new node
               fitView({ 
                 padding: 0.2, 
                 includeHiddenNodes: false,
                 nodes: [newNode],
                 duration: 100, // Smooth animation
               })
-            }, 50)
+              return
+            }
+            
+            attempts++
+            if (attempts < maxAttempts) {
+              setTimeout(poll, 50)
+            } else {
+              console.warn('Timeout waiting for new edge/node to appear')
+            }
           }
-        }, 10)
+          poll()
+        }
+        pollForEdgeAndNode()
       } catch (error) {
         console.error('Failed to create concept and relationship from Tab:', error)
       }

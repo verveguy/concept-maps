@@ -185,10 +185,10 @@ export function calculatePreviewTransform(
   // Move up by half the height increase (Y decreases)
   const translateY = -heightDiff / 2
   
-  // Normalize -0 to 0 for consistency
+  // Return transform values (no normalization needed as -0 === 0 in JavaScript)
   return { 
-    x: translateX === 0 ? 0 : translateX, 
-    y: translateY === 0 ? 0 : translateY 
+    x: translateX, 
+    y: translateY 
   }
 }
 

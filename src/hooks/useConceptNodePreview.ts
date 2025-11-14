@@ -137,6 +137,7 @@ export function useConceptNodePreview(params: UseConceptNodePreviewParams): UseC
   const isPermanentExpansionRef = useRef(false)
   const collapsedHeightRef = useRef<number | null>(null)
   const collapsedWidthRef = useRef<number | null>(null)
+  const isMountedRef = useRef(true)
 
   // Handler to toggle notes/metadata visibility (persistent)
   const handleShowNotesAndMetadata = async (e: React.MouseEvent) => {
@@ -208,7 +209,7 @@ export function useConceptNodePreview(params: UseConceptNodePreviewParams): UseC
       
       // Re-enable transition after database update completes
       requestAnimationFrame(() => {
-        if (nodeRef.current) {
+        if (isMountedRef.current && nodeRef.current) {
           nodeRef.current.style.removeProperty('transition')
         }
       })
@@ -329,28 +330,32 @@ export function useConceptNodePreview(params: UseConceptNodePreviewParams): UseC
     })
   }
 
-  // Clear transform when preview ends (but not for permanent expansion)
+  // Reset collapsed dimensions when preview ends (consolidated reset logic)
   useEffect(() => {
     if (!isPreviewingNotes && !isPermanentExpansionRef.current) {
       setPreviewTransform(null)
-      // Reset collapsed dimensions for next preview
+      // Reset collapsed dimensions when preview ends
       collapsedHeightRef.current = null
       collapsedWidthRef.current = null
     }
   }, [isPreviewingNotes])
   
-  // Reset permanent expansion flag when notes/metadata are hidden
+  // Reset permanent expansion flag and dimensions when showNotesAndMetadata becomes false
   useEffect(() => {
     if (!showNotesAndMetadata) {
       isPermanentExpansionRef.current = false
-      // Clear transform when permanently hiding notes/metadata
       setPreviewTransform(null)
+      // Reset collapsed dimensions when permanently hidden
+      collapsedHeightRef.current = null
+      collapsedWidthRef.current = null
     }
   }, [showNotesAndMetadata])
 
-  // Cleanup timeout on unmount
+  // Cleanup timeout and set mounted flag on unmount
   useEffect(() => {
+    isMountedRef.current = true
     return () => {
+      isMountedRef.current = false
       if (previewTimeoutRef.current) {
         clearTimeout(previewTimeoutRef.current)
       }

@@ -71,7 +71,6 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   const nodeRef = useRef<HTMLDivElement>(null)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isMetadataExpanded, setIsMetadataExpanded] = useState(false)
-  const [isDarkMode] = useState(() => document.documentElement.classList.contains('dark'))
 
   // Extract hooks
   const nodeStyle = useConceptNodeStyle(data.concept?.metadata || {}, selected)
@@ -328,7 +327,7 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
           borderWidth: `${nodeStyle.borderThickness}px`,
           borderStyle: nodeStyle.borderStyle === 'long-dash' ? 'dashed' : nodeStyle.borderStyle,
           borderColor: nodeStyle.borderColor,
-          boxShadow: selected ? (isDarkMode ? '0 0 0 2px rgba(210, 250, 255, 0.2)' : '0 0 0 2px rgba(99, 102, 241, 0.2)') : undefined,
+          boxShadow: selected ? (document.documentElement.classList.contains('dark') ? '0 0 0 2px rgba(210, 250, 255, 0.2)' : '0 0 0 2px rgba(99, 102, 241, 0.2)') : undefined,
           opacity: nodeOpacity,
           filter: nodeFilter,
           transform: previewTransform

@@ -191,38 +191,49 @@ export function useConceptNodeTripleEntry() {
         // Get incremental layout function from store
         const applyIncrementalLayout = useCanvasStore.getState().applyIncrementalLayoutForNewNodes
         
-        // Apply incremental layout if function is available and a layout is selected
-        if (applyIncrementalLayout) {
-          // Small delay to ensure the new node is fully created and edges are updated
-          setTimeout(async () => {
-            try {
-              await applyIncrementalLayout(new Set([toConceptId]))
-            } catch (error) {
-              console.error('Failed to apply incremental layout for new concept:', error)
-            }
-          }, 150) // Delay to ensure node and edges are created
-        }
-        
-        // Wait a bit for the node to appear in React Flow
-        setTimeout(() => {
-          const nodes = getNodes()
-          const newNode = nodes.find((node) => node.id === toConceptId)
-          if (newNode) {
-            const updatedNodes = nodes.map((node) => {
-              if (node.id === toConceptId) {
-                return {
-                  ...node,
-                  data: {
-                    ...node.data,
-                    shouldStartEditing: true,
-                  },
+        // Poll for node existence before applying layout (max 2s, poll every 50ms)
+        const pollForNodeAndApplyLayout = async () => {
+          const maxAttempts = 40 // 40 * 50ms = 2000ms
+          let attempts = 0
+          const poll = async () => {
+            const nodes = getNodes()
+            const newNode = nodes.find((node) => node.id === toConceptId)
+            if (newNode) {
+              // Apply incremental layout if function is available
+              if (applyIncrementalLayout) {
+                try {
+                  await applyIncrementalLayout(new Set([toConceptId]))
+                } catch (error) {
+                  console.error('Failed to apply incremental layout for new concept:', error)
                 }
               }
-              return node
-            })
-            setNodes(updatedNodes)
+              
+              // Set shouldStartEditing flag
+              const updatedNodes = nodes.map((node) => {
+                if (node.id === toConceptId) {
+                  return {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      shouldStartEditing: true,
+                    },
+                  }
+                }
+                return node
+              })
+              setNodes(updatedNodes)
+              return
+            }
+            attempts++
+            if (attempts < maxAttempts) {
+              setTimeout(poll, 50)
+            } else {
+              console.warn('Timeout waiting for new node to appear for layout')
+            }
           }
-        }, 50) // Small delay to ensure React Flow has updated its internal state
+          poll()
+        }
+        pollForNodeAndApplyLayout()
       }
 
       return {
