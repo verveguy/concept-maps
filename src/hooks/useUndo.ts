@@ -5,9 +5,12 @@
  */
 
 import { useCallback } from 'react'
+import { db, tx } from '@/lib/instant'
 import { useConceptActions } from './useConceptActions'
 import { useRelationshipActions } from './useRelationshipActions'
 import { useCommentActions } from './useCommentActions'
+import { useMapActions } from './useMapActions'
+import { usePerspectiveActions } from './usePerspectiveActions'
 import { useUndoStore, type MutationCommandUnion } from '@/stores/undoStore'
 
 /**
@@ -49,6 +52,16 @@ export function useUndo() {
     linkCommentToConcept: linkCommentToConceptAction,
     unlinkCommentFromConcept: unlinkCommentFromConceptAction 
   } = useCommentActions()
+  const {
+    updateMap: updateMapAction,
+  } = useMapActions()
+  const {
+    createPerspective: createPerspectiveAction,
+    updatePerspective: updatePerspectiveAction,
+    deletePerspective: deletePerspectiveAction,
+    toggleConceptInPerspective: toggleConceptInPerspectiveAction,
+    toggleRelationshipInPerspective: toggleRelationshipInPerspectiveAction,
+  } = usePerspectiveActions()
   const {
     recordDeletion,
     getHistory,
@@ -188,14 +201,90 @@ export function useUndo() {
             const reverseUpdates: any = {}
             if (command.previousState.name !== undefined) reverseUpdates.name = command.previousState.name
             if (command.previousState.layoutAlgorithm !== undefined) reverseUpdates.layoutAlgorithm = command.previousState.layoutAlgorithm
-            // Note: updateMap is not in useCanvasMutations, so we'd need to import useMapActions
-            // For now, log a warning
-            console.warn('Cannot undo updateMap: updateMapAction not available in useUndo', command)
-            return false
+            await updateMapAction(command.mapId, reverseUpdates)
+            return true
           } else {
             console.warn('Cannot undo updateMap: previousState not available', command)
             return false
           }
+        }
+        case 'createPerspective': {
+          // Reverse create: delete the perspective
+          if (!command.perspectiveId) {
+            console.warn('Cannot undo createPerspective: perspectiveId not available', command)
+            return false
+          }
+          // Hard delete perspectives (they don't support soft delete)
+          await db.transact([tx.perspectives[command.perspectiveId].delete()])
+          return true
+        }
+        case 'updatePerspective': {
+          // Reverse update: restore previous state if available
+          if (command.previousState) {
+            const reverseUpdates: any = {}
+            if (command.previousState.name !== undefined) reverseUpdates.name = command.previousState.name
+            if (command.previousState.conceptIds !== undefined) reverseUpdates.conceptIds = command.previousState.conceptIds
+            if (command.previousState.relationshipIds !== undefined) reverseUpdates.relationshipIds = command.previousState.relationshipIds
+            await updatePerspectiveAction(command.perspectiveId, reverseUpdates)
+            return true
+          } else {
+            console.warn('Cannot undo updatePerspective: previousState not available', command)
+            return false
+          }
+        }
+        case 'deletePerspective': {
+          // Reverse delete: recreate the perspective with previous state
+          await createPerspectiveAction(
+            {
+              mapId: command.previousState.mapId,
+              name: command.previousState.name,
+              conceptIds: command.previousState.conceptIds,
+              relationshipIds: command.previousState.relationshipIds,
+            },
+            command.perspectiveId
+          )
+          return true
+        }
+        case 'toggleConceptInPerspective': {
+          // Reverse toggle: toggle back to previous state
+          // The toggle action checks if conceptId is in currentConceptIds to decide add/remove
+          // For undo: if wasIncluded=true, we removed it, so current state = previousConceptIds (without it)
+          //          if wasIncluded=false, we added it, so current state = previousConceptIds + concept
+          // We need to fetch current perspective state to get accurate currentConceptIds
+          // For now, reconstruct: if wasIncluded, current = previous (without concept), else current = previous + concept
+          const currentConceptIds = command.wasIncluded
+            ? command.previousConceptIds.filter(id => id !== command.conceptId)
+            : [...command.previousConceptIds, command.conceptId]
+          
+          // We need allRelationships for toggleConceptInPerspective to manage relationship updates
+          // For undo, relationships should already be in correct state, but we need to pass them
+          // Query current relationships for the map (we'd need mapId, but we can use empty array for now)
+          // The action will handle relationship updates based on current concept state
+          const allRelationships: Array<{ id: string; fromConceptId: string; toConceptId: string }> = []
+          
+          await toggleConceptInPerspectiveAction(
+            command.perspectiveId,
+            command.conceptId,
+            currentConceptIds,
+            command.previousRelationshipIds,
+            allRelationships
+          )
+          return true
+        }
+        case 'toggleRelationshipInPerspective': {
+          // Reverse toggle: toggle back to previous state
+          // If wasIncluded=true, we removed it, so current = previous (without it)
+          // If wasIncluded=false, we added it, so current = previous + relationship
+          const currentRelationshipIds = command.wasIncluded
+            ? command.previousRelationshipIds.filter(id => id !== command.relationshipId)
+            : [...command.previousRelationshipIds, command.relationshipId]
+          
+          await toggleRelationshipInPerspectiveAction(
+            command.perspectiveId,
+            command.relationshipId,
+            currentRelationshipIds
+          )
+          return true
         }
         default: {
           // This should never happen due to exhaustive type checking
@@ -221,6 +310,12 @@ export function useUndo() {
     undeleteComment,
     linkCommentToConceptAction,
     unlinkCommentFromConceptAction,
+    updateMapAction,
+    createPerspectiveAction,
+    updatePerspectiveAction,
+    deletePerspectiveAction,
+    toggleConceptInPerspectiveAction,
+    toggleRelationshipInPerspectiveAction,
   ])
 
   /**

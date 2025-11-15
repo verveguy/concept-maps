@@ -70,6 +70,9 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
     getLastUpdateTime,
     setLastUpdateTime,
     connectionStart,
+    setDragStartPosition,
+    getDragStartPosition,
+    clearDragStartPosition,
   } = useCanvasStore()
 
   const {
@@ -193,8 +196,45 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
   )
 
   /**
+   * Handle node drag start - track initial position and start operation grouping.
+   * This ensures all drag-related mutations are grouped into a single undoable operation.
+   */
+  const onNodeDragStart = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      if (!currentMapId || !hasWriteAccess) return
+
+      // Skip text view node (UI state only)
+      if (node.id === 'text-view-node') return
+
+      const concept = concepts.find((c) => c.id === node.id)
+      const comment = comments.find((c) => c.id === node.id)
+      
+      if (!concept && !comment) return
+
+      // Store initial position for undo/redo
+      const initialPosition = concept 
+        ? { x: concept.position.x, y: concept.position.y }
+        : { x: comment!.position.x, y: comment!.position.y }
+      
+      setDragStartPosition(node.id, initialPosition)
+      
+      // Start operation grouping - all subsequent mutations during drag will use same operationId
+      startOperation()
+    },
+    [
+      currentMapId,
+      hasWriteAccess,
+      concepts,
+      comments,
+      setDragStartPosition,
+      startOperation,
+    ]
+  )
+
+  /**
    * Handle node drag - update position in database with throttling.
    * Skips position updates if connection creation is in progress (Handle drag).
+   * Uses initial drag position as previousState for undo support.
    */
   const onNodeDrag = useCallback(
     async (_event: React.MouseEvent, node: Node) => {
@@ -241,15 +281,21 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
       if (timeSinceLastUpdate >= THROTTLE_MS) {
         setLastUpdateTime(node.id, now)
         
+        // Get initial drag position for previousState (for undo support)
+        const dragStartPosition = getDragStartPosition(node.id)
+        const previousState = dragStartPosition
+          ? { position: dragStartPosition }
+          : undefined
+        
         try {
           if (concept) {
             await updateConcept(node.id, {
               position: { x: node.position.x, y: node.position.y },
-            })
+            }, previousState)
           } else if (comment) {
             await updateComment(node.id, {
               position: { x: node.position.x, y: node.position.y },
-            })
+            }, previousState)
           }
         } catch (error) {
           console.error(`Failed to update node ${node.id} position:`, error)
@@ -269,6 +315,7 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
       getLastUpdateTime,
       setLastUpdateTime,
       connectionStart,
+      getDragStartPosition,
     ]
   )
 
@@ -297,6 +344,12 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
       })
       setCursor(flowPosition)
 
+      // Get initial drag position for previousState (for undo support)
+      const dragStartPosition = getDragStartPosition(node.id)
+      const previousState = dragStartPosition
+        ? { position: dragStartPosition }
+        : undefined
+
       // Always save final position immediately on drag stop
       // Mark node as user-placed since the user explicitly dragged it
       if (concept) {
@@ -308,7 +361,7 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
             await updateConcept(node.id, {
               position: { x: node.position.x, y: node.position.y },
               userPlaced: true, // User explicitly positioned this node
-            })
+            }, previousState)
             // Update last update time so we don't trigger another update unnecessarily
             setLastUpdateTime(node.id, Date.now())
           } catch (error) {
@@ -324,7 +377,7 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
             await updateComment(node.id, {
               position: { x: node.position.x, y: node.position.y },
               userPlaced: true, // User explicitly positioned this node
-            })
+            }, previousState)
             // Update last update time so we don't trigger another update unnecessarily
             setLastUpdateTime(node.id, Date.now())
           } catch (error) {
@@ -332,6 +385,10 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
           }
         }
       }
+
+      // End operation grouping and clear drag start position
+      endOperation()
+      clearDragStartPosition(node.id)
     },
     [
       concepts,
@@ -344,6 +401,9 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
       setCursor,
       hasWriteAccess,
       setLastUpdateTime,
+      getDragStartPosition,
+      endOperation,
+      clearDragStartPosition,
     ]
   )
 
@@ -360,6 +420,7 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
 
   return {
     onNodesChange,
+    onNodeDragStart,
     onNodeDrag,
     onNodeDragStop,
     onNodeClick,

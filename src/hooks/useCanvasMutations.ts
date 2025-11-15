@@ -10,11 +10,12 @@
  */
 
 import { useCallback } from 'react'
+import { id } from '@/lib/instant'
 import { useConceptActions, type CreateConceptData, type UpdateConceptData } from './useConceptActions'
 import { useRelationshipActions, type CreateRelationshipData, type UpdateRelationshipData } from './useRelationshipActions'
 import { useCommentActions, type CreateCommentData, type UpdateCommentData } from './useCommentActions'
 import { useMapActions } from './useMapActions'
-import { useUndoStore } from '@/stores/undoStore'
+import { useUndoStore, generateCommandId, generateOperationId } from '@/stores/undoStore'
 import type {
   CreateConceptCommand,
   UpdateConceptCommand,
@@ -73,21 +74,25 @@ export function useCanvasMutations() {
 
   /**
    * Create a new concept with undo tracking.
+   * Generates the concept ID before creating so it can be stored in the command for undo.
    */
   const createConcept = useCallback(
     async (data: CreateConceptData) => {
       try {
-        await createConceptAction(data)
+        // Generate ID before creating so we can store it in the command
+        const conceptId = id()
         
-        // Record mutation for undo
-        // Note: We don't have the generated conceptId here, but we can track by operation
+        // Create the concept with the generated ID
+        await createConceptAction(data, conceptId)
+        
+        // Record mutation for undo with the concept ID
         const command: CreateConceptCommand = {
           type: 'createConcept',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           data,
-          conceptId: '', // Will be populated if needed for undo
+          conceptId,
         }
         recordMutation(command)
       } catch (error) {
@@ -100,22 +105,37 @@ export function useCanvasMutations() {
 
   /**
    * Update a concept with undo tracking.
-   * Note: Capturing previous state requires fetching current state first.
-   * For now, we'll record the mutation without previous state.
+   * 
+   * @param conceptId - ID of the concept to update
+   * @param updates - Partial concept data to update
+   * @param previousState - Optional previous state for undo support. If not provided,
+   *                        the mutation will be recorded without previousState (undo may not work properly).
    */
   const updateConcept = useCallback(
-    async (conceptId: string, updates: UpdateConceptData) => {
+    async (
+      conceptId: string,
+      updates: UpdateConceptData,
+      previousState?: {
+        label?: string
+        position?: { x: number; y: number }
+        notes?: string
+        metadata?: Record<string, unknown>
+        showNotesAndMetadata?: boolean
+        userPlaced?: boolean
+      }
+    ) => {
       try {
         await updateConceptAction(conceptId, updates)
         
         // Record mutation for undo
         const command: UpdateConceptCommand = {
           type: 'updateConcept',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           conceptId,
           updates,
+          previousState,
         }
         recordMutation(command)
       } catch (error) {
@@ -137,9 +157,9 @@ export function useCanvasMutations() {
         // Record mutation for undo (also record in deletion history for backward compatibility)
         const command: DeleteConceptCommand = {
           type: 'deleteConcept',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           conceptId,
         }
         recordMutation(command)
@@ -156,20 +176,25 @@ export function useCanvasMutations() {
 
   /**
    * Create a new relationship with undo tracking.
+   * Generates the relationship ID before creating so it can be stored in the command for undo.
    */
   const createRelationship = useCallback(
     async (data: CreateRelationshipData) => {
       try {
-        await createRelationshipAction(data)
+        // Generate ID before creating so we can store it in the command
+        const relationshipId = id()
         
-        // Record mutation for undo
+        // Create the relationship with the generated ID
+        await createRelationshipAction(data, relationshipId)
+        
+        // Record mutation for undo with the relationship ID
         const command: CreateRelationshipCommand = {
           type: 'createRelationship',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           data,
-          relationshipId: '', // Will be populated if needed for undo
+          relationshipId,
         }
         recordMutation(command)
       } catch (error) {
@@ -182,20 +207,35 @@ export function useCanvasMutations() {
 
   /**
    * Update a relationship with undo tracking.
+   * 
+   * @param relationshipId - ID of the relationship to update
+   * @param updates - Partial relationship data to update
+   * @param previousState - Optional previous state for undo support. If not provided,
+   *                        the mutation will be recorded without previousState (undo may not work properly).
    */
   const updateRelationship = useCallback(
-    async (relationshipId: string, updates: UpdateRelationshipData) => {
+    async (
+      relationshipId: string,
+      updates: UpdateRelationshipData,
+      previousState?: {
+        primaryLabel?: string
+        reverseLabel?: string
+        notes?: string
+        metadata?: Record<string, unknown>
+      }
+    ) => {
       try {
         await updateRelationshipAction(relationshipId, updates)
         
         // Record mutation for undo
         const command: UpdateRelationshipCommand = {
           type: 'updateRelationship',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           relationshipId,
           updates,
+          previousState,
         }
         recordMutation(command)
       } catch (error) {
@@ -233,9 +273,9 @@ export function useCanvasMutations() {
         // Record mutation for undo
         const command: ReverseRelationshipCommand = {
           type: 'reverseRelationship',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           relationshipId,
           previousState,
         }
@@ -259,9 +299,9 @@ export function useCanvasMutations() {
         // Record mutation for undo
         const command: DeleteRelationshipCommand = {
           type: 'deleteRelationship',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           relationshipId,
         }
         recordMutation(command)
@@ -278,20 +318,25 @@ export function useCanvasMutations() {
 
   /**
    * Create a new comment with undo tracking.
+   * Generates the comment ID before creating so it can be stored in the command for undo.
    */
   const createComment = useCallback(
     async (data: CreateCommentData) => {
       try {
-        await createCommentAction(data)
+        // Generate ID before creating so we can store it in the command
+        const commentId = id()
         
-        // Record mutation for undo
+        // Create the comment with the generated ID
+        await createCommentAction(data, commentId)
+        
+        // Record mutation for undo with the comment ID
         const command: CreateCommentCommand = {
           type: 'createComment',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           data,
-          commentId: '', // Will be populated if needed for undo
+          commentId,
         }
         recordMutation(command)
       } catch (error) {
@@ -304,20 +349,34 @@ export function useCanvasMutations() {
 
   /**
    * Update a comment with undo tracking.
+   * 
+   * @param commentId - ID of the comment to update
+   * @param updates - Partial comment data to update
+   * @param previousState - Optional previous state for undo support. If not provided,
+   *                        the mutation will be recorded without previousState (undo may not work properly).
    */
   const updateComment = useCallback(
-    async (commentId: string, updates: UpdateCommentData) => {
+    async (
+      commentId: string,
+      updates: UpdateCommentData,
+      previousState?: {
+        text?: string
+        position?: { x: number; y: number }
+        userPlaced?: boolean
+      }
+    ) => {
       try {
         await updateCommentAction(commentId, updates)
         
         // Record mutation for undo
         const command: UpdateCommentCommand = {
           type: 'updateComment',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           commentId,
           updates,
+          previousState,
         }
         recordMutation(command)
       } catch (error) {
@@ -339,9 +398,9 @@ export function useCanvasMutations() {
         // Record mutation for undo
         const command: DeleteCommentCommand = {
           type: 'deleteComment',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           commentId,
         }
         recordMutation(command)
@@ -367,9 +426,9 @@ export function useCanvasMutations() {
         // Record mutation for undo
         const command: LinkCommentToConceptCommand = {
           type: 'linkCommentToConcept',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           commentId,
           conceptId,
         }
@@ -393,9 +452,9 @@ export function useCanvasMutations() {
         // Record mutation for undo
         const command: UnlinkCommentFromConceptCommand = {
           type: 'unlinkCommentFromConcept',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           commentId,
           conceptId,
         }
@@ -423,9 +482,9 @@ export function useCanvasMutations() {
         // Record mutation for undo
         const command: UpdateMapCommand = {
           type: 'updateMap',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           mapId,
           updates,
           previousState,

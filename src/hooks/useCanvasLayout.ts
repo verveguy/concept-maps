@@ -12,7 +12,7 @@ import { useCallback } from 'react'
 import type { Node, Edge } from 'reactflow'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { useMapStore } from '@/stores/mapStore'
-import { useUndoStore } from '@/stores/undoStore'
+import { useUndoStore, generateCommandId, generateOperationId } from '@/stores/undoStore'
 import type {
   UpdateConceptCommand,
   UpdateCommentCommand,
@@ -222,7 +222,7 @@ export function useCanvasLayout(options: UseCanvasLayoutOptions) {
       try {
         // Start operation to group all layout updates as a single undoable action
         startOperation()
-        const operationId = useUndoStore.getState().currentOperationId || `op_${Date.now()}`
+        const operationId = useUndoStore.getState().currentOperationId || generateOperationId()
         
         // When doing a full layout (not incremental), update ALL nodes
         // When doing incremental layout, only update new nodes
@@ -318,7 +318,7 @@ export function useCanvasLayout(options: UseCanvasLayoutOptions) {
           if (node.type === 'concept') {
             const command: UpdateConceptCommand = {
               type: 'updateConcept',
-              id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              id: generateCommandId(),
               timestamp: Date.now(),
               operationId,
               conceptId: node.id,
@@ -335,7 +335,7 @@ export function useCanvasLayout(options: UseCanvasLayoutOptions) {
           } else if (node.type === 'comment') {
             const command: UpdateCommentCommand = {
               type: 'updateComment',
-              id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              id: generateCommandId(),
               timestamp: Date.now(),
               operationId,
               commentId: node.id,
