@@ -214,6 +214,26 @@ const MAX_MUTATION_HISTORY_SIZE = 100
 const OPERATION_TIME_WINDOW_MS = 1000 // 1 second
 
 /**
+ * Generate a unique command ID.
+ * Uses a consistent format: cmd_timestamp_random
+ * 
+ * @returns A unique command ID string
+ */
+export function generateCommandId(): string {
+  return `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+/**
+ * Generate a unique operation ID.
+ * Uses a consistent format: op_timestamp_random
+ * 
+ * @returns A unique operation ID string
+ */
+export function generateOperationId(): string {
+  return `op_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+}
+
+/**
  * State interface for undo history.
  */
 export interface UndoState {
@@ -275,7 +295,7 @@ export const useUndoStore = create<UndoState>((set, get) => ({
   currentOperationStartTime: null,
   
   startOperation: () => {
-    const operationId = `op_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const operationId = generateOperationId()
     set({
       currentOperationId: operationId,
       currentOperationStartTime: Date.now(),
@@ -302,7 +322,7 @@ export const useUndoStore = create<UndoState>((set, get) => ({
         operationId = state.currentOperationId
       } else {
         // Time window expired, start new operation
-        operationId = `op_${now}_${Math.random().toString(36).substr(2, 9)}`
+        operationId = generateOperationId()
         set({
           currentOperationId: operationId,
           currentOperationStartTime: now,
@@ -315,7 +335,7 @@ export const useUndoStore = create<UndoState>((set, get) => ({
         operationId = mostRecent.operationId
       } else {
         // Start new operation
-        operationId = `op_${now}_${Math.random().toString(36).substr(2, 9)}`
+        operationId = generateOperationId()
         set({
           currentOperationId: operationId,
           currentOperationStartTime: now,

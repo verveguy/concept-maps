@@ -15,7 +15,7 @@ import { useConceptActions, type CreateConceptData, type UpdateConceptData } fro
 import { useRelationshipActions, type CreateRelationshipData, type UpdateRelationshipData } from './useRelationshipActions'
 import { useCommentActions, type CreateCommentData, type UpdateCommentData } from './useCommentActions'
 import { useMapActions } from './useMapActions'
-import { useUndoStore } from '@/stores/undoStore'
+import { useUndoStore, generateCommandId, generateOperationId } from '@/stores/undoStore'
 import type {
   CreateConceptCommand,
   UpdateConceptCommand,
@@ -88,9 +88,9 @@ export function useCanvasMutations() {
         // Record mutation for undo with the concept ID
         const command: CreateConceptCommand = {
           type: 'createConcept',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           data,
           conceptId,
         }
@@ -130,9 +130,9 @@ export function useCanvasMutations() {
         // Record mutation for undo
         const command: UpdateConceptCommand = {
           type: 'updateConcept',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           conceptId,
           updates,
           previousState,
@@ -157,9 +157,9 @@ export function useCanvasMutations() {
         // Record mutation for undo (also record in deletion history for backward compatibility)
         const command: DeleteConceptCommand = {
           type: 'deleteConcept',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           conceptId,
         }
         recordMutation(command)
@@ -190,9 +190,9 @@ export function useCanvasMutations() {
         // Record mutation for undo with the relationship ID
         const command: CreateRelationshipCommand = {
           type: 'createRelationship',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           data,
           relationshipId,
         }
@@ -230,9 +230,9 @@ export function useCanvasMutations() {
         // Record mutation for undo
         const command: UpdateRelationshipCommand = {
           type: 'updateRelationship',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           relationshipId,
           updates,
           previousState,
@@ -273,9 +273,9 @@ export function useCanvasMutations() {
         // Record mutation for undo
         const command: ReverseRelationshipCommand = {
           type: 'reverseRelationship',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           relationshipId,
           previousState,
         }
@@ -299,9 +299,9 @@ export function useCanvasMutations() {
         // Record mutation for undo
         const command: DeleteRelationshipCommand = {
           type: 'deleteRelationship',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           relationshipId,
         }
         recordMutation(command)
@@ -332,9 +332,9 @@ export function useCanvasMutations() {
         // Record mutation for undo with the comment ID
         const command: CreateCommentCommand = {
           type: 'createComment',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           data,
           commentId,
         }
@@ -371,9 +371,9 @@ export function useCanvasMutations() {
         // Record mutation for undo
         const command: UpdateCommentCommand = {
           type: 'updateComment',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           commentId,
           updates,
           previousState,
@@ -398,9 +398,9 @@ export function useCanvasMutations() {
         // Record mutation for undo
         const command: DeleteCommentCommand = {
           type: 'deleteComment',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           commentId,
         }
         recordMutation(command)
@@ -426,9 +426,9 @@ export function useCanvasMutations() {
         // Record mutation for undo
         const command: LinkCommentToConceptCommand = {
           type: 'linkCommentToConcept',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           commentId,
           conceptId,
         }
@@ -452,9 +452,9 @@ export function useCanvasMutations() {
         // Record mutation for undo
         const command: UnlinkCommentFromConceptCommand = {
           type: 'unlinkCommentFromConcept',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           commentId,
           conceptId,
         }
@@ -482,9 +482,9 @@ export function useCanvasMutations() {
         // Record mutation for undo
         const command: UpdateMapCommand = {
           type: 'updateMap',
-          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          id: generateCommandId(),
           timestamp: Date.now(),
-          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          operationId: useUndoStore.getState().currentOperationId || generateOperationId(),
           mapId,
           updates,
           previousState,
