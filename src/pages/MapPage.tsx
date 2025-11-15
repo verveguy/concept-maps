@@ -15,6 +15,7 @@ import { ShareDialog } from '@/components/share/ShareDialog'
 import { InvitationAcceptScreen } from '@/components/invitation/InvitationAcceptScreen'
 import { SearchBox } from '@/components/layout/SearchBox'
 import { UndoButton } from '@/components/ui/UndoButton'
+import { RedoButton } from '@/components/ui/RedoButton'
 import { IconButton } from '@/components/ui/IconButton'
 import { PresenceHeader } from '@/components/presence/PresenceHeader'
 import { useMapStore } from '@/stores/mapStore'
@@ -266,8 +267,6 @@ export function MapPage() {
             <PresenceHeader />
             {/* Search Box */}
             <SearchBox />
-            {/* Undo Button */}
-            <UndoButton />
           </div>
 
           {/* Invitation Accept Screen - displayed in Canvas area */}
@@ -308,6 +307,11 @@ export function MapPage() {
             >
               {map?.name || 'Untitled Map'}
             </h1>
+            {/* Undo/Redo Buttons */}
+            <div className="flex items-center -space-x-1">
+              <UndoButton />
+              <RedoButton />
+            </div>
             {currentPerspective && (
               <>
                 <span className="text-muted-foreground">/</span>
@@ -330,8 +334,6 @@ export function MapPage() {
           <PresenceHeader />
           {/* Search Box */}
           <SearchBox />
-          {/* Undo Button */}
-          <UndoButton />
           {currentPerspective && !isEditingPerspective && (
             <button
               onClick={() => setIsEditingPerspective(true)}

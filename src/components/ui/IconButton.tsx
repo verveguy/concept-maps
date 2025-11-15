@@ -25,7 +25,10 @@ const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         ref={ref}
         variant="ghost"
         size={size}
-        className={cn("border-0 shadow-none", className)}
+        className={cn(
+          "border-0 shadow-none hover:bg-muted/50",
+          className
+        )}
         {...props}
       />
     )

@@ -1,6 +1,6 @@
 /**
  * Undo button component for toolbar.
- * Displays an undo button when there are recent deletions to undo.
+ * Displays an icon-only undo button when there are recent operations to undo.
  * Also supports Cmd+Z / Ctrl+Z keyboard shortcut.
  */
 
@@ -8,11 +8,12 @@ import { useEffect } from 'react'
 import { Undo2 } from 'lucide-react'
 import { useUndo } from '@/hooks/useUndo'
 import { useUndoStore } from '@/stores/undoStore'
+import { IconButton } from './IconButton'
 
 /**
  * Undo button component for toolbar.
  * 
- * Displays an undo button when there are recent deletions to undo. Supports
+ * Displays an icon-only undo button when there are recent operations to undo. Supports
  * both click interaction and keyboard shortcut (Cmd+Z / Ctrl+Z). The button
  * is disabled when there's nothing to undo.
  * 
@@ -47,10 +48,12 @@ import { useUndoStore } from '@/stores/undoStore'
  * ```
  */
 export function UndoButton() {
-  const { undo, getHistory } = useUndo()
-  // Subscribe to deletion history changes from the store
+  const { undo, canUndo } = useUndo()
+  // Subscribe to mutation history changes from the store
+  const mutationHistory = useUndoStore((state) => state.mutationHistory)
   const deletionHistory = useUndoStore((state) => state.deletionHistory)
-  const hasHistory = deletionHistory.length > 0
+  // Check if undo is available (either mutation history or deletion history)
+  const hasHistory = mutationHistory.length > 0 || deletionHistory.length > 0
 
   // Handle keyboard shortcut (Cmd+Z / Ctrl+Z)
   useEffect(() => {
@@ -65,8 +68,7 @@ export function UndoButton() {
         event.preventDefault()
         
         // Check if there's something to undo
-        const history = getHistory()
-        if (history.length > 0) {
+        if (canUndo() || deletionHistory.length > 0) {
           void undo()
         }
       }
@@ -76,22 +78,20 @@ export function UndoButton() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [undo, getHistory])
+  }, [undo, canUndo, deletionHistory.length])
 
   const handleUndo = async () => {
     await undo()
   }
 
   return (
-    <button
+    <IconButton
       onClick={handleUndo}
       disabled={!hasHistory}
-      className="px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
-      title={hasHistory ? 'Undo last deletion (Cmd+Z / Ctrl+Z)' : 'No deletions to undo'}
-      aria-label="Undo deletion"
+      title={hasHistory ? 'Undo last operation (Cmd+Z / Ctrl+Z)' : 'No operations to undo'}
+      aria-label="Undo operation"
     >
       <Undo2 className="h-4 w-4" />
-      Undo
-    </button>
+    </IconButton>
   )
 }

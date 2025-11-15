@@ -18,6 +18,7 @@ describe('undoStore mutation tracking', () => {
     // Reset store state before each test
     useUndoStore.getState().clearHistory()
     useUndoStore.getState().clearMutationHistory()
+    useUndoStore.getState().clearRedoStack()
     useUndoStore.getState().endOperation()
   })
 
@@ -100,6 +101,44 @@ describe('undoStore mutation tracking', () => {
       expect(history.length).toBe(MAX_SIZE)
       // Most recent should be first
       expect(history[0].id).toBe(`cmd-${MAX_SIZE + 9}`)
+    })
+
+    it('should clear redo stack when recording new mutations', () => {
+      // Add something to redo stack
+      const redoCommand: CreateConceptCommand = {
+        type: 'createConcept',
+        id: 'redo-cmd-1',
+        timestamp: Date.now(),
+        operationId: 'redo-op-1',
+        data: {
+          mapId: 'map-1',
+          label: 'Redo Concept',
+          position: { x: 100, y: 200 },
+        },
+        conceptId: 'redo-concept-1',
+      }
+      useUndoStore.getState().pushToRedoStack([redoCommand])
+      expect(useUndoStore.getState().redoStack.length).toBe(1)
+
+      // Record a new mutation
+      const newCommand: CreateConceptCommand = {
+        type: 'createConcept',
+        id: 'cmd-1',
+        timestamp: Date.now(),
+        operationId: 'op-1',
+        data: {
+          mapId: 'map-1',
+          label: 'New Concept',
+          position: { x: 100, y: 200 },
+        },
+        conceptId: 'concept-1',
+      }
+      useUndoStore.getState().recordMutation(newCommand)
+
+      // Redo stack should be cleared
+      expect(useUndoStore.getState().redoStack.length).toBe(0)
+      // Mutation history should have the new command
+      expect(useUndoStore.getState().mutationHistory.length).toBe(1)
     })
   })
 
@@ -322,6 +361,235 @@ describe('undoStore mutation tracking', () => {
       const operation = useUndoStore.getState().getMostRecentMutationOperation()
       expect(operation.length).toBe(1)
       expect(operation[0].operationId).toBe(currentOpId)
+    })
+  })
+
+  describe('redo stack', () => {
+    it('should push operation to redo stack', () => {
+      const command1: CreateConceptCommand = {
+        type: 'createConcept',
+        id: 'cmd-1',
+        timestamp: Date.now(),
+        operationId: 'op-1',
+        data: {
+          mapId: 'map-1',
+          label: 'Concept 1',
+          position: { x: 100, y: 200 },
+        },
+        conceptId: 'concept-1',
+      }
+
+      const command2: UpdateConceptCommand = {
+        type: 'updateConcept',
+        id: 'cmd-2',
+        timestamp: Date.now() + 100,
+        operationId: 'op-1',
+        conceptId: 'concept-1',
+        updates: { label: 'Updated' },
+      }
+
+      useUndoStore.getState().pushToRedoStack([command1, command2])
+
+      const redoStack = useUndoStore.getState().redoStack
+      expect(redoStack.length).toBe(2)
+      expect(redoStack[0]).toEqual(command1)
+      expect(redoStack[1]).toEqual(command2)
+    })
+
+    it('should get most recent redo operation', () => {
+      const operationId1 = 'op-1'
+      const operationId2 = 'op-2'
+
+      const cmd1: CreateConceptCommand = {
+        type: 'createConcept',
+        id: 'cmd-1',
+        timestamp: Date.now(),
+        operationId: operationId1,
+        data: {
+          mapId: 'map-1',
+          label: 'Concept 1',
+          position: { x: 100, y: 200 },
+        },
+        conceptId: 'concept-1',
+      }
+
+      const cmd2: CreateRelationshipCommand = {
+        type: 'createRelationship',
+        id: 'cmd-2',
+        timestamp: Date.now() + 100,
+        operationId: operationId1,
+        data: {
+          mapId: 'map-1',
+          fromConceptId: 'concept-1',
+          toConceptId: 'concept-2',
+          primaryLabel: 'related to',
+        },
+        relationshipId: 'rel-1',
+      }
+
+      const cmd3: DeleteConceptCommand = {
+        type: 'deleteConcept',
+        id: 'cmd-3',
+        timestamp: Date.now() + 200,
+        operationId: operationId2,
+        conceptId: 'concept-3',
+      }
+
+      useUndoStore.getState().pushToRedoStack([cmd1, cmd2])
+      useUndoStore.getState().pushToRedoStack([cmd3])
+
+      const operation = useUndoStore.getState().getMostRecentRedoOperation()
+      expect(operation.length).toBe(1)
+      expect(operation[0].operationId).toBe(operationId2)
+      expect(operation[0]).toEqual(cmd3)
+    })
+
+    it('should return empty array when redo stack is empty', () => {
+      const operation = useUndoStore.getState().getMostRecentRedoOperation()
+      expect(operation).toEqual([])
+    })
+
+    it('should remove most recent redo operation', () => {
+      const operationId1 = 'op-1'
+      const operationId2 = 'op-2'
+
+      const cmd1: CreateConceptCommand = {
+        type: 'createConcept',
+        id: 'cmd-1',
+        timestamp: Date.now(),
+        operationId: operationId1,
+        data: {
+          mapId: 'map-1',
+          label: 'Concept 1',
+          position: { x: 100, y: 200 },
+        },
+        conceptId: 'concept-1',
+      }
+
+      const cmd2: CreateRelationshipCommand = {
+        type: 'createRelationship',
+        id: 'cmd-2',
+        timestamp: Date.now() + 100,
+        operationId: operationId1,
+        data: {
+          mapId: 'map-1',
+          fromConceptId: 'concept-1',
+          toConceptId: 'concept-2',
+          primaryLabel: 'related to',
+        },
+        relationshipId: 'rel-1',
+      }
+
+      const cmd3: DeleteConceptCommand = {
+        type: 'deleteConcept',
+        id: 'cmd-3',
+        timestamp: Date.now() + 200,
+        operationId: operationId2,
+        conceptId: 'concept-3',
+      }
+
+      useUndoStore.getState().pushToRedoStack([cmd1, cmd2])
+      useUndoStore.getState().pushToRedoStack([cmd3])
+
+      useUndoStore.getState().removeMostRecentRedoOperation()
+
+      const redoStack = useUndoStore.getState().redoStack
+      expect(redoStack.length).toBe(2)
+      expect(redoStack[0]).toEqual(cmd1)
+      expect(redoStack[1]).toEqual(cmd2)
+    })
+
+    it('should clear redo stack', () => {
+      const command: CreateConceptCommand = {
+        type: 'createConcept',
+        id: 'cmd-1',
+        timestamp: Date.now(),
+        operationId: 'op-1',
+        data: {
+          mapId: 'map-1',
+          label: 'Concept 1',
+          position: { x: 100, y: 200 },
+        },
+        conceptId: 'concept-1',
+      }
+
+      useUndoStore.getState().pushToRedoStack([command])
+      expect(useUndoStore.getState().redoStack.length).toBe(1)
+
+      useUndoStore.getState().clearRedoStack()
+      expect(useUndoStore.getState().redoStack.length).toBe(0)
+    })
+
+    it('should limit redo stack size to MAX_MUTATION_HISTORY_SIZE', () => {
+      const MAX_SIZE = 100
+      
+      // Create more commands than the max
+      for (let i = 0; i < MAX_SIZE + 10; i++) {
+        const command: CreateConceptCommand = {
+          type: 'createConcept',
+          id: `redo-cmd-${i}`,
+          timestamp: Date.now() + i,
+          operationId: 'op-1',
+          data: {
+            mapId: 'map-1',
+            label: `Concept ${i}`,
+            position: { x: 100, y: 200 },
+          },
+          conceptId: `concept-${i}`,
+        }
+        useUndoStore.getState().pushToRedoStack([command])
+      }
+
+      const redoStack = useUndoStore.getState().redoStack
+      expect(redoStack.length).toBe(MAX_SIZE)
+      // Most recent should be first
+      expect(redoStack[0].id).toBe(`redo-cmd-${MAX_SIZE + 9}`)
+    })
+  })
+
+  describe('canUndo and canRedo', () => {
+    it('should return false when no mutations exist', () => {
+      expect(useUndoStore.getState().canUndo()).toBe(false)
+    })
+
+    it('should return true when mutations exist', () => {
+      const command: CreateConceptCommand = {
+        type: 'createConcept',
+        id: 'cmd-1',
+        timestamp: Date.now(),
+        operationId: 'op-1',
+        data: {
+          mapId: 'map-1',
+          label: 'Concept 1',
+          position: { x: 100, y: 200 },
+        },
+        conceptId: 'concept-1',
+      }
+
+      useUndoStore.getState().recordMutation(command)
+      expect(useUndoStore.getState().canUndo()).toBe(true)
+    })
+
+    it('should return false when redo stack is empty', () => {
+      expect(useUndoStore.getState().canRedo()).toBe(false)
+    })
+
+    it('should return true when redo stack has items', () => {
+      const command: CreateConceptCommand = {
+        type: 'createConcept',
+        id: 'cmd-1',
+        timestamp: Date.now(),
+        operationId: 'op-1',
+        data: {
+          mapId: 'map-1',
+          label: 'Concept 1',
+          position: { x: 100, y: 200 },
+        },
+        conceptId: 'concept-1',
+      }
+
+      useUndoStore.getState().pushToRedoStack([command])
+      expect(useUndoStore.getState().canRedo()).toBe(true)
     })
   })
 })

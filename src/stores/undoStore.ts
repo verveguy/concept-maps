@@ -221,6 +221,8 @@ export interface UndoState {
   deletionHistory: DeletionEntry[]
   /** Mutation command history (all mutations) */
   mutationHistory: MutationCommandUnion[]
+  /** Redo stack (operations that were undone) */
+  redoStack: MutationCommandUnion[]
   /** Current operation ID for grouping deletions */
   currentOperationId: string | null
   /** Timestamp when current operation started */
@@ -247,6 +249,18 @@ export interface UndoState {
   removeMostRecentOperation: () => void
   /** Remove mutations from the most recent operation */
   removeMostRecentMutationOperation: () => void
+  /** Push operation to redo stack */
+  pushToRedoStack: (operation: MutationCommandUnion[]) => void
+  /** Get most recent operation from redo stack */
+  getMostRecentRedoOperation: () => MutationCommandUnion[]
+  /** Remove most recent operation from redo stack */
+  removeMostRecentRedoOperation: () => void
+  /** Clear redo stack */
+  clearRedoStack: () => void
+  /** Check if redo is available */
+  canRedo: () => boolean
+  /** Check if undo is available */
+  canUndo: () => boolean
 }
 
 /**
@@ -256,6 +270,7 @@ export interface UndoState {
 export const useUndoStore = create<UndoState>((set, get) => ({
   deletionHistory: [],
   mutationHistory: [],
+  redoStack: [],
   currentOperationId: null,
   currentOperationStartTime: null,
   
@@ -329,14 +344,21 @@ export const useUndoStore = create<UndoState>((set, get) => ({
   
   recordMutation: (command) => {
     set((state) => {
+      // Clear redo stack when new mutations are recorded (standard undo/redo behavior)
       const newHistory = [command, ...state.mutationHistory]
       
       // Trim history if it exceeds max size
       if (newHistory.length > MAX_MUTATION_HISTORY_SIZE) {
-        return { mutationHistory: newHistory.slice(0, MAX_MUTATION_HISTORY_SIZE) }
+        return { 
+          mutationHistory: newHistory.slice(0, MAX_MUTATION_HISTORY_SIZE),
+          redoStack: [] // Clear redo stack on new mutation
+        }
       }
       
-      return { mutationHistory: newHistory }
+      return { 
+        mutationHistory: newHistory,
+        redoStack: [] // Clear redo stack on new mutation
+      }
     })
   },
   
@@ -412,6 +434,63 @@ export const useUndoStore = create<UndoState>((set, get) => ({
       
       return { mutationHistory: remainingHistory }
     })
+  },
+  
+  pushToRedoStack: (operation) => {
+    set((state) => {
+      // Add operation to redo stack (newest first, same as mutation history)
+      const newRedoStack = [...operation, ...state.redoStack]
+      
+      // Trim redo stack if it exceeds max size
+      if (newRedoStack.length > MAX_MUTATION_HISTORY_SIZE) {
+        return { redoStack: newRedoStack.slice(0, MAX_MUTATION_HISTORY_SIZE) }
+      }
+      
+      return { redoStack: newRedoStack }
+    })
+  },
+  
+  getMostRecentRedoOperation: () => {
+    const redoStack = get().redoStack
+    if (redoStack.length === 0) {
+      return []
+    }
+    
+    // Get the operation ID of the most recent redo operation
+    const mostRecentOperationId = redoStack[0].operationId
+    
+    // Return all commands with the same operation ID
+    return redoStack.filter((command) => command.operationId === mostRecentOperationId)
+  },
+  
+  removeMostRecentRedoOperation: () => {
+    set((state) => {
+      if (state.redoStack.length === 0) {
+        return state
+      }
+      
+      // Get the operation ID of the most recent redo operation
+      const mostRecentOperationId = state.redoStack[0].operationId
+      
+      // Remove all commands with the same operation ID
+      const remainingRedoStack = state.redoStack.filter(
+        (command) => command.operationId !== mostRecentOperationId
+      )
+      
+      return { redoStack: remainingRedoStack }
+    })
+  },
+  
+  clearRedoStack: () => {
+    set({ redoStack: [] })
+  },
+  
+  canRedo: () => {
+    return get().redoStack.length > 0
+  },
+  
+  canUndo: () => {
+    return get().mutationHistory.length > 0
   },
 }))
 
