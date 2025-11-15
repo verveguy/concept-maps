@@ -5,7 +5,7 @@ import { useUIStore } from '@/stores/uiStore'
 import { useMapStore } from '@/stores/mapStore'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { useCanvasMutations } from '@/hooks/useCanvasMutations'
-import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
+import { usePerspectiveMutations } from '@/hooks/usePerspectiveMutations'
 import { usePresence } from '@/hooks/usePresence'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { usePerspectives } from '@/hooks/usePerspectives'
@@ -59,7 +59,7 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   const conceptEditorOpen = useUIStore((state) => state.conceptEditorOpen)
   const setConceptEditorOpen = useUIStore((state) => state.setConceptEditorOpen)
   const { updateConcept } = useCanvasMutations()
-  const { toggleConceptInPerspective } = usePerspectiveActions()
+  const { toggleConceptInPerspective } = usePerspectiveMutations()
   const { otherUsersPresence } = usePresence()
   const { hasWriteAccess } = useMapPermissions()
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
