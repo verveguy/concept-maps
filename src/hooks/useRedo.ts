@@ -29,6 +29,8 @@ export function useRedo() {
     deleteComment,
     linkCommentToConcept,
     unlinkCommentFromConcept,
+    resolveComment,
+    unresolveComment,
     updateMap,
   } = useCanvasMutations()
   
@@ -127,6 +129,16 @@ export function useRedo() {
           await unlinkCommentFromConcept(command.commentId, command.conceptId)
           return true
         }
+        case 'resolveComment': {
+          // Re-execute resolve: resolve again
+          await resolveComment(command.commentId, command.previousState)
+          return true
+        }
+        case 'unresolveComment': {
+          // Re-execute unresolve: unresolve again
+          await unresolveComment(command.commentId, command.previousState)
+          return true
+        }
         case 'updateMap': {
           // Re-execute update: apply the same updates again
           await updateMap(command.mapId, command.updates, command.previousState)
@@ -156,6 +168,8 @@ export function useRedo() {
     deleteComment,
     linkCommentToConcept,
     unlinkCommentFromConcept,
+    resolveComment,
+    unresolveComment,
     updateMap,
   ])
 
@@ -199,29 +213,53 @@ export function useRedo() {
     
     try {
       // Remove from redo stack BEFORE re-executing to avoid race condition
-      // (re-execution will trigger recordMutation which clears redo stack)
       removeMostRecentRedoOperation()
       
-      // Re-execute commands in original order (oldest first)
-      // Since redo stack is newest first, we need to reverse to get original order
-      const reexecutePromises = operation
-        .slice()
-        .reverse()
-        .map((command) => reexecuteCommand(command))
+      // Set isRedoing flag to prevent double-recording mutations
+      // Mutations re-executed during redo should not be recorded again
+      useUndoStore.getState().setIsRedoing(true)
       
-      const results = await Promise.all(reexecutePromises)
-      const allSucceeded = results.every((r) => r === true)
-      
-      if (allSucceeded || results.some((r) => r === true)) {
-        // Mutations will be re-recorded by useCanvasMutations hooks when re-executed
-        console.log('Redo successful - re-executed', operation.length, 'commands')
-        return true
-      } else {
-        console.error('All re-execute operations failed')
-        return false
+      try {
+        // Re-execute commands in original order (oldest first)
+        // Since redo stack is newest first, we need to reverse to get original order
+        const reexecutePromises = operation
+          .slice()
+          .reverse()
+          .map((command) => reexecuteCommand(command))
+        
+        const results = await Promise.all(reexecutePromises)
+        const allSucceeded = results.every((r) => r === true)
+        
+        if (allSucceeded || results.some((r) => r === true)) {
+          // Mutations were re-executed but not re-recorded (due to isRedoing flag)
+          // We'll add them back to mutation history after clearing the flag
+          console.log('Redo successful - re-executed', operation.length, 'commands')
+          return true
+        } else {
+          console.error('All re-execute operations failed')
+          return false
+        }
+      } finally {
+        // Always clear the isRedoing flag
+        useUndoStore.getState().setIsRedoing(false)
+        
+        // After clearing the flag, manually add the operation back to mutation history
+        // This restores the commands to the history so they can be undone again
+        if (operation.length > 0) {
+          const state = useUndoStore.getState()
+          const MAX_MUTATION_HISTORY_SIZE = 100
+          const newHistory = [...operation, ...state.mutationHistory]
+          // Trim if needed
+          const trimmedHistory = newHistory.length > MAX_MUTATION_HISTORY_SIZE 
+            ? newHistory.slice(0, MAX_MUTATION_HISTORY_SIZE)
+            : newHistory
+          useUndoStore.setState({ mutationHistory: trimmedHistory })
+        }
       }
     } catch (error) {
       console.error('Failed to redo operation:', error)
+      // Ensure flag is cleared even on error
+      useUndoStore.getState().setIsRedoing(false)
       return false
     }
   }, [

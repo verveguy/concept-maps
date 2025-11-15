@@ -25,7 +25,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import { Check } from 'lucide-react'
-import { useCommentActions } from '@/hooks/useCommentActions'
+import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { useUIStore } from '@/stores/uiStore'
 import { getAvatarUrl } from '@/lib/avatar'
@@ -123,7 +123,7 @@ function getTapePositionOffset(commentId: string, position: { x: number; y: numb
 }
 
 export const CommentNode = memo(({ data, selected }: NodeProps<CommentNodeData>) => {
-  const { updateComment } = useCommentActions()
+  const { updateComment } = useCanvasMutations()
   const { hasWriteAccess } = useMapPermissions()
   const setSelectedCommentId = useUIStore((state) => state.setSelectedCommentId)
   const setSelectedConceptId = useUIStore((state) => state.setSelectedConceptId)

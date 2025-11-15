@@ -8,6 +8,7 @@ import { useCallback } from 'react'
 import { useConceptActions } from './useConceptActions'
 import { useRelationshipActions } from './useRelationshipActions'
 import { useCommentActions } from './useCommentActions'
+import { useMapActions } from './useMapActions'
 import { useUndoStore, type MutationCommandUnion } from '@/stores/undoStore'
 
 /**
@@ -47,8 +48,13 @@ export function useUndo() {
     deleteComment, 
     updateComment: updateCommentAction,
     linkCommentToConcept: linkCommentToConceptAction,
-    unlinkCommentFromConcept: unlinkCommentFromConceptAction 
+    unlinkCommentFromConcept: unlinkCommentFromConceptAction,
+    resolveComment: resolveCommentAction,
+    unresolveComment: unresolveCommentAction,
   } = useCommentActions()
+  const {
+    updateMap: updateMapAction,
+  } = useMapActions()
   const {
     recordDeletion,
     getHistory,
@@ -182,16 +188,28 @@ export function useUndo() {
           await linkCommentToConceptAction(command.commentId, command.conceptId)
           return true
         }
+        case 'resolveComment': {
+          // Reverse resolve: unresolve (restore previous resolved state)
+          if (command.previousState.resolved === false) {
+            await unresolveCommentAction(command.commentId)
+          }
+          return true
+        }
+        case 'unresolveComment': {
+          // Reverse unresolve: resolve (restore previous resolved state)
+          if (command.previousState.resolved === true) {
+            await resolveCommentAction(command.commentId)
+          }
+          return true
+        }
         case 'updateMap': {
           // Reverse update: restore previous state if available
           if (command.previousState) {
             const reverseUpdates: any = {}
             if (command.previousState.name !== undefined) reverseUpdates.name = command.previousState.name
             if (command.previousState.layoutAlgorithm !== undefined) reverseUpdates.layoutAlgorithm = command.previousState.layoutAlgorithm
-            // Note: updateMap is not in useCanvasMutations, so we'd need to import useMapActions
-            // For now, log a warning
-            console.warn('Cannot undo updateMap: updateMapAction not available in useUndo', command)
-            return false
+            await updateMapAction(command.mapId, reverseUpdates)
+            return true
           } else {
             console.warn('Cannot undo updateMap: previousState not available', command)
             return false
@@ -221,6 +239,9 @@ export function useUndo() {
     undeleteComment,
     linkCommentToConceptAction,
     unlinkCommentFromConceptAction,
+    resolveCommentAction,
+    unresolveCommentAction,
+    updateMapAction,
   ])
 
   /**

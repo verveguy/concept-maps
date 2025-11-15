@@ -11,13 +11,7 @@ import type {
   CreateConceptCommand,
   UpdateConceptCommand,
   DeleteConceptCommand,
-  CreateRelationshipCommand,
-  UpdateRelationshipCommand,
   ReverseRelationshipCommand,
-  DeleteRelationshipCommand,
-  CreateCommentCommand,
-  UpdateCommentCommand,
-  DeleteCommentCommand,
   LinkCommentToConceptCommand,
   UnlinkCommentFromConceptCommand,
 } from '../../stores/undoStore'

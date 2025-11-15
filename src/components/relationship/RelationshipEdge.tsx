@@ -155,7 +155,7 @@ import {
   useNodes,
 } from 'reactflow'
 import type { RelationshipEdgeData } from '@/lib/reactFlowTypes'
-import { useRelationshipActions } from '@/hooks/useRelationshipActions'
+import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 import { useUIStore } from '@/stores/uiStore'
 import { EdgeToolbar } from '@/components/toolbar/EdgeToolbar'
 
@@ -1303,7 +1303,7 @@ export const RelationshipEdge = memo(
     data,
     selected,
   }: EdgeProps<RelationshipEdgeData>) => {
-    const { updateRelationship } = useRelationshipActions()
+    const { updateRelationship } = useCanvasMutations()
     const { getNode, setNodes, flowToScreenPosition } = useReactFlow()
     const nodes = useNodes()
     const relationship = data?.relationship

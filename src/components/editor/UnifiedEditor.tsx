@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Trash2, X, Plus } from 'lucide-react'
-import { useConceptActions } from '@/hooks/useConceptActions'
-import { useRelationshipActions } from '@/hooks/useRelationshipActions'
-import { useUndo } from '@/hooks/useUndo'
+import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 import { useConcepts } from '@/hooks/useConcepts'
 import { useRelationships } from '@/hooks/useRelationships'
 import { useUIStore } from '@/stores/uiStore'
@@ -89,34 +87,7 @@ export function UnifiedEditor() {
   
   const concepts = useConcepts()
   const relationships = useRelationships()
-  const { updateConcept, deleteConcept } = useConceptActions()
-  const { updateRelationship, deleteRelationship } = useRelationshipActions()
-  const { recordDeletion, startOperation, endOperation } = useUndo()
-
-  // Wrapper functions to record deletions for undo
-  const handleDeleteConcept = async (conceptId: string) => {
-    try {
-      startOperation()
-      recordDeletion('concept', conceptId)
-      await deleteConcept(conceptId)
-      endOperation()
-    } catch (error) {
-      endOperation()
-      throw error
-    }
-  }
-
-  const handleDeleteRelationship = async (relationshipId: string) => {
-    try {
-      startOperation()
-      recordDeletion('relationship', relationshipId)
-      await deleteRelationship(relationshipId)
-      endOperation()
-    } catch (error) {
-      endOperation()
-      throw error
-    }
-  }
+  const { updateConcept, deleteConcept, updateRelationship, deleteRelationship } = useCanvasMutations()
 
   const concept = concepts.find((c) => c.id === selectedConceptId)
   const relationship = relationships.find((r) => r.id === selectedRelationshipId)
@@ -152,7 +123,7 @@ export function UnifiedEditor() {
         concept={concept}
         onClose={() => setConceptEditorOpen(false)}
         onUpdate={updateConcept}
-        onDelete={handleDeleteConcept}
+        onDelete={deleteConcept}
       />
     )
   }
@@ -163,7 +134,7 @@ export function UnifiedEditor() {
         relationship={relationship}
         onClose={() => setRelationshipEditorOpen(false)}
         onUpdate={updateRelationship}
-        onDelete={handleDeleteRelationship}
+        onDelete={deleteRelationship}
       />
     )
   }

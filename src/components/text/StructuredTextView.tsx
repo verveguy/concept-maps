@@ -9,7 +9,7 @@ import { useState, useCallback } from 'react'
 import { Plus } from 'lucide-react'
 import { useConcepts } from '@/hooks/useConcepts'
 import { useRelationships } from '@/hooks/useRelationships'
-import { useRelationshipActions } from '@/hooks/useRelationshipActions'
+import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 import { useMapStore } from '@/stores/mapStore'
 import {
   conceptsToTriples,
@@ -18,7 +18,6 @@ import {
   stripLineBreaks,
 } from '@/lib/textRepresentation'
 import { EditableTriple } from './EditableTriple'
-import { db, tx, id } from '@/lib/instant'
 
 /**
  * StructuredTextView component - Text view for concept maps.
@@ -67,7 +66,7 @@ export function StructuredTextView() {
   const concepts = useConcepts()
   const relationships = useRelationships()
   const currentMapId = useMapStore((state) => state.currentMapId)
-  const { createRelationship } = useRelationshipActions()
+  const { createConcept, createRelationship } = useCanvasMutations()
 
   const triples = conceptsToTriples(concepts, relationships)
   const orphanConcepts = findOrphanConcepts(concepts, relationships)
@@ -94,58 +93,36 @@ export function StructuredTextView() {
 
       // Create concepts if they don't exist
       if (!fromConcept) {
-        const fromConceptId = id()
-        await db.transact([
-          tx.concepts[fromConceptId]
-            .update({
-              label: parsed.from,
-              positionX: 250,
-              positionY: 250,
-              notes: '',
-              metadata: JSON.stringify({}),
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            })
-            .link({ map: currentMapId }),
-        ])
-        fromConcept = {
-          id: fromConceptId,
+        await createConcept({
           mapId: currentMapId,
           label: parsed.from,
           position: { x: 250, y: 250 },
           notes: '',
           metadata: {},
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          deletedAt: null,
+          userPlaced: false,
+        })
+        // Wait a bit for the concept to appear in the concepts array
+        await new Promise(resolve => setTimeout(resolve, 100))
+        fromConcept = concepts.find((c) => c.label === parsed.from)
+        if (!fromConcept) {
+          throw new Error('Failed to create from concept')
         }
       }
 
       if (!toConcept) {
-        const toConceptId = id()
-        await db.transact([
-          tx.concepts[toConceptId]
-            .update({
-              label: parsed.to,
-              positionX: 350,
-              positionY: 350,
-              notes: '',
-              metadata: JSON.stringify({}),
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            })
-            .link({ map: currentMapId }),
-        ])
-        toConcept = {
-          id: toConceptId,
+        await createConcept({
           mapId: currentMapId,
           label: parsed.to,
           position: { x: 350, y: 350 },
           notes: '',
           metadata: {},
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          deletedAt: null,
+          userPlaced: false,
+        })
+        // Wait a bit for the concept to appear in the concepts array
+        await new Promise(resolve => setTimeout(resolve, 100))
+        toConcept = concepts.find((c) => c.label === parsed.to)
+        if (!toConcept) {
+          throw new Error('Failed to create to concept')
         }
       }
 
@@ -177,6 +154,7 @@ export function StructuredTextView() {
     currentMapId,
     concepts,
     newTripleText,
+    createConcept,
     createRelationship,
   ])
 
