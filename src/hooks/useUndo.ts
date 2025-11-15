@@ -8,6 +8,7 @@ import { useCallback } from 'react'
 import { useConceptActions } from './useConceptActions'
 import { useRelationshipActions } from './useRelationshipActions'
 import { useCommentActions } from './useCommentActions'
+import { useMapActions } from './useMapActions'
 import { useUndoStore, type MutationCommandUnion } from '@/stores/undoStore'
 
 /**
@@ -49,6 +50,9 @@ export function useUndo() {
     linkCommentToConcept: linkCommentToConceptAction,
     unlinkCommentFromConcept: unlinkCommentFromConceptAction 
   } = useCommentActions()
+  const {
+    updateMap: updateMapAction,
+  } = useMapActions()
   const {
     recordDeletion,
     getHistory,
@@ -188,10 +192,8 @@ export function useUndo() {
             const reverseUpdates: any = {}
             if (command.previousState.name !== undefined) reverseUpdates.name = command.previousState.name
             if (command.previousState.layoutAlgorithm !== undefined) reverseUpdates.layoutAlgorithm = command.previousState.layoutAlgorithm
-            // Note: updateMap is not in useCanvasMutations, so we'd need to import useMapActions
-            // For now, log a warning
-            console.warn('Cannot undo updateMap: updateMapAction not available in useUndo', command)
-            return false
+            await updateMapAction(command.mapId, reverseUpdates)
+            return true
           } else {
             console.warn('Cannot undo updateMap: previousState not available', command)
             return false
@@ -221,6 +223,7 @@ export function useUndo() {
     undeleteComment,
     linkCommentToConceptAction,
     unlinkCommentFromConceptAction,
+    updateMapAction,
   ])
 
   /**

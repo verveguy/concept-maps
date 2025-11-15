@@ -261,6 +261,10 @@ export interface UndoState {
   canRedo: () => boolean
   /** Check if undo is available */
   canUndo: () => boolean
+  /** Flag to indicate if we're currently executing a redo operation (to prevent double-recording) */
+  isRedoing: boolean
+  /** Set the isRedoing flag */
+  setIsRedoing: (isRedoing: boolean) => void
 }
 
 /**
@@ -273,6 +277,7 @@ export const useUndoStore = create<UndoState>((set, get) => ({
   redoStack: [],
   currentOperationId: null,
   currentOperationStartTime: null,
+  isRedoing: false,
   
   startOperation: () => {
     const operationId = `op_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -343,9 +348,16 @@ export const useUndoStore = create<UndoState>((set, get) => ({
   },
   
   recordMutation: (command) => {
-    set((state) => {
+    const state = get()
+    // Skip recording if we're currently executing a redo operation
+    // This prevents double-recording when redo re-executes commands
+    if (state.isRedoing) {
+      return
+    }
+    
+    set((currentState) => {
       // Clear redo stack when new mutations are recorded (standard undo/redo behavior)
-      const newHistory = [command, ...state.mutationHistory]
+      const newHistory = [command, ...currentState.mutationHistory]
       
       // Trim history if it exceeds max size
       if (newHistory.length > MAX_MUTATION_HISTORY_SIZE) {
@@ -492,5 +504,6 @@ export const useUndoStore = create<UndoState>((set, get) => ({
   canUndo: () => {
     return get().mutationHistory.length > 0
   },
+  setIsRedoing: (isRedoing) => set({ isRedoing }),
 }))
 

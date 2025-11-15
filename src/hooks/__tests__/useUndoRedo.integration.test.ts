@@ -9,11 +9,6 @@ import { useUndo } from '../useUndo'
 import { useRedo } from '../useRedo'
 import { useCanvasMutations } from '../useCanvasMutations'
 import { useUndoStore } from '../../stores/undoStore'
-import type {
-  CreateConceptCommand,
-  UpdateConceptCommand,
-  DeleteConceptCommand,
-} from '../../stores/undoStore'
 
 // Mock action hooks - these will be called by useCanvasMutations
 const mockCreateConceptAction = vi.fn().mockResolvedValue(undefined)
@@ -283,16 +278,17 @@ describe('Undo/Redo Integration', () => {
       expect(useUndoStore.getState().redoStack.length).toBeLessThanOrEqual(1)
 
       // Redo again (should redo concept 2)
-      // Note: Redo will fail because createConcept commands don't have conceptIds
+      // Note: Now creates have conceptIds, so redo should succeed
       await act(async () => {
         const success = await redo.current.redo()
-        // Redo fails for creates without conceptIds, but operation is still removed from redo stack
-        expect(success).toBe(false)
+        // Redo should succeed now that creates have conceptIds
+        expect(success).toBe(true)
       })
 
-      // Redo stack is cleared even if redo failed
+      // Redo stack should be empty after successful redo
       expect(useUndoStore.getState().redoStack.length).toBe(0)
-      // Mutation history may or may not have the failed redo attempt
+      // Mutation history should have the redone operation
+      expect(useUndoStore.getState().mutationHistory.length).toBeGreaterThan(0)
     })
 
     it('should group operations correctly for undo', async () => {
@@ -323,15 +319,14 @@ describe('Undo/Redo Integration', () => {
       const operation = useUndoStore.getState().getMostRecentMutationOperation()
       expect(operation.length).toBe(2)
 
-      // Undo should undo both (but creates without conceptId can't be undone)
+      // Undo should undo both (creates now have conceptIds, so they can be undone)
       await act(async () => {
         const success = await undo.current.undo()
         expect(success).toBe(true)
       })
 
-      // Creates without conceptId can't be undone, so deleteConcept won't be called
-      // But the operation is still moved to redo stack
-      expect(mockDeleteConceptAction).toHaveBeenCalledTimes(0)
+      // Creates now have conceptIds, so deleteConcept should be called for both
+      expect(mockDeleteConceptAction).toHaveBeenCalledTimes(2)
       expect(useUndoStore.getState().mutationHistory.length).toBe(0)
       expect(useUndoStore.getState().redoStack.length).toBe(2)
     })

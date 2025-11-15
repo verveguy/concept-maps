@@ -75,8 +75,8 @@ describe('useCanvasMutations', () => {
         await result.current.createConcept(conceptData)
       })
 
-      // Verify action was called
-      expect(mockCreateConcept).toHaveBeenCalledWith(conceptData)
+      // Verify action was called (with optional ID parameter)
+      expect(mockCreateConcept).toHaveBeenCalledWith(conceptData, expect.any(String))
 
       // Verify mutation was recorded
       const mutations = useUndoStore.getState().mutationHistory
@@ -174,8 +174,8 @@ describe('useCanvasMutations', () => {
         await result.current.createRelationship(relationshipData)
       })
 
-      // Verify action was called
-      expect(mockCreateRelationship).toHaveBeenCalledWith(relationshipData)
+      // Verify action was called (with optional ID parameter)
+      expect(mockCreateRelationship).toHaveBeenCalledWith(relationshipData, expect.any(String))
 
       // Verify mutation was recorded
       const mutations = useUndoStore.getState().mutationHistory
@@ -246,8 +246,8 @@ describe('useCanvasMutations', () => {
         await result.current.createComment(commentData)
       })
 
-      // Verify action was called
-      expect(mockCreateComment).toHaveBeenCalledWith(commentData)
+      // Verify action was called (with optional ID parameter)
+      expect(mockCreateComment).toHaveBeenCalledWith(commentData, expect.any(String))
 
       // Verify mutation was recorded
       const mutations = useUndoStore.getState().mutationHistory

@@ -18,6 +18,9 @@ import type { Concept, Comment, Relationship } from '@/lib/schema'
 // Create shared mock functions
 const mockGetLastUpdateTime = vi.fn(() => null)
 const mockSetLastUpdateTime = vi.fn()
+const mockGetDragStartPosition = vi.fn(() => undefined)
+const mockSetDragStartPosition = vi.fn()
+const mockClearDragStartPosition = vi.fn()
 
 // Mock dependencies
 vi.mock('../useCanvasMutations', () => ({
@@ -403,6 +406,10 @@ describe('useCanvasNodeHandlers', () => {
         const state = {
           getLastUpdateTime: mockGetLastUpdateTime,
           setLastUpdateTime: vi.fn(),
+          getDragStartPosition: mockGetDragStartPosition,
+          setDragStartPosition: mockSetDragStartPosition,
+          clearDragStartPosition: mockClearDragStartPosition,
+          connectionStart: null,
         }
         return selector ? selector(state as any) : state
       })
@@ -517,7 +524,7 @@ describe('useCanvasNodeHandlers', () => {
 
       expect(mockUpdateComment).toHaveBeenCalledWith('comment-1', {
         position: { x: 160, y: 260 },
-      })
+      }, undefined) // previousState is optional
     })
   })
 
@@ -540,6 +547,10 @@ describe('useCanvasNodeHandlers', () => {
         const state = {
           getLastUpdateTime: vi.fn(() => null),
           setLastUpdateTime: mockSetLastUpdateTime,
+          getDragStartPosition: mockGetDragStartPosition,
+          setDragStartPosition: mockSetDragStartPosition,
+          clearDragStartPosition: mockClearDragStartPosition,
+          connectionStart: null,
         }
         return selector ? selector(state as any) : state
       })
@@ -565,7 +576,7 @@ describe('useCanvasNodeHandlers', () => {
       expect(mockUpdateConcept).toHaveBeenCalledWith('concept-1', {
         position: { x: 150, y: 250 },
         userPlaced: true,
-      })
+      }, undefined) // previousState is optional
       expect(mockSetLastUpdateTime).toHaveBeenCalledWith('concept-1', expect.any(Number))
     })
 

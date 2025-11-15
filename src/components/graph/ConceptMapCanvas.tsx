@@ -264,6 +264,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   // Node handlers hook - handles node changes, drag, and click events
   const {
     onNodesChange,
+    onNodeDragStart,
     onNodeDrag,
     onNodeDragStop,
     onNodeClick,
@@ -678,6 +679,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
         onConnect={hasWriteAccess ? onConnect : undefined}
         onConnectStart={hasWriteAccess ? onConnectStart : undefined}
         onConnectEnd={hasWriteAccess ? onConnectEnd : undefined}
+        onNodeDragStart={hasWriteAccess ? onNodeDragStart : undefined}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         onNodeClick={onNodeClick}
