@@ -11,9 +11,15 @@ This plan addresses gaps in the undo/redo system by normalizing all **map-scoped
 
 ### Existing Issues (from original plan)
 1. **Missing previousState for drag operations** - Position updates during drag don't capture previous state, making them un-undoable
+   - **Impact**: Node dragging (concepts/comments) creates `updateConcept`/`updateComment` mutations but without `previousState`, undo cannot restore original position
+   - **Current behavior**: Each drag event calls `updateConcept`/`updateComment` without tracking initial position
 2. **Drag operations not grouped** - Each drag event creates separate mutations instead of grouping into one operation
+   - **Impact**: Dragging a node multiple times creates multiple undo entries instead of one "move node" operation
+   - **Current behavior**: Each throttled position update during drag creates a separate command
 3. **Missing previousState for all updates** - `updateConcept`, `updateComment`, `updateRelationship` don't capture previous state before updating
+   - **Impact**: Any update operation cannot be properly undone without knowing what was changed from
 4. **Missing IDs in create commands** - Create commands don't populate entity IDs needed for undo
+   - **Impact**: Cannot undo create operations because the command doesn't know which entity was created
 5. **updateMap not undoable** - Missing implementation in useUndo
 
 ### New Issues Discovered
@@ -42,10 +48,18 @@ This plan addresses gaps in the undo/redo system by normalizing all **map-scoped
 
 ### Current Mutation Flow
 1. **Tracked mutations** (via `useCanvasMutations`):
-   - Concept: create, update, delete
+   - Concept: create, update (including drag position updates), delete
    - Relationship: create, update, reverse, delete
-   - Comment: create, update, delete, link/unlink
+   - Comment: create, update (including drag position updates), delete, link/unlink
    - Map: update (partial - missing undo implementation)
+   
+   **Note**: Drag operations (node dragging) are mutations that update position via `updateConcept`/`updateComment`. These are currently tracked but lack proper undo support due to missing `previousState` and operation grouping.
+
+**Drag Operations Inventory**:
+- ✅ **Node dragging** (concepts/comments): Creates `updateConcept`/`updateComment` mutations - **NEEDS FIX** (missing previousState, not grouped)
+- ❌ **Edge dragging**: Not supported in React Flow (edges connect nodes and move when nodes move)
+- ❌ **Canvas pan/zoom**: Not mutations (UI state only, doesn't modify database)
+- ✅ **Connection creation drag**: Creates relationships via `createRelationship` - already tracked (but needs ID fix from Phase 1)
 
 2. **Untracked mutations** (direct action calls, but should be tracked):
    - Perspective: all operations (within map scope)
@@ -68,33 +82,42 @@ This plan addresses gaps in the undo/redo system by normalizing all **map-scoped
 
 #### 1.1 Capture Previous State Before Updates
 
+**Critical**: Drag operations are mutations that need undo support. When a user drags a node (concept or comment), it creates `updateConcept`/`updateComment` mutations that must be undoable.
+
 **File: `src/hooks/useCanvasMutations.ts`**
 
 - Modify `updateConcept`, `updateComment`, `updateRelationship` to accept optional `previousState` parameter
 - When `previousState` is not provided, fetch current state from passed entity arrays (concepts/comments/relationships)
 - Store `previousState` in mutation command for proper undo
 - **Approach**: Accept `previousState` as optional parameter, capture at call site when available, otherwise fetch from entity arrays
+- **For drag operations**: The `previousState` should contain the position at drag start, not the current position
 
 **File: `src/hooks/useCanvasNodeHandlers.ts`**
 
+- **CRITICAL**: Drag operations create mutations via `updateConcept`/`updateComment` calls in `onNodeDrag` and `onNodeDragStop`
 - Track initial position when drag starts (store in ref or canvas store)
 - Pass `previousState` to `updateConcept`/`updateComment` calls in `onNodeDrag` and `onNodeDragStop`
 - Use the initial position from when drag started, not the current position
+- Ensure all position updates during a drag operation use the same initial `previousState`
 
 **File: `src/stores/canvasStore.ts`**
 
 - Add state to track drag start positions: `dragStartPositions: Map<string, { x: number; y: number }>`
 - Store initial position when drag starts (`onNodeDragStart`)
 - Clear when drag ends (`onNodeDragStop`)
+- This ensures we can always provide `previousState` for drag-related position updates
 
 #### 1.2 Group Drag Operations
+
+**Critical**: Drag operations create multiple mutations (one per throttled update during drag, plus final update on drag stop). These must be grouped into a single undoable operation.
 
 **File: `src/hooks/useCanvasNodeHandlers.ts`**
 
 - Add `onNodeDragStart` handler (React Flow supports this)
-- Call `startOperation()` when drag starts
-- Call `endOperation()` when drag stops (`onNodeDragStop`)
-- Ensure all drag-related mutations use the same operationId
+- Call `startOperation()` when drag starts - this groups all subsequent mutations into one operation
+- Call `endOperation()` when drag stops (`onNodeDragStop`) - this closes the operation group
+- Ensure all drag-related mutations (throttled updates during drag + final update on stop) use the same operationId
+- **Result**: Dragging a node creates one undo entry, not multiple entries for each position update
 
 #### 1.3 Populate IDs in Create Commands
 
@@ -255,10 +278,11 @@ await createPerspective(data)
 ## To-dos
 
 ### Phase 1: Fix Existing Tracked Mutations
-- [ ] Modify useCanvasMutations to capture previousState before updates - updateConcept, updateComment, updateRelationship need to fetch current state and store in command
-- [ ] Add onNodeDragStart handler to start operation, endOperation on drag stop - group all drag mutations into single undoable operation
-- [ ] Add drag start position tracking to canvasStore - store initial position when drag starts, use for previousState in updates
-- [ ] Modify onNodeDrag and onNodeDragStop to pass previousState from drag start position to updateConcept/updateComment calls
+- [ ] **CRITICAL: Fix drag operations** - Drag operations are mutations that need undo support
+  - [ ] Add onNodeDragStart handler to start operation, endOperation on drag stop - group all drag mutations into single undoable operation
+  - [ ] Add drag start position tracking to canvasStore - store initial position when drag starts, use for previousState in updates
+  - [ ] Modify onNodeDrag and onNodeDragStop to pass previousState from drag start position to updateConcept/updateComment calls
+- [ ] Modify useCanvasMutations to capture previousState before updates - updateConcept, updateComment, updateRelationship need to fetch current state and store in command (when previousState not provided)
 - [ ] Fix create commands to populate entity IDs - generate ID before creating and store in command for undo
 - [ ] Modify action hooks to accept optional ID parameter - useConceptActions, useRelationshipActions, useCommentActions
 - [ ] Implement updateMap undo in useUndo.ts - import useMapActions and properly reverse updateMap commands
