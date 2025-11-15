@@ -3,7 +3,9 @@
 
 ## Overview
 
-This plan addresses gaps in the undo/redo system by normalizing all mutations with the command pattern. The existing codebase has a mutation/action pattern established (`useConceptActions`, `useRelationshipActions`, etc.), and we need to ensure all mutations are properly tracked and reversible.
+This plan addresses gaps in the undo/redo system by normalizing all **map-scoped** mutations with the command pattern. The existing codebase has a mutation/action pattern established (`useConceptActions`, `useRelationshipActions`, etc.), and we need to ensure all mutations **within a map context** are properly tracked and reversible.
+
+**Scope**: Undo/redo applies only to operations within a single map (concepts, relationships, comments, perspectives, map metadata). Map-level operations (creating/deleting maps, sharing) are intentionally excluded as they operate outside the map context.
 
 ## Critical Issues Identified
 
@@ -15,15 +17,26 @@ This plan addresses gaps in the undo/redo system by normalizing all mutations wi
 5. **updateMap not undoable** - Missing implementation in useUndo
 
 ### New Issues Discovered
-6. **Missing mutation types** - Several mutation types are not tracked at all:
-   - Map operations: `createMap`, `deleteMap` (only `updateMap` is partially tracked)
+6. **Missing mutation types** - Several mutation types within a map are not tracked:
    - Perspective operations: `createPerspective`, `updatePerspective`, `deletePerspective`, `toggleConceptInPerspective`, `toggleRelationshipInPerspective`
-   - Sharing operations: `createInvitation`, `acceptInvitation`, `declineInvitation`, `revokeInvitation`, `updateSharePermission`, `revokeShare`
-   - Trash operations: `emptyTrash` (permanent deletion - may be intentionally excluded)
+   - Map metadata updates: `updateMap` (partially tracked but missing undo implementation)
 
 7. **Inconsistent mutation tracking** - Some mutations go through `useCanvasMutations` (which tracks commands), while others call action hooks directly (bypassing command tracking)
 
 8. **Redo double-recording** - When redo executes commands via `useCanvasMutations`, they get recorded again, potentially causing issues
+
+### Scope Definition
+**Undo/Redo Scope**: Operations within a single map context only. This includes:
+- ✅ Concept operations (create, update, delete)
+- ✅ Relationship operations (create, update, reverse, delete)
+- ✅ Comment operations (create, update, delete, link/unlink)
+- ✅ Perspective operations (create, update, delete, toggle concept/relationship)
+- ✅ Map metadata updates (name, layoutAlgorithm)
+
+**Out of Scope** (no undo/redo support):
+- ❌ Map creation/deletion (map-level operations)
+- ❌ Sharing operations (invitations, permissions - map-level operations)
+- ❌ Trash operations (permanent deletion - intentionally excluded)
 
 ## Architecture Analysis
 
@@ -34,11 +47,14 @@ This plan addresses gaps in the undo/redo system by normalizing all mutations wi
    - Comment: create, update, delete, link/unlink
    - Map: update (partial - missing undo implementation)
 
-2. **Untracked mutations** (direct action calls):
-   - Map: create, delete
-   - Perspective: all operations
-   - Sharing: all operations
-   - Trash: emptyTrash
+2. **Untracked mutations** (direct action calls, but should be tracked):
+   - Perspective: all operations (within map scope)
+   - Map: update (partially tracked but missing undo implementation)
+
+3. **Out of scope** (intentionally not tracked):
+   - Map: create, delete (map-level operations)
+   - Sharing: all operations (map-level operations)
+   - Trash: emptyTrash (permanent deletion)
 
 ### Command Pattern Structure
 - Commands are stored in `undoStore.ts` with types defined in `MutationCommandUnion`
@@ -105,31 +121,7 @@ This plan addresses gaps in the undo/redo system by normalizing all mutations wi
 
 ### Phase 2: Add Missing Mutation Types
 
-#### 2.1 Map Operations
-
-**File: `src/stores/undoStore.ts`**
-
-- Add command types:
-  - `CreateMapCommand` - with mapId, name, creatorId
-  - `DeleteMapCommand` - with mapId, previousState (name, layoutAlgorithm, etc.)
-
-**File: `src/hooks/useCanvasMutations.ts`** (or create `useMapMutations.ts`)
-
-- Wrap `createMap` from `useMapActions`
-- Wrap `deleteMap` from `useMapActions` (capture previous state before deletion)
-- Record commands for both operations
-
-**File: `src/hooks/useUndo.ts`**
-
-- Add undo handlers for `createMap` (delete) and `deleteMap` (recreate with previousState)
-
-**File: `src/hooks/useRedo.ts`**
-
-- Add redo handlers for `createMap` and `deleteMap`
-
-**Note**: Map operations may be called from `Sidebar.tsx` - need to ensure they go through mutation wrapper
-
-#### 2.2 Perspective Operations
+#### 2.1 Perspective Operations
 
 **File: `src/stores/undoStore.ts`**
 
@@ -158,43 +150,7 @@ This plan addresses gaps in the undo/redo system by normalizing all mutations wi
 **Files using perspectives**: `Sidebar.tsx`, `PerspectiveEditor.tsx`, `ConceptNode.tsx`
 - Update to use `usePerspectiveMutations` instead of direct `usePerspectiveActions` calls
 
-#### 2.3 Sharing Operations
-
-**File: `src/stores/undoStore.ts`**
-
-- Add command types:
-  - `CreateInvitationCommand` - with invitationId, mapId, invitedEmail, permission, token
-  - `AcceptInvitationCommand` - with invitationId, shareId, previousInvitationState
-  - `DeclineInvitationCommand` - with invitationId, previousInvitationState
-  - `RevokeInvitationCommand` - with invitationId, previousInvitationState
-  - `UpdateSharePermissionCommand` - with shareId, previousPermission, newPermission
-  - `RevokeShareCommand` - with shareId, previousShareState
-
-**File: `src/hooks/useSharingMutations.ts`** (new file, or extend `useSharing.ts`)
-
-- Wrap sharing actions from `useSharing`
-- Record commands for all operations
-- Capture previous state before updates/revocations
-
-**File: `src/hooks/useUndo.ts`**
-
-- Add undo handlers for all sharing command types
-- **Note**: Some operations may be complex (e.g., acceptInvitation creates share + updates invitation)
-
-**File: `src/hooks/useRedo.ts`**
-
-- Add redo handlers for all sharing command types
-
-**Files using sharing**: `ShareDialog.tsx`, `InvitationAcceptScreen.tsx`
-- Update to use mutation wrapper instead of direct `useSharing` calls
-
-#### 2.4 Trash Operations
-
-**Decision**: `emptyTrash` performs permanent deletion. This is typically not undoable by design (trash is meant to be permanent). However, we could:
-- Option A: Track it but mark as non-reversible (for audit purposes)
-- Option B: Exclude it from undo/redo (current approach)
-
-**Recommendation**: Option B - exclude from undo/redo. Trash operations are meant to be permanent.
+**Note**: Map create/delete and sharing operations are intentionally excluded from undo/redo scope as they are map-level operations, not operations within a map.
 
 ### Phase 3: Fix Redo Double-Recording
 
@@ -218,29 +174,29 @@ This plan addresses gaps in the undo/redo system by normalizing all mutations wi
 - Set `isRedoing` to false after completion (in finally block)
 - Ensure flag is cleared even on error
 
-**Apply same pattern to**: `usePerspectiveMutations.ts`, `useSharingMutations.ts`, `useMapMutations.ts`
+**Apply same pattern to**: `usePerspectiveMutations.ts`
 
 ### Phase 4: Ensure Consistent Mutation Tracking
 
 **Goal**: Ensure all mutations go through command tracking, not direct action calls.
 
 **Files to audit and update**:
-1. `src/components/layout/Sidebar.tsx` - Map and perspective operations
-2. `src/components/perspective/PerspectiveEditor.tsx` - Perspective operations
-3. `src/components/concept/ConceptNode.tsx` - Perspective toggle operations
-4. `src/components/share/ShareDialog.tsx` - Sharing operations
-5. `src/components/invitation/InvitationAcceptScreen.tsx` - Invitation acceptance
+1. `src/components/perspective/PerspectiveEditor.tsx` - Perspective operations
+2. `src/components/concept/ConceptNode.tsx` - Perspective toggle operations
+3. `src/components/layout/Sidebar.tsx` - Perspective operations (map create/delete remain direct)
 
-**Pattern**: Replace direct action calls with mutation wrapper calls:
+**Pattern**: Replace direct action calls with mutation wrapper calls for in-scope operations:
 ```typescript
-// Before
-const { createMap } = useMapActions()
-await createMap(name)
+// Before (perspective operations)
+const { createPerspective } = usePerspectiveActions()
+await createPerspective(data)
 
 // After
-const { createMap } = useMapMutations() // or useCanvasMutations if map ops are there
-await createMap(name)
+const { createPerspective } = usePerspectiveMutations()
+await createPerspective(data)
 ```
+
+**Note**: Map create/delete and sharing operations remain direct (out of scope).
 
 ## Files to Modify
 
@@ -253,22 +209,17 @@ await createMap(name)
 6. `src/hooks/useRedo.ts` - Add handlers for new command types, add isRedoing flag management
 
 ### New Files
-7. `src/hooks/useMapMutations.ts` - Wrap map operations (or extend useCanvasMutations)
-8. `src/hooks/usePerspectiveMutations.ts` - Wrap perspective operations
-9. `src/hooks/useSharingMutations.ts` - Wrap sharing operations (or extend useSharing)
+7. `src/hooks/usePerspectiveMutations.ts` - Wrap perspective operations
 
 ### Action Hook Updates
-10. `src/hooks/useConceptActions.ts` - Accept optional ID parameter
-11. `src/hooks/useRelationshipActions.ts` - Accept optional ID parameter  
-12. `src/hooks/useCommentActions.ts` - Accept optional ID parameter
-13. `src/hooks/useMapActions.ts` - Accept optional ID parameter (for createMap)
+8. `src/hooks/useConceptActions.ts` - Accept optional ID parameter
+9. `src/hooks/useRelationshipActions.ts` - Accept optional ID parameter  
+10. `src/hooks/useCommentActions.ts` - Accept optional ID parameter
 
 ### Component Updates
-14. `src/components/layout/Sidebar.tsx` - Use mutation wrappers
-15. `src/components/perspective/PerspectiveEditor.tsx` - Use mutation wrappers
-16. `src/components/concept/ConceptNode.tsx` - Use mutation wrappers
-17. `src/components/share/ShareDialog.tsx` - Use mutation wrappers
-18. `src/components/invitation/InvitationAcceptScreen.tsx` - Use mutation wrappers
+11. `src/components/perspective/PerspectiveEditor.tsx` - Use mutation wrappers
+12. `src/components/concept/ConceptNode.tsx` - Use mutation wrappers
+13. `src/components/layout/Sidebar.tsx` - Use mutation wrappers for perspective operations (map create/delete remain direct)
 
 ## Testing Considerations
 
@@ -285,8 +236,7 @@ await createMap(name)
 - Test undo after partial drag (drag started but cancelled)
 - Test concurrent drags of multiple nodes
 - Test undo/redo for perspective operations
-- Test undo/redo for sharing operations
-- Test undo/redo for map operations
+- Test undo/redo for map metadata updates (name, layoutAlgorithm)
 - Verify redo doesn't double-record mutations
 
 ### Edge Cases
@@ -314,27 +264,19 @@ await createMap(name)
 - [ ] Implement updateMap undo in useUndo.ts - import useMapActions and properly reverse updateMap commands
 
 ### Phase 2: Add Missing Mutation Types
-- [ ] Add map command types to undoStore - CreateMapCommand, DeleteMapCommand
-- [ ] Create useMapMutations wrapper or extend useCanvasMutations - wrap createMap and deleteMap
-- [ ] Add map undo/redo handlers - implement in useUndo and useRedo
 - [ ] Add perspective command types to undoStore - CreatePerspectiveCommand, UpdatePerspectiveCommand, DeletePerspectiveCommand, ToggleConceptInPerspectiveCommand, ToggleRelationshipInPerspectiveCommand
 - [ ] Create usePerspectiveMutations wrapper - wrap all perspective actions
 - [ ] Add perspective undo/redo handlers - implement in useUndo and useRedo
-- [ ] Add sharing command types to undoStore - CreateInvitationCommand, AcceptInvitationCommand, DeclineInvitationCommand, RevokeInvitationCommand, UpdateSharePermissionCommand, RevokeShareCommand
-- [ ] Create useSharingMutations wrapper or extend useSharing - wrap all sharing actions
-- [ ] Add sharing undo/redo handlers - implement in useUndo and useRedo
-- [ ] Update components to use mutation wrappers - Sidebar, PerspectiveEditor, ConceptNode, ShareDialog, InvitationAcceptScreen
+- [ ] Update components to use mutation wrappers - PerspectiveEditor, ConceptNode, Sidebar (for perspective operations only)
 
 ### Phase 3: Fix Redo Double-Recording
 - [ ] Add isRedoing flag to undoStore - state and setter
 - [ ] Modify useCanvasMutations to check isRedoing flag - skip recordMutation if isRedoing is true
 - [ ] Modify useRedo to set isRedoing flag - set true before re-execution, false after (in finally)
-- [ ] Apply same pattern to usePerspectiveMutations, useSharingMutations, useMapMutations
+- [ ] Apply same pattern to usePerspectiveMutations
 
 ### Phase 4: Ensure Consistent Tracking
-- [ ] Audit all component files for direct action calls - identify mutations that bypass command tracking
-- [ ] Update Sidebar.tsx to use mutation wrappers
+- [ ] Audit component files for direct action calls - identify in-scope mutations that bypass command tracking
 - [ ] Update PerspectiveEditor.tsx to use mutation wrappers
 - [ ] Update ConceptNode.tsx to use mutation wrappers
-- [ ] Update ShareDialog.tsx to use mutation wrappers
-- [ ] Update InvitationAcceptScreen.tsx to use mutation wrappers
+- [ ] Update Sidebar.tsx to use mutation wrappers for perspective operations (map create/delete remain direct)
