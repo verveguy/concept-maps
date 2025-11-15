@@ -91,7 +91,7 @@ export function useConceptActions() {
    * Create a new concept in the database.
    * 
    * Creates a concept with the provided data and links it to the specified map.
-   * The concept ID is automatically generated. Timestamps (`createdAt`, `updatedAt`)
+   * The concept ID is automatically generated if not provided. Timestamps (`createdAt`, `updatedAt`)
    * are set to the current time.
    * 
    * @param concept - Concept data to create
@@ -100,6 +100,9 @@ export function useConceptActions() {
    * @param concept.position - X/Y coordinates on the canvas
    * @param concept.notes - Optional markdown notes (defaults to empty string)
    * @param concept.metadata - Optional metadata object (defaults to empty object)
+   * @param conceptId - Optional concept ID. If not provided, one will be generated.
+   * 
+   * @returns The concept ID (either provided or generated)
    * 
    * @throws Error if the transaction fails
    * 
@@ -116,10 +119,10 @@ export function useConceptActions() {
    * })
    * ```
    */
-  const createConcept = async (concept: CreateConceptData) => {
-    const conceptId = id()
+  const createConcept = async (concept: CreateConceptData, conceptId?: string): Promise<string> => {
+    const finalConceptId = conceptId || id()
     await db.transact([
-      tx.concepts[conceptId]
+      tx.concepts[finalConceptId]
         .update({
           label: concept.label,
           positionX: concept.position.x,
@@ -134,6 +137,8 @@ export function useConceptActions() {
         })
         .link({ map: concept.mapId }),
     ])
+    
+    return finalConceptId
   }
 
   /**

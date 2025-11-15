@@ -323,15 +323,14 @@ describe('Undo/Redo Integration', () => {
       const operation = useUndoStore.getState().getMostRecentMutationOperation()
       expect(operation.length).toBe(2)
 
-      // Undo should undo both (but creates without conceptId can't be undone)
+      // Undo should undo both creates (IDs are now populated, so creates can be undone)
       await act(async () => {
         const success = await undo.current.undo()
         expect(success).toBe(true)
       })
 
-      // Creates without conceptId can't be undone, so deleteConcept won't be called
-      // But the operation is still moved to redo stack
-      expect(mockDeleteConceptAction).toHaveBeenCalledTimes(0)
+      // Creates now have IDs populated, so they can be undone by deleting the concepts
+      expect(mockDeleteConceptAction).toHaveBeenCalledTimes(2)
       expect(useUndoStore.getState().mutationHistory.length).toBe(0)
       expect(useUndoStore.getState().redoStack.length).toBe(2)
     })

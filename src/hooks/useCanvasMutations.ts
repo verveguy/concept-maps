@@ -10,6 +10,7 @@
  */
 
 import { useCallback } from 'react'
+import { id } from '@/lib/instant'
 import { useConceptActions, type CreateConceptData, type UpdateConceptData } from './useConceptActions'
 import { useRelationshipActions, type CreateRelationshipData, type UpdateRelationshipData } from './useRelationshipActions'
 import { useCommentActions, type CreateCommentData, type UpdateCommentData } from './useCommentActions'
@@ -73,21 +74,25 @@ export function useCanvasMutations() {
 
   /**
    * Create a new concept with undo tracking.
+   * Generates the concept ID before creating so it can be stored in the command for undo.
    */
   const createConcept = useCallback(
     async (data: CreateConceptData) => {
       try {
-        await createConceptAction(data)
+        // Generate ID before creating so we can store it in the command
+        const conceptId = id()
         
-        // Record mutation for undo
-        // Note: We don't have the generated conceptId here, but we can track by operation
+        // Create the concept with the generated ID
+        await createConceptAction(data, conceptId)
+        
+        // Record mutation for undo with the concept ID
         const command: CreateConceptCommand = {
           type: 'createConcept',
           id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           timestamp: Date.now(),
           operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
           data,
-          conceptId: '', // Will be populated if needed for undo
+          conceptId,
         }
         recordMutation(command)
       } catch (error) {
@@ -171,20 +176,25 @@ export function useCanvasMutations() {
 
   /**
    * Create a new relationship with undo tracking.
+   * Generates the relationship ID before creating so it can be stored in the command for undo.
    */
   const createRelationship = useCallback(
     async (data: CreateRelationshipData) => {
       try {
-        await createRelationshipAction(data)
+        // Generate ID before creating so we can store it in the command
+        const relationshipId = id()
         
-        // Record mutation for undo
+        // Create the relationship with the generated ID
+        await createRelationshipAction(data, relationshipId)
+        
+        // Record mutation for undo with the relationship ID
         const command: CreateRelationshipCommand = {
           type: 'createRelationship',
           id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           timestamp: Date.now(),
           operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
           data,
-          relationshipId: '', // Will be populated if needed for undo
+          relationshipId,
         }
         recordMutation(command)
       } catch (error) {
@@ -308,20 +318,25 @@ export function useCanvasMutations() {
 
   /**
    * Create a new comment with undo tracking.
+   * Generates the comment ID before creating so it can be stored in the command for undo.
    */
   const createComment = useCallback(
     async (data: CreateCommentData) => {
       try {
-        await createCommentAction(data)
+        // Generate ID before creating so we can store it in the command
+        const commentId = id()
         
-        // Record mutation for undo
+        // Create the comment with the generated ID
+        await createCommentAction(data, commentId)
+        
+        // Record mutation for undo with the comment ID
         const command: CreateCommentCommand = {
           type: 'createComment',
           id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           timestamp: Date.now(),
           operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
           data,
-          commentId: '', // Will be populated if needed for undo
+          commentId,
         }
         recordMutation(command)
       } catch (error) {

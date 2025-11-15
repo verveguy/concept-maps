@@ -96,7 +96,7 @@ export function useRelationshipActions() {
    * Create a new relationship between two concepts.
    * 
    * Creates a relationship with the provided data and links it to the specified map
-   * and concepts. The relationship ID is automatically generated. Timestamps
+   * and concepts. The relationship ID is automatically generated if not provided. Timestamps
    * (`createdAt`, `updatedAt`) are set to the current time.
    * 
    * **Directional Labels:**
@@ -114,6 +114,9 @@ export function useRelationshipActions() {
    * @param relationship.reverseLabel - Label for target → source direction (defaults to primaryLabel)
    * @param relationship.notes - Optional markdown notes (defaults to empty string)
    * @param relationship.metadata - Optional metadata object (defaults to empty object)
+   * @param relationshipId - Optional relationship ID. If not provided, one will be generated.
+   * 
+   * @returns The relationship ID (either provided or generated)
    * 
    * @throws Error if the transaction fails or concepts don't exist
    * 
@@ -132,10 +135,10 @@ export function useRelationshipActions() {
    * })
    * ```
    */
-  const createRelationship = async (relationship: CreateRelationshipData) => {
-    const relationshipId = id()
+  const createRelationship = async (relationship: CreateRelationshipData, relationshipId?: string): Promise<string> => {
+    const finalRelationshipId = relationshipId || id()
     await db.transact([
-      tx.relationships[relationshipId]
+      tx.relationships[finalRelationshipId]
         .update({
           primaryLabel: relationship.primaryLabel,
           reverseLabel: relationship.reverseLabel || relationship.primaryLabel,
@@ -150,6 +153,8 @@ export function useRelationshipActions() {
           toConcept: relationship.toConceptId,
         }),
     ])
+    
+    return finalRelationshipId
   }
 
   /**

@@ -85,7 +85,7 @@ export function useCommentActions() {
    * 
    * Creates a comment with the provided data and links it to the specified map,
    * creator (current user), and optionally to concepts. The comment ID is
-   * automatically generated. Timestamps (`createdAt`, `updatedAt`) are set to
+   * automatically generated if not provided. Timestamps (`createdAt`, `updatedAt`) are set to
    * the current time.
    * 
    * @param comment - Comment data to create
@@ -93,6 +93,9 @@ export function useCommentActions() {
    * @param comment.text - Comment text content
    * @param comment.position - X/Y coordinates on the canvas
    * @param comment.conceptIds - Optional array of concept IDs to link this comment to
+   * @param commentId - Optional comment ID. If not provided, one will be generated.
+   * 
+   * @returns The comment ID (either provided or generated)
    * 
    * @throws Error if the transaction fails or user is not authenticated
    * 
@@ -108,14 +111,14 @@ export function useCommentActions() {
    * })
    * ```
    */
-  const createComment = async (comment: CreateCommentData) => {
+  const createComment = async (comment: CreateCommentData, commentId?: string): Promise<string> => {
     if (!auth.user?.id) {
       throw new Error('User must be authenticated to create comments')
     }
 
-    const commentId = id()
+    const finalCommentId = commentId || id()
     const transactions: Parameters<typeof db.transact>[0] = [
-      tx.comments[commentId]
+      tx.comments[finalCommentId]
         .update({
           text: comment.text,
           positionX: comment.position.x,
@@ -129,11 +132,12 @@ export function useCommentActions() {
     // Link to concepts if provided
     if (comment.conceptIds && comment.conceptIds.length > 0) {
       comment.conceptIds.forEach((conceptId) => {
-        transactions.push(tx.comments[commentId].link({ concepts: conceptId }))
+        transactions.push(tx.comments[finalCommentId].link({ concepts: conceptId }))
       })
     }
 
     await db.transact(transactions)
+    return finalCommentId
   }
 
   /**

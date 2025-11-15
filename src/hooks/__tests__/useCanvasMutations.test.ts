@@ -75,14 +75,18 @@ describe('useCanvasMutations', () => {
         await result.current.createConcept(conceptData)
       })
 
-      // Verify action was called
-      expect(mockCreateConcept).toHaveBeenCalledWith(conceptData)
+      // Verify action was called with data and generated ID
+      expect(mockCreateConcept).toHaveBeenCalledWith(
+        conceptData,
+        expect.any(String) // ID is generated before calling action
+      )
 
-      // Verify mutation was recorded
+      // Verify mutation was recorded with concept ID
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(1)
       expect(mutations[0].type).toBe('createConcept')
       expect((mutations[0] as any).data).toEqual(conceptData)
+      expect((mutations[0] as any).conceptId).toBeTruthy() // ID should be populated
     })
 
     it('should update a concept and record mutation', async () => {
@@ -174,14 +178,18 @@ describe('useCanvasMutations', () => {
         await result.current.createRelationship(relationshipData)
       })
 
-      // Verify action was called
-      expect(mockCreateRelationship).toHaveBeenCalledWith(relationshipData)
+      // Verify action was called with data and generated ID
+      expect(mockCreateRelationship).toHaveBeenCalledWith(
+        relationshipData,
+        expect.any(String) // ID is generated before calling action
+      )
 
-      // Verify mutation was recorded
+      // Verify mutation was recorded with relationship ID
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(1)
       expect(mutations[0].type).toBe('createRelationship')
       expect((mutations[0] as any).data).toEqual(relationshipData)
+      expect((mutations[0] as any).relationshipId).toBeTruthy() // ID should be populated
     })
 
     it('should update a relationship and record mutation', async () => {
@@ -246,14 +254,18 @@ describe('useCanvasMutations', () => {
         await result.current.createComment(commentData)
       })
 
-      // Verify action was called
-      expect(mockCreateComment).toHaveBeenCalledWith(commentData)
+      // Verify action was called with data and generated ID
+      expect(mockCreateComment).toHaveBeenCalledWith(
+        commentData,
+        expect.any(String) // ID is generated before calling action
+      )
 
-      // Verify mutation was recorded
+      // Verify mutation was recorded with comment ID
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(1)
       expect(mutations[0].type).toBe('createComment')
       expect((mutations[0] as any).data).toEqual(commentData)
+      expect((mutations[0] as any).commentId).toBeTruthy() // ID should be populated
     })
 
     it('should update a comment and record mutation', async () => {
