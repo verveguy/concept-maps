@@ -127,6 +127,18 @@ export interface CanvasState {
   /** Set Option/Alt key pressed state */
   setIsOptionKeyPressed: (pressed: boolean) => void
 
+  // Drag start position tracking (for undo/redo)
+  /** Map of node ID to initial position when drag started */
+  dragStartPositions: Map<string, { x: number; y: number }>
+  /** Set drag start position for a node */
+  setDragStartPosition: (nodeId: string, position: { x: number; y: number }) => void
+  /** Get drag start position for a node */
+  getDragStartPosition: (nodeId: string) => { x: number; y: number } | undefined
+  /** Clear drag start position for a node */
+  clearDragStartPosition: (nodeId: string) => void
+  /** Clear all drag start positions */
+  clearAllDragStartPositions: () => void
+
   // Reset/clear functions
   /** Reset all canvas state (useful when switching maps) */
   resetCanvasState: () => void
@@ -148,6 +160,7 @@ const INITIAL_RESETTABLE_STATE = {
   pendingConcept: null as PendingConcept | null,
   prevConceptIds: new Set<string>(),
   applyIncrementalLayoutForNewNodes: null as ((newNodeIds: Set<string>, layoutType?: LayoutType) => Promise<void>) | null,
+  dragStartPositions: new Map<string, { x: number; y: number }>(),
 } as const
 
 /**
@@ -248,6 +261,25 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   isOptionKeyPressed: false,
   setIsOptionKeyPressed: (pressed) => set({ isOptionKeyPressed: pressed }),
 
+  // Drag start position tracking
+  dragStartPositions: INITIAL_RESETTABLE_STATE.dragStartPositions,
+  setDragStartPosition: (nodeId, position) =>
+    set((state) => {
+      const newMap = new Map(state.dragStartPositions)
+      newMap.set(nodeId, position)
+      return { dragStartPositions: newMap }
+    }),
+  getDragStartPosition: (nodeId) => {
+    return get().dragStartPositions.get(nodeId)
+  },
+  clearDragStartPosition: (nodeId) =>
+    set((state) => {
+      const newMap = new Map(state.dragStartPositions)
+      newMap.delete(nodeId)
+      return { dragStartPositions: newMap }
+    }),
+  clearAllDragStartPositions: () => set({ dragStartPositions: INITIAL_RESETTABLE_STATE.dragStartPositions }),
+
   // Reset function - resets all resettable state to initial values
   // Note: selectedLayout and hasCheckedInitialConcept are preserved
   // as they are user preferences and should persist across map switches
@@ -264,6 +296,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       pendingConcept: INITIAL_RESETTABLE_STATE.pendingConcept,
       prevConceptIds: new Set<string>(),
       applyIncrementalLayoutForNewNodes: INITIAL_RESETTABLE_STATE.applyIncrementalLayoutForNewNodes,
+      dragStartPositions: new Map<string, { x: number; y: number }>(),
       // Preserve user preferences
       selectedLayout: currentState.selectedLayout,
       hasCheckedInitialConcept: currentState.hasCheckedInitialConcept,
