@@ -89,7 +89,7 @@ export function usePerspectiveActions() {
    * Create a new perspective.
    * 
    * Creates a perspective with the provided name and concept/relationship selections.
-   * The perspective ID is automatically generated. The `createdAt` timestamp is
+   * The perspective ID is automatically generated if not provided. The `createdAt` timestamp is
    * set to the current time, and the perspective is linked to the authenticated user
    * as the creator.
    * 
@@ -104,6 +104,9 @@ export function usePerspectiveActions() {
    * @param perspective.name - Display name for the perspective
    * @param perspective.conceptIds - Optional array of concept IDs to include (defaults to empty array)
    * @param perspective.relationshipIds - Optional array of relationship IDs to include (defaults to empty array)
+   * @param perspectiveId - Optional perspective ID. If not provided, one will be generated.
+   * 
+   * @returns The perspective ID (either provided or generated)
    * 
    * @throws Error if user is not authenticated or the transaction fails
    * 
@@ -119,12 +122,12 @@ export function usePerspectiveActions() {
    * })
    * ```
    */
-  const createPerspective = async (perspective: CreatePerspectiveData) => {
+  const createPerspective = async (perspective: CreatePerspectiveData, perspectiveId?: string): Promise<string> => {
     if (!auth.user?.id) throw new Error('User must be authenticated')
 
-    const perspectiveId = id()
+    const finalPerspectiveId = perspectiveId || id()
     await db.transact([
-      tx.perspectives[perspectiveId]
+      tx.perspectives[finalPerspectiveId]
         .update({
           name: perspective.name,
           conceptIds: JSON.stringify(perspective.conceptIds || []),
@@ -136,6 +139,8 @@ export function usePerspectiveActions() {
           creator: auth.user.id,
         }),
     ])
+    
+    return finalPerspectiveId
   }
 
   /**

@@ -35,6 +35,11 @@ export type MutationType =
   | 'linkCommentToConcept'
   | 'unlinkCommentFromConcept'
   | 'updateMap'
+  | 'createPerspective'
+  | 'updatePerspective'
+  | 'deletePerspective'
+  | 'toggleConceptInPerspective'
+  | 'toggleRelationshipInPerspective'
 
 /**
  * Base mutation command interface.
@@ -166,6 +171,61 @@ export interface UpdateMapCommand extends MutationCommand {
 }
 
 /**
+ * Perspective mutation commands.
+ */
+export interface CreatePerspectiveCommand extends MutationCommand {
+  type: 'createPerspective'
+  perspectiveId: string
+  mapId: string
+  name: string
+  conceptIds: string[]
+  relationshipIds: string[]
+}
+
+export interface UpdatePerspectiveCommand extends MutationCommand {
+  type: 'updatePerspective'
+  perspectiveId: string
+  updates: {
+    name?: string
+    conceptIds?: string[]
+    relationshipIds?: string[]
+  }
+  previousState?: {
+    name?: string
+    conceptIds?: string[]
+    relationshipIds?: string[]
+  }
+}
+
+export interface DeletePerspectiveCommand extends MutationCommand {
+  type: 'deletePerspective'
+  perspectiveId: string
+  previousState: {
+    mapId: string
+    name: string
+    conceptIds: string[]
+    relationshipIds: string[]
+  }
+}
+
+export interface ToggleConceptInPerspectiveCommand extends MutationCommand {
+  type: 'toggleConceptInPerspective'
+  perspectiveId: string
+  conceptId: string
+  wasIncluded: boolean
+  previousConceptIds: string[]
+  previousRelationshipIds: string[]
+}
+
+export interface ToggleRelationshipInPerspectiveCommand extends MutationCommand {
+  type: 'toggleRelationshipInPerspective'
+  perspectiveId: string
+  relationshipId: string
+  wasIncluded: boolean
+  previousRelationshipIds: string[]
+}
+
+/**
  * Union type of all mutation commands.
  */
 export type MutationCommandUnion =
@@ -182,6 +242,11 @@ export type MutationCommandUnion =
   | LinkCommentToConceptCommand
   | UnlinkCommentFromConceptCommand
   | UpdateMapCommand
+  | CreatePerspectiveCommand
+  | UpdatePerspectiveCommand
+  | DeletePerspectiveCommand
+  | ToggleConceptInPerspectiveCommand
+  | ToggleRelationshipInPerspectiveCommand
 
 /**
  * Represents a deletion entry in the undo history.
@@ -214,23 +279,45 @@ const MAX_MUTATION_HISTORY_SIZE = 100
 const OPERATION_TIME_WINDOW_MS = 1000 // 1 second
 
 /**
- * Generate a unique command ID.
- * Uses a consistent format: cmd_timestamp_random
+ * Generate a unique command ID using UUID v4.
+ * Uses the same UUID format as InstantDB for consistency.
  * 
- * @returns A unique command ID string
+ * @returns A unique command ID string (UUID v4)
  */
 export function generateCommandId(): string {
-  return `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  // Use crypto.randomUUID() if available (modern browsers and Node.js 19.6+)
+  // Fallback to manual UUID generation for older environments
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  
+  // Fallback UUID v4 generation
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
 }
 
 /**
- * Generate a unique operation ID.
- * Uses a consistent format: op_timestamp_random
+ * Generate a unique operation ID using UUID v4.
+ * Uses the same UUID format as InstantDB for consistency.
  * 
- * @returns A unique operation ID string
+ * @returns A unique operation ID string (UUID v4)
  */
 export function generateOperationId(): string {
-  return `op_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  // Use crypto.randomUUID() if available (modern browsers and Node.js 19.6+)
+  // Fallback to manual UUID generation for older environments
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  
+  // Fallback UUID v4 generation
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
 }
 
 /**
@@ -281,6 +368,10 @@ export interface UndoState {
   canRedo: () => boolean
   /** Check if undo is available */
   canUndo: () => boolean
+  /** Flag to prevent recording mutations during redo execution */
+  isRedoing: boolean
+  /** Set the isRedoing flag */
+  setIsRedoing: (value: boolean) => void
 }
 
 /**
@@ -293,6 +384,8 @@ export const useUndoStore = create<UndoState>((set, get) => ({
   redoStack: [],
   currentOperationId: null,
   currentOperationStartTime: null,
+  isRedoing: false,
+  setIsRedoing: (value) => set({ isRedoing: value }),
   
   startOperation: () => {
     const operationId = generateOperationId()
@@ -363,9 +456,16 @@ export const useUndoStore = create<UndoState>((set, get) => ({
   },
   
   recordMutation: (command) => {
-    set((state) => {
+    const state = get()
+    
+    // Skip recording if we're currently redoing (prevents double-recording)
+    if (state.isRedoing) {
+      return
+    }
+    
+    set((currentState) => {
       // Clear redo stack when new mutations are recorded (standard undo/redo behavior)
-      const newHistory = [command, ...state.mutationHistory]
+      const newHistory = [command, ...currentState.mutationHistory]
       
       // Trim history if it exceeds max size
       if (newHistory.length > MAX_MUTATION_HISTORY_SIZE) {

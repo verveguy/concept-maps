@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { X, Trash2, Eye, Edit } from 'lucide-react'
-import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
+import { usePerspectiveMutations } from '@/hooks/usePerspectiveMutations'
 import { usePerspectives } from '@/hooks/usePerspectives'
 import { useMapStore } from '@/stores/mapStore'
 import { useAllRelationships } from '@/hooks/useRelationships'
@@ -124,7 +124,7 @@ export function PerspectiveEditor() {
       createdAt: new Date(r.createdAt),
       updatedAt: new Date(r.updatedAt),
     })) || []
-  const { updatePerspective, deletePerspective, toggleConceptInPerspective, toggleRelationshipInPerspective } = usePerspectiveActions()
+  const { updatePerspective, deletePerspective, toggleConceptInPerspective, toggleRelationshipInPerspective } = usePerspectiveMutations()
 
   const perspective = perspectives.find((p) => p.id === currentPerspectiveId)
 
@@ -151,6 +151,8 @@ export function PerspectiveEditor() {
     try {
       await updatePerspective(currentPerspectiveId, {
         name: name.trim(),
+      }, {
+        name: perspective.name,
       })
     } catch (error) {
       console.error('Failed to update perspective name:', error)
@@ -168,7 +170,13 @@ export function PerspectiveEditor() {
 
     setIsDeleting(true)
     try {
-      await deletePerspective(currentPerspectiveId)
+      // Capture previous state before deletion for undo support
+      await deletePerspective(currentPerspectiveId, {
+        mapId: perspective.mapId,
+        name: perspective.name,
+        conceptIds: perspective.conceptIds,
+        relationshipIds: perspective.relationshipIds,
+      })
       setCurrentPerspectiveId(null) // Clear selection after deletion
       setIsEditingPerspective(false)
     } catch (error) {

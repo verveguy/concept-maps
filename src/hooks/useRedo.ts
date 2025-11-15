@@ -6,6 +6,7 @@
 
 import { useCallback } from 'react'
 import { useCanvasMutations } from './useCanvasMutations'
+import { usePerspectiveMutations } from './usePerspectiveMutations'
 import { useUndoStore, type MutationCommandUnion } from '@/stores/undoStore'
 
 /**
@@ -32,10 +33,20 @@ export function useRedo() {
     updateMap,
   } = useCanvasMutations()
   
+  // Use perspective mutations hooks so mutations are properly recorded for undo
+  const {
+    createPerspective,
+    updatePerspective,
+    deletePerspective,
+    toggleConceptInPerspective,
+    toggleRelationshipInPerspective,
+  } = usePerspectiveMutations()
+  
   const {
     getMostRecentRedoOperation,
     removeMostRecentRedoOperation,
     canRedo,
+    setIsRedoing,
   } = useUndoStore()
 
   /**
@@ -132,6 +143,49 @@ export function useRedo() {
           await updateMap(command.mapId, command.updates, command.previousState)
           return true
         }
+        case 'createPerspective': {
+          // Re-execute create: create the perspective again with original data
+          await createPerspective({
+            mapId: command.mapId,
+            name: command.name,
+            conceptIds: command.conceptIds,
+            relationshipIds: command.relationshipIds,
+          })
+          return true
+        }
+        case 'updatePerspective': {
+          // Re-execute update: apply the same updates again
+          await updatePerspective(command.perspectiveId, command.updates, command.previousState)
+          return true
+        }
+        case 'deletePerspective': {
+          // Re-execute delete: delete the perspective again
+          await deletePerspective(command.perspectiveId, command.previousState)
+          return true
+        }
+        case 'toggleConceptInPerspective': {
+          // Re-execute toggle: toggle again
+          // We need allRelationships - for redo, relationships should be in current state
+          // Pass empty array for now - the action will handle relationship updates
+          const allRelationships: Array<{ id: string; fromConceptId: string; toConceptId: string }> = []
+          await toggleConceptInPerspective(
+            command.perspectiveId,
+            command.conceptId,
+            command.previousConceptIds,
+            command.previousRelationshipIds,
+            allRelationships
+          )
+          return true
+        }
+        case 'toggleRelationshipInPerspective': {
+          // Re-execute toggle: toggle again
+          await toggleRelationshipInPerspective(
+            command.perspectiveId,
+            command.relationshipId,
+            command.previousRelationshipIds
+          )
+          return true
+        }
         default: {
           // This should never happen due to exhaustive type checking
           const _exhaustive: never = command
@@ -157,6 +211,11 @@ export function useRedo() {
     linkCommentToConcept,
     unlinkCommentFromConcept,
     updateMap,
+    createPerspective,
+    updatePerspective,
+    deletePerspective,
+    toggleConceptInPerspective,
+    toggleRelationshipInPerspective,
   ])
 
   /**
@@ -197,6 +256,9 @@ export function useRedo() {
 
     console.log('Attempting to redo operation with', operation.length, 'commands:', operation)
     
+    // Set isRedoing flag to prevent mutations from being recorded during redo
+    setIsRedoing(true)
+    
     try {
       // Remove from redo stack BEFORE re-executing to avoid race condition
       // (re-execution will trigger recordMutation which clears redo stack)
@@ -213,7 +275,7 @@ export function useRedo() {
       const allSucceeded = results.every((r) => r === true)
       
       if (allSucceeded || results.some((r) => r === true)) {
-        // Mutations will be re-recorded by useCanvasMutations hooks when re-executed
+        // Mutations are NOT re-recorded because isRedoing flag prevents recordMutation
         console.log('Redo successful - re-executed', operation.length, 'commands')
         return true
       } else {
@@ -223,11 +285,15 @@ export function useRedo() {
     } catch (error) {
       console.error('Failed to redo operation:', error)
       return false
+    } finally {
+      // Always clear the isRedoing flag, even if redo fails
+      setIsRedoing(false)
     }
   }, [
     getMostRecentRedoOperation,
     removeMostRecentRedoOperation,
     reexecuteCommand,
+    setIsRedoing,
   ])
 
   return {
