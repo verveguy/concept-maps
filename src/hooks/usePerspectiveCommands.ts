@@ -1,11 +1,11 @@
 /**
- * Perspective mutations hook.
+ * Perspective commands hook.
  * 
- * Wraps all perspective mutations with undo tracking and operation grouping.
- * Provides a consistent mutation interface for perspective operations.
+ * Wraps all perspective actions with command tracking and operation grouping.
+ * Provides a consistent command interface for perspective operations.
  * 
- * This hook implements the Command Pattern, where each mutation is recorded
- * as a command that can be executed and undone. Mutations are automatically
+ * This hook implements the Command Pattern, where each action is recorded
+ * as a command that can be executed and undone. Commands are automatically
  * grouped into operations for better undo/redo behavior.
  */
 
@@ -22,14 +22,14 @@ import type {
 } from '@/stores/undoStore'
 
 /**
- * Hook for perspective mutations with undo tracking.
+ * Hook for perspective commands with undo tracking.
  * 
- * Wraps all perspective mutation actions and automatically records them for undo/redo.
- * Mutations are grouped into operations for better undo behavior.
+ * Wraps all perspective action hooks and automatically records them as commands for undo/redo.
+ * Commands are grouped into operations for better undo behavior.
  * 
- * @returns Object containing wrapped perspective mutation functions
+ * @returns Object containing wrapped perspective command functions
  */
-export function usePerspectiveMutations() {
+export function usePerspectiveCommands() {
   const {
     createPerspective: createPerspectiveAction,
     updatePerspective: updatePerspectiveAction,
@@ -45,7 +45,7 @@ export function usePerspectiveMutations() {
   } = useUndoStore()
 
   /**
-   * Create a new perspective with undo tracking.
+   * Create a new perspective with command tracking.
    * Generates the perspective ID before creating so it can be stored in the command for undo.
    */
   const createPerspective = useCallback(
@@ -57,7 +57,7 @@ export function usePerspectiveMutations() {
         // Create the perspective with the generated ID
         await createPerspectiveAction(data, perspectiveId)
         
-        // Record mutation for undo with the perspective ID
+        // Record command for undo with the perspective ID
         const command: CreatePerspectiveCommand = {
           type: 'createPerspective',
           id: generateCommandId(),
@@ -79,12 +79,12 @@ export function usePerspectiveMutations() {
   )
 
   /**
-   * Update a perspective with undo tracking.
+   * Update a perspective with command tracking.
    * 
    * @param perspectiveId - ID of the perspective to update
    * @param updates - Partial perspective data to update
    * @param previousState - Optional previous state for undo support. If not provided,
-   *                        the mutation will be recorded without previousState (undo may not work properly).
+   *                        the command will be recorded without previousState (undo may not work properly).
    */
   const updatePerspective = useCallback(
     async (
@@ -99,7 +99,7 @@ export function usePerspectiveMutations() {
       try {
         await updatePerspectiveAction(perspectiveId, updates)
         
-        // Record mutation for undo
+        // Record command for undo
         const command: UpdatePerspectiveCommand = {
           type: 'updatePerspective',
           id: generateCommandId(),
@@ -119,7 +119,7 @@ export function usePerspectiveMutations() {
   )
 
   /**
-   * Delete a perspective with undo tracking.
+   * Delete a perspective with command tracking.
    * Captures previous state before deletion for undo support.
    */
   const deletePerspective = useCallback(
@@ -135,7 +135,7 @@ export function usePerspectiveMutations() {
       try {
         await deletePerspectiveAction(perspectiveId)
         
-        // Record mutation for undo
+        // Record command for undo
         const command: DeletePerspectiveCommand = {
           type: 'deletePerspective',
           id: generateCommandId(),
@@ -154,7 +154,7 @@ export function usePerspectiveMutations() {
   )
 
   /**
-   * Toggle a concept's inclusion in a perspective with undo tracking.
+   * Toggle a concept's inclusion in a perspective with command tracking.
    */
   const toggleConceptInPerspective = useCallback(
     async (
@@ -178,7 +178,7 @@ export function usePerspectiveMutations() {
           allRelationships
         )
         
-        // Record mutation for undo
+        // Record command for undo
         const command: ToggleConceptInPerspectiveCommand = {
           type: 'toggleConceptInPerspective',
           id: generateCommandId(),
@@ -200,7 +200,7 @@ export function usePerspectiveMutations() {
   )
 
   /**
-   * Toggle a relationship's inclusion in a perspective with undo tracking.
+   * Toggle a relationship's inclusion in a perspective with command tracking.
    */
   const toggleRelationshipInPerspective = useCallback(
     async (
@@ -219,7 +219,7 @@ export function usePerspectiveMutations() {
           currentRelationshipIds
         )
         
-        // Record mutation for undo
+        // Record command for undo
         const command: ToggleRelationshipInPerspectiveCommand = {
           type: 'toggleRelationshipInPerspective',
           id: generateCommandId(),

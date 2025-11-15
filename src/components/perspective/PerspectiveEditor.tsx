@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { X, Trash2, Eye, Edit } from 'lucide-react'
-import { usePerspectiveMutations } from '@/hooks/usePerspectiveMutations'
+import { usePerspectiveCommands } from '@/hooks/usePerspectiveCommands'
 import { usePerspectives } from '@/hooks/usePerspectives'
 import { useMapStore } from '@/stores/mapStore'
 import { useAllRelationships } from '@/hooks/useRelationships'
@@ -124,7 +124,7 @@ export function PerspectiveEditor() {
       createdAt: new Date(r.createdAt),
       updatedAt: new Date(r.updatedAt),
     })) || []
-  const { updatePerspective, deletePerspective, toggleConceptInPerspective, toggleRelationshipInPerspective } = usePerspectiveMutations()
+  const { updatePerspective, deletePerspective, toggleConceptInPerspective, toggleRelationshipInPerspective } = usePerspectiveCommands()
 
   const perspective = perspectives.find((p) => p.id === currentPerspectiveId)
 

@@ -23,7 +23,7 @@ import type {
   UpdateMapCommand,
 } from '../../stores/undoStore'
 
-// Mock useCanvasMutations
+// Mock useCanvasCommands
 const mockCreateConcept = vi.fn().mockResolvedValue(undefined)
 const mockUpdateConcept = vi.fn().mockResolvedValue(undefined)
 const mockDeleteConcept = vi.fn().mockResolvedValue(undefined)
@@ -38,8 +38,8 @@ const mockLinkCommentToConcept = vi.fn().mockResolvedValue(undefined)
 const mockUnlinkCommentFromConcept = vi.fn().mockResolvedValue(undefined)
 const mockUpdateMap = vi.fn().mockResolvedValue(undefined)
 
-vi.mock('../useCanvasMutations', () => ({
-  useCanvasMutations: () => ({
+vi.mock('../useCanvasCommands', () => ({
+  useCanvasCommands: () => ({
     createConcept: mockCreateConcept,
     updateConcept: mockUpdateConcept,
     deleteConcept: mockDeleteConcept,

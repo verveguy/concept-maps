@@ -30,7 +30,7 @@
  * import { useConceptNodePreview } from '@/hooks/useConceptNodePreview'
  * 
  * function ConceptNode({ concept, nodeRef }) {
- *   const { updateConcept } = useCanvasMutations()
+ *   const { updateConcept } = useCanvasCommands()
  *   const {
  *     isPreviewingNotes,
  *     previewTransform,

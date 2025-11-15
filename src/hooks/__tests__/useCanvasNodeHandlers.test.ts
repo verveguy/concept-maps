@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useCanvasNodeHandlers } from '../useCanvasNodeHandlers'
-import { useCanvasMutations } from '../useCanvasMutations'
+import { useCanvasCommands } from '../useCanvasCommands'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useMapStore } from '@/stores/mapStore'
@@ -23,8 +23,8 @@ const mockSetDragStartPosition = vi.fn()
 const mockClearDragStartPosition = vi.fn()
 
 // Mock dependencies
-vi.mock('../useCanvasMutations', () => ({
-  useCanvasMutations: vi.fn(() => ({
+vi.mock('../useCanvasCommands', () => ({
+  useCanvasCommands: vi.fn(() => ({
     deleteConcept: vi.fn().mockResolvedValue(undefined),
     deleteComment: vi.fn().mockResolvedValue(undefined),
     deleteRelationship: vi.fn().mockResolvedValue(undefined),
@@ -248,7 +248,7 @@ describe('useCanvasNodeHandlers', () => {
       const mockEndOperation = vi.fn()
 
       // Set up mocks before rendering hook
-      vi.mocked(useCanvasMutations).mockReturnValue({
+      vi.mocked(useCanvasCommands).mockReturnValue({
         deleteConcept: mockDeleteConcept,
         deleteComment: vi.fn().mockResolvedValue(undefined),
         deleteRelationship: mockDeleteRelationship,
@@ -291,7 +291,7 @@ describe('useCanvasNodeHandlers', () => {
       const mockStartOperation = vi.fn()
       const mockEndOperation = vi.fn()
 
-      vi.mocked(useCanvasMutations).mockReturnValue({
+      vi.mocked(useCanvasCommands).mockReturnValue({
         deleteConcept: vi.fn(),
         deleteComment: mockDeleteComment,
         deleteRelationship: vi.fn(),
@@ -401,7 +401,7 @@ describe('useCanvasNodeHandlers', () => {
         .mockReturnValueOnce(Date.now() - 50) // Second call - recent update (within throttle)
         .mockReturnValueOnce(Date.now() - 150) // Third call - old update (outside throttle)
 
-      vi.mocked(useCanvasMutations).mockReturnValue({
+      vi.mocked(useCanvasCommands).mockReturnValue({
         deleteConcept: vi.fn(),
         deleteComment: vi.fn(),
         deleteRelationship: vi.fn(),
@@ -500,7 +500,7 @@ describe('useCanvasNodeHandlers', () => {
     it('should update comment position', async () => {
       const mockUpdateComment = vi.fn().mockResolvedValue(undefined)
 
-      vi.mocked(useCanvasMutations).mockReturnValue({
+      vi.mocked(useCanvasCommands).mockReturnValue({
         deleteConcept: vi.fn(),
         deleteComment: vi.fn(),
         deleteRelationship: vi.fn(),
@@ -546,7 +546,7 @@ describe('useCanvasNodeHandlers', () => {
       const mockUpdateConcept = vi.fn().mockResolvedValue(undefined)
       const mockSetLastUpdateTime = vi.fn()
 
-      vi.mocked(useCanvasMutations).mockReturnValue({
+      vi.mocked(useCanvasCommands).mockReturnValue({
         deleteConcept: vi.fn(),
         deleteComment: vi.fn(),
         deleteRelationship: vi.fn(),
@@ -600,7 +600,7 @@ describe('useCanvasNodeHandlers', () => {
     it('should not update if position unchanged', async () => {
       const mockUpdateConcept = vi.fn().mockResolvedValue(undefined)
 
-      vi.mocked(useCanvasMutations).mockReturnValue({
+      vi.mocked(useCanvasCommands).mockReturnValue({
         deleteConcept: vi.fn(),
         deleteComment: vi.fn(),
         deleteRelationship: vi.fn(),

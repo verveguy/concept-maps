@@ -8,7 +8,7 @@
 import { useState, useEffect } from 'react'
 import { Pencil, Check, Trash2, Circle, Eye, EyeOff } from 'lucide-react'
 import { useUIStore } from '@/stores/uiStore'
-import { useCanvasMutations } from '@/hooks/useCanvasMutations'
+import { useCanvasCommands } from '@/hooks/useCanvasCommands'
 import { useCommentActions } from '@/hooks/useCommentActions'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { useUndoStore } from '@/stores/undoStore'
@@ -399,7 +399,7 @@ export function NodeToolbar({
   onEdit,
 }: NodeToolbarProps) {
   const { hasWriteAccess } = useMapPermissions()
-  const { updateConcept, deleteConcept } = useCanvasMutations()
+  const { updateConcept, deleteConcept } = useCanvasCommands()
   const { resolveComment, unresolveComment, deleteComment } = useCommentActions()
   const setConceptEditorOpen = useUIStore((state) => state.setConceptEditorOpen)
   const setSelectedCommentId = useUIStore((state) => state.setSelectedCommentId)

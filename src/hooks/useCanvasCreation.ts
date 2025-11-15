@@ -10,7 +10,7 @@
 
 import { useEffect } from 'react'
 import type { Node } from 'reactflow'
-import { useCanvasMutations } from './useCanvasMutations'
+import { useCanvasCommands } from './useCanvasCommands'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { useMapStore } from '@/stores/mapStore'
 import type { Concept } from '@/lib/schema'
@@ -37,7 +37,7 @@ export function useCanvasCreation(options: UseCanvasCreationOptions) {
 
   const {
     createRelationship,
-  } = useCanvasMutations()
+  } = useCanvasCommands()
 
   const {
     pendingConcept,

@@ -77,7 +77,7 @@ import { useCanvasDataSync } from '@/hooks/useCanvasDataSync'
 import { useCanvasCreation } from '@/hooks/useCanvasCreation'
 import { useCanvasDeepLinking } from '@/hooks/useCanvasDeepLinking'
 import { useCanvasPresence } from '@/hooks/useCanvasPresence'
-import { useCanvasMutations } from '@/hooks/useCanvasMutations'
+import { useCanvasCommands } from '@/hooks/useCanvasCommands'
 import type { LayoutType } from '@/lib/layouts'
 import { useUIStore } from '@/stores/uiStore'
 import { useMapStore } from '@/stores/mapStore'
@@ -309,7 +309,7 @@ const ConceptMapCanvasInner = forwardRef<ConceptMapCanvasRef, ConceptMapCanvasPr
   })
   
   // Get mutation hooks for undo/redo tracking
-  const { updateConcept, updateComment, startOperation, endOperation } = useCanvasMutations()
+  const { updateConcept, updateComment, startOperation, endOperation } = useCanvasCommands()
   
   // Handler to pin all nodes (set userPlaced: true on all concepts and comments)
   const handlePinNodes = useCallback(async () => {

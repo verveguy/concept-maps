@@ -4,8 +4,8 @@ import type { ConceptNodeData } from '@/lib/reactFlowTypes'
 import { useUIStore } from '@/stores/uiStore'
 import { useMapStore } from '@/stores/mapStore'
 import { useCanvasStore } from '@/stores/canvasStore'
-import { useCanvasMutations } from '@/hooks/useCanvasMutations'
-import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
+import { useCanvasCommands } from '@/hooks/useCanvasCommands'
+import { usePerspectiveCommands } from '@/hooks/usePerspectiveCommands'
 import { usePresence } from '@/hooks/usePresence'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { usePerspectives } from '@/hooks/usePerspectives'
@@ -58,8 +58,8 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   const selectedConceptId = useUIStore((state) => state.selectedConceptId)
   const conceptEditorOpen = useUIStore((state) => state.conceptEditorOpen)
   const setConceptEditorOpen = useUIStore((state) => state.setConceptEditorOpen)
-  const { updateConcept } = useCanvasMutations()
-  const { toggleConceptInPerspective } = usePerspectiveActions()
+  const { updateConcept } = useCanvasCommands()
+  const { toggleConceptInPerspective } = usePerspectiveCommands()
   const { otherUsersPresence } = usePresence()
   const { hasWriteAccess } = useMapPermissions()
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)

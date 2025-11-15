@@ -6,13 +6,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useCanvasCreation } from '../useCanvasCreation'
-import { useCanvasMutations } from '../useCanvasMutations'
+import { useCanvasCommands } from '../useCanvasCommands'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { useMapStore } from '@/stores/mapStore'
 import type { Concept } from '@/lib/schema'
 
 // Mock dependencies
-vi.mock('../useCanvasMutations')
+vi.mock('../useCanvasCommands')
 vi.mock('@/stores/canvasStore')
 vi.mock('@/stores/mapStore')
 
@@ -54,8 +54,8 @@ describe('useCanvasCreation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
-    // Mock useCanvasMutations
-    vi.mocked(useCanvasMutations).mockReturnValue({
+    // Mock useCanvasCommands
+    vi.mocked(useCanvasCommands).mockReturnValue({
       createRelationship: mockCreateRelationship,
       createConcept: vi.fn(),
       updateConcept: vi.fn(),

@@ -1,11 +1,11 @@
 /**
- * Tests for useCanvasMutations hook.
- * Verifies that mutations are wrapped correctly and recorded for undo.
+ * Tests for useCanvasCommands hook.
+ * Verifies that commands are wrapped correctly and recorded for undo.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
-import { useCanvasMutations } from '../useCanvasMutations'
+import { useCanvasCommands } from '../useCanvasCommands'
 import { useUndoStore } from '../../stores/undoStore'
 
 // Create mock functions
@@ -48,7 +48,7 @@ vi.mock('../useCommentActions', () => ({
   }),
 }))
 
-describe('useCanvasMutations', () => {
+describe('useCanvasCommands', () => {
   beforeEach(() => {
     // Reset stores
     useUndoStore.getState().clearHistory()
@@ -59,9 +59,9 @@ describe('useCanvasMutations', () => {
     vi.clearAllMocks()
   })
 
-  describe('concept mutations', () => {
-    it('should create a concept and record mutation', async () => {
-      const { result } = renderHook(() => useCanvasMutations())
+  describe('concept commands', () => {
+    it('should create a concept and record command', async () => {
+      const { result } = renderHook(() => useCanvasCommands())
 
       const conceptData = {
         mapId: 'map-1',
@@ -81,7 +81,7 @@ describe('useCanvasMutations', () => {
         expect.any(String) // ID is generated before calling action
       )
 
-      // Verify mutation was recorded with concept ID
+      // Verify command was recorded with concept ID
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(1)
       expect(mutations[0].type).toBe('createConcept')
@@ -89,8 +89,8 @@ describe('useCanvasMutations', () => {
       expect((mutations[0] as any).conceptId).toBeTruthy() // ID should be populated
     })
 
-    it('should update a concept and record mutation', async () => {
-      const { result } = renderHook(() => useCanvasMutations())
+    it('should update a concept and record command', async () => {
+      const { result } = renderHook(() => useCanvasCommands())
 
       const updates = {
         label: 'Updated Label',
@@ -104,7 +104,7 @@ describe('useCanvasMutations', () => {
       // Verify action was called
       expect(mockUpdateConcept).toHaveBeenCalledWith('concept-1', updates)
 
-      // Verify mutation was recorded
+      // Verify command was recorded
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(1)
       expect(mutations[0].type).toBe('updateConcept')
@@ -112,8 +112,8 @@ describe('useCanvasMutations', () => {
       expect((mutations[0] as any).updates).toEqual(updates)
     })
 
-    it('should delete a concept and record mutation', async () => {
-      const { result } = renderHook(() => useCanvasMutations())
+    it('should delete a concept and record command', async () => {
+      const { result } = renderHook(() => useCanvasCommands())
 
       await act(async () => {
         await result.current.deleteConcept('concept-1')
@@ -122,7 +122,7 @@ describe('useCanvasMutations', () => {
       // Verify action was called
       expect(mockDeleteConcept).toHaveBeenCalledWith('concept-1')
 
-      // Verify mutation was recorded
+      // Verify command was recorded
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(1)
       expect(mutations[0].type).toBe('deleteConcept')
@@ -136,7 +136,7 @@ describe('useCanvasMutations', () => {
     })
 
     it('should handle create concept errors', async () => {
-      const { result } = renderHook(() => useCanvasMutations())
+      const { result } = renderHook(() => useCanvasCommands())
       const error = new Error('Failed to create concept')
       mockCreateConcept.mockRejectedValueOnce(error)
 
@@ -153,7 +153,7 @@ describe('useCanvasMutations', () => {
         await expect(result.current.createConcept(conceptData)).rejects.toThrow('Failed to create concept')
       })
 
-      // Verify mutation was NOT recorded on error
+      // Verify command was NOT recorded on error
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(0)
 
@@ -162,9 +162,9 @@ describe('useCanvasMutations', () => {
     })
   })
 
-  describe('relationship mutations', () => {
-    it('should create a relationship and record mutation', async () => {
-      const { result } = renderHook(() => useCanvasMutations())
+  describe('relationship commands', () => {
+    it('should create a relationship and record command', async () => {
+      const { result } = renderHook(() => useCanvasCommands())
 
       const relationshipData = {
         mapId: 'map-1',
@@ -184,7 +184,7 @@ describe('useCanvasMutations', () => {
         expect.any(String) // ID is generated before calling action
       )
 
-      // Verify mutation was recorded with relationship ID
+      // Verify command was recorded with relationship ID
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(1)
       expect(mutations[0].type).toBe('createRelationship')
@@ -192,8 +192,8 @@ describe('useCanvasMutations', () => {
       expect((mutations[0] as any).relationshipId).toBeTruthy() // ID should be populated
     })
 
-    it('should update a relationship and record mutation', async () => {
-      const { result } = renderHook(() => useCanvasMutations())
+    it('should update a relationship and record command', async () => {
+      const { result } = renderHook(() => useCanvasCommands())
 
       const updates = {
         primaryLabel: 'updated label',
@@ -207,7 +207,7 @@ describe('useCanvasMutations', () => {
       // Verify action was called
       expect(mockUpdateRelationship).toHaveBeenCalledWith('rel-1', updates)
 
-      // Verify mutation was recorded
+      // Verify command was recorded
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(1)
       expect(mutations[0].type).toBe('updateRelationship')
@@ -215,8 +215,8 @@ describe('useCanvasMutations', () => {
       expect((mutations[0] as any).updates).toEqual(updates)
     })
 
-    it('should delete a relationship and record mutation', async () => {
-      const { result } = renderHook(() => useCanvasMutations())
+    it('should delete a relationship and record command', async () => {
+      const { result } = renderHook(() => useCanvasCommands())
 
       await act(async () => {
         await result.current.deleteRelationship('rel-1')
@@ -225,7 +225,7 @@ describe('useCanvasMutations', () => {
       // Verify action was called
       expect(mockDeleteRelationship).toHaveBeenCalledWith('rel-1')
 
-      // Verify mutation was recorded
+      // Verify command was recorded
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(1)
       expect(mutations[0].type).toBe('deleteRelationship')
@@ -239,9 +239,9 @@ describe('useCanvasMutations', () => {
     })
   })
 
-  describe('comment mutations', () => {
-    it('should create a comment and record mutation', async () => {
-      const { result } = renderHook(() => useCanvasMutations())
+  describe('comment commands', () => {
+    it('should create a comment and record command', async () => {
+      const { result } = renderHook(() => useCanvasCommands())
 
       const commentData = {
         mapId: 'map-1',
@@ -260,7 +260,7 @@ describe('useCanvasMutations', () => {
         expect.any(String) // ID is generated before calling action
       )
 
-      // Verify mutation was recorded with comment ID
+      // Verify command was recorded with comment ID
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(1)
       expect(mutations[0].type).toBe('createComment')
@@ -268,8 +268,8 @@ describe('useCanvasMutations', () => {
       expect((mutations[0] as any).commentId).toBeTruthy() // ID should be populated
     })
 
-    it('should update a comment and record mutation', async () => {
-      const { result } = renderHook(() => useCanvasMutations())
+    it('should update a comment and record command', async () => {
+      const { result } = renderHook(() => useCanvasCommands())
 
       const updates = {
         text: 'Updated comment',
@@ -283,7 +283,7 @@ describe('useCanvasMutations', () => {
       // Verify action was called
       expect(mockUpdateComment).toHaveBeenCalledWith('comment-1', updates)
 
-      // Verify mutation was recorded
+      // Verify command was recorded
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(1)
       expect(mutations[0].type).toBe('updateComment')
@@ -291,8 +291,8 @@ describe('useCanvasMutations', () => {
       expect((mutations[0] as any).updates).toEqual(updates)
     })
 
-    it('should delete a comment and record mutation', async () => {
-      const { result } = renderHook(() => useCanvasMutations())
+    it('should delete a comment and record command', async () => {
+      const { result } = renderHook(() => useCanvasCommands())
 
       await act(async () => {
         await result.current.deleteComment('comment-1')
@@ -301,7 +301,7 @@ describe('useCanvasMutations', () => {
       // Verify action was called
       expect(mockDeleteComment).toHaveBeenCalledWith('comment-1')
 
-      // Verify mutation was recorded
+      // Verify command was recorded
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(1)
       expect(mutations[0].type).toBe('deleteComment')
@@ -314,8 +314,8 @@ describe('useCanvasMutations', () => {
       expect(deletions[0].id).toBe('comment-1')
     })
 
-    it('should link comment to concept and record mutation', async () => {
-      const { result } = renderHook(() => useCanvasMutations())
+    it('should link comment to concept and record command', async () => {
+      const { result } = renderHook(() => useCanvasCommands())
 
       await act(async () => {
         await result.current.linkCommentToConcept('comment-1', 'concept-1')
@@ -324,7 +324,7 @@ describe('useCanvasMutations', () => {
       // Verify action was called
       expect(mockLinkCommentToConcept).toHaveBeenCalledWith('comment-1', 'concept-1')
 
-      // Verify mutation was recorded
+      // Verify command was recorded
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(1)
       expect(mutations[0].type).toBe('linkCommentToConcept')
@@ -332,8 +332,8 @@ describe('useCanvasMutations', () => {
       expect((mutations[0] as any).conceptId).toBe('concept-1')
     })
 
-    it('should unlink comment from concept and record mutation', async () => {
-      const { result } = renderHook(() => useCanvasMutations())
+    it('should unlink comment from concept and record command', async () => {
+      const { result } = renderHook(() => useCanvasCommands())
 
       await act(async () => {
         await result.current.unlinkCommentFromConcept('comment-1', 'concept-1')
@@ -342,7 +342,7 @@ describe('useCanvasMutations', () => {
       // Verify action was called
       expect(mockUnlinkCommentFromConcept).toHaveBeenCalledWith('comment-1', 'concept-1')
 
-      // Verify mutation was recorded
+      // Verify command was recorded
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(1)
       expect(mutations[0].type).toBe('unlinkCommentFromConcept')
@@ -353,14 +353,14 @@ describe('useCanvasMutations', () => {
 
   describe('operation management', () => {
     it('should provide startOperation and endOperation functions', () => {
-      const { result } = renderHook(() => useCanvasMutations())
+      const { result } = renderHook(() => useCanvasCommands())
 
       expect(typeof result.current.startOperation).toBe('function')
       expect(typeof result.current.endOperation).toBe('function')
     })
 
-    it('should use current operation ID when recording mutations', async () => {
-      const { result } = renderHook(() => useCanvasMutations())
+    it('should use current operation ID when recording commands', async () => {
+      const { result } = renderHook(() => useCanvasCommands())
 
       // Start an operation
       await act(async () => {
@@ -378,11 +378,10 @@ describe('useCanvasMutations', () => {
         })
       })
 
-      // Verify mutation uses the operation ID
+      // Verify command uses the operation ID
       const mutations = useUndoStore.getState().mutationHistory
       expect(mutations.length).toBe(1)
       expect(mutations[0].operationId).toBe(operationId)
     })
   })
 })
-

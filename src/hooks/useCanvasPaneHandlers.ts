@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
-import { useCanvasMutations } from './useCanvasMutations'
+import { useCanvasCommands } from './useCanvasCommands'
 import { useUIStore } from '@/stores/uiStore'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { useMapStore } from '@/stores/mapStore'
@@ -51,7 +51,7 @@ export function useCanvasPaneHandlers(options: UseCanvasPaneHandlersOptions) {
   const {
     createConcept,
     createComment,
-  } = useCanvasMutations()
+  } = useCanvasCommands()
 
   const {
     setSelectedConceptId,
