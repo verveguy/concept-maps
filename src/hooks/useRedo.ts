@@ -29,6 +29,8 @@ export function useRedo() {
     deleteComment,
     linkCommentToConcept,
     unlinkCommentFromConcept,
+    resolveComment,
+    unresolveComment,
     updateMap,
   } = useCanvasMutations()
   
@@ -127,6 +129,16 @@ export function useRedo() {
           await unlinkCommentFromConcept(command.commentId, command.conceptId)
           return true
         }
+        case 'resolveComment': {
+          // Re-execute resolve: resolve again
+          await resolveComment(command.commentId, command.previousState)
+          return true
+        }
+        case 'unresolveComment': {
+          // Re-execute unresolve: unresolve again
+          await unresolveComment(command.commentId, command.previousState)
+          return true
+        }
         case 'updateMap': {
           // Re-execute update: apply the same updates again
           await updateMap(command.mapId, command.updates, command.previousState)
@@ -156,6 +168,8 @@ export function useRedo() {
     deleteComment,
     linkCommentToConcept,
     unlinkCommentFromConcept,
+    resolveComment,
+    unresolveComment,
     updateMap,
   ])
 

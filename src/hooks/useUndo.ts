@@ -48,7 +48,9 @@ export function useUndo() {
     deleteComment, 
     updateComment: updateCommentAction,
     linkCommentToConcept: linkCommentToConceptAction,
-    unlinkCommentFromConcept: unlinkCommentFromConceptAction 
+    unlinkCommentFromConcept: unlinkCommentFromConceptAction,
+    resolveComment: resolveCommentAction,
+    unresolveComment: unresolveCommentAction,
   } = useCommentActions()
   const {
     updateMap: updateMapAction,
@@ -186,6 +188,20 @@ export function useUndo() {
           await linkCommentToConceptAction(command.commentId, command.conceptId)
           return true
         }
+        case 'resolveComment': {
+          // Reverse resolve: unresolve (restore previous resolved state)
+          if (command.previousState.resolved === false) {
+            await unresolveCommentAction(command.commentId)
+          }
+          return true
+        }
+        case 'unresolveComment': {
+          // Reverse unresolve: resolve (restore previous resolved state)
+          if (command.previousState.resolved === true) {
+            await resolveCommentAction(command.commentId)
+          }
+          return true
+        }
         case 'updateMap': {
           // Reverse update: restore previous state if available
           if (command.previousState) {
@@ -223,6 +239,8 @@ export function useUndo() {
     undeleteComment,
     linkCommentToConceptAction,
     unlinkCommentFromConceptAction,
+    resolveCommentAction,
+    unresolveCommentAction,
     updateMapAction,
   ])
 

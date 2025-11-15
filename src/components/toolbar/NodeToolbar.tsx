@@ -9,9 +9,8 @@ import { useState, useEffect } from 'react'
 import { Pencil, Check, Trash2, Circle, Eye, EyeOff } from 'lucide-react'
 import { useUIStore } from '@/stores/uiStore'
 import { useCanvasMutations } from '@/hooks/useCanvasMutations'
-import { useCommentActions } from '@/hooks/useCommentActions'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
-import { useUndoStore } from '@/stores/undoStore'
+import { useComments } from '@/hooks/useComments'
 import { IconButton } from '@/components/ui/IconButton'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -399,12 +398,11 @@ export function NodeToolbar({
   onEdit,
 }: NodeToolbarProps) {
   const { hasWriteAccess } = useMapPermissions()
-  const { updateConcept, deleteConcept } = useCanvasMutations()
-  const { resolveComment, unresolveComment, deleteComment } = useCommentActions()
+  const { updateConcept, deleteConcept, resolveComment, unresolveComment, deleteComment } = useCanvasMutations()
+  const comments = useComments()
   const setConceptEditorOpen = useUIStore((state) => state.setConceptEditorOpen)
   const setSelectedCommentId = useUIStore((state) => state.setSelectedCommentId)
   const setSelectedConceptId = useUIStore((state) => state.setSelectedConceptId)
-  const recordDeletion = useUndoStore((state) => state.recordDeletion)
 
   // Get current style values
   const [fillColor, setFillColor] = useState<string>('#ffffff')
@@ -475,10 +473,13 @@ export function NodeToolbar({
   const handleResolveClick = async () => {
     if (!comment || !hasWriteAccess) return
     try {
+      const currentComment = comments.find((c) => c.id === comment.id)
+      if (!currentComment) return
+      
       if (comment.resolved) {
-        await unresolveComment(comment.id)
+        await unresolveComment(comment.id, { resolved: true })
       } else {
-        await resolveComment(comment.id)
+        await resolveComment(comment.id, { resolved: false })
       }
     } catch (error) {
       console.error('Failed to toggle comment resolution:', error)
@@ -489,7 +490,6 @@ export function NodeToolbar({
     if (!comment || !hasWriteAccess) return
     if (!confirm(`Are you sure you want to delete this comment?`)) return
     try {
-      recordDeletion('comment', comment.id)
       await deleteComment(comment.id)
       setSelectedCommentId(null)
     } catch (error) {
@@ -501,7 +501,6 @@ export function NodeToolbar({
     if (!concept || !hasWriteAccess) return
     if (!confirm(`Are you sure you want to delete this concept?`)) return
     try {
-      recordDeletion('concept', concept.id)
       await deleteConcept(concept.id)
       setSelectedConceptId(null)
     } catch (error) {

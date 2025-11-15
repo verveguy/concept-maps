@@ -29,6 +29,8 @@ import type {
   DeleteCommentCommand,
   LinkCommentToConceptCommand,
   UnlinkCommentFromConceptCommand,
+  ResolveCommentCommand,
+  UnresolveCommentCommand,
   UpdateMapCommand,
 } from '@/stores/undoStore'
 
@@ -60,6 +62,8 @@ export function useCanvasMutations() {
     deleteComment: deleteCommentAction,
     linkCommentToConcept: linkCommentToConceptAction,
     unlinkCommentFromConcept: unlinkCommentFromConceptAction,
+    resolveComment: resolveCommentAction,
+    unresolveComment: unresolveCommentAction,
   } = useCommentActions()
 
   const {
@@ -459,6 +463,58 @@ export function useCanvasMutations() {
   )
 
   /**
+   * Resolve a comment with undo tracking.
+   */
+  const resolveComment = useCallback(
+    async (commentId: string, previousState: { resolved: boolean }) => {
+      try {
+        await resolveCommentAction(commentId)
+        
+        // Record mutation for undo
+        const command: ResolveCommentCommand = {
+          type: 'resolveComment',
+          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: Date.now(),
+          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          commentId,
+          previousState,
+        }
+        recordMutation(command)
+      } catch (error) {
+        console.error('Failed to resolve comment:', error)
+        throw error
+      }
+    },
+    [resolveCommentAction, recordMutation]
+  )
+
+  /**
+   * Unresolve a comment with undo tracking.
+   */
+  const unresolveComment = useCallback(
+    async (commentId: string, previousState: { resolved: boolean }) => {
+      try {
+        await unresolveCommentAction(commentId)
+        
+        // Record mutation for undo
+        const command: UnresolveCommentCommand = {
+          type: 'unresolveComment',
+          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: Date.now(),
+          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          commentId,
+          previousState,
+        }
+        recordMutation(command)
+      } catch (error) {
+        console.error('Failed to unresolve comment:', error)
+        throw error
+      }
+    },
+    [unresolveCommentAction, recordMutation]
+  )
+
+  /**
    * Update a map with undo tracking.
    */
   const updateMap = useCallback(
@@ -507,6 +563,8 @@ export function useCanvasMutations() {
     deleteComment,
     linkCommentToConcept,
     unlinkCommentFromConcept,
+    resolveComment,
+    unresolveComment,
     
     // Map mutations
     updateMap,

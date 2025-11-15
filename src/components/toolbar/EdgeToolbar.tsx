@@ -8,10 +8,8 @@
 import { useState, useEffect } from 'react'
 import { Pencil, Trash2, ArrowLeftRight } from 'lucide-react'
 import { useUIStore } from '@/stores/uiStore'
-import { useRelationshipActions } from '@/hooks/useRelationshipActions'
 import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
-import { useUndoStore } from '@/stores/undoStore'
 import { useRelationships } from '@/hooks/useRelationships'
 import { IconButton } from '@/components/ui/IconButton'
 import { Input } from '@/components/ui/input'
@@ -372,13 +370,11 @@ export function EdgeToolbar({
   relationship,
   onEdit,
 }: EdgeToolbarProps) {
-      const { hasWriteAccess } = useMapPermissions()
-      const { updateRelationship, deleteRelationship } = useRelationshipActions()
-      const { reverseRelationship } = useCanvasMutations()
-      const setRelationshipEditorOpen = useUIStore((state) => state.setRelationshipEditorOpen)
-      const setSelectedRelationshipId = useUIStore((state) => state.setSelectedRelationshipId)
-      const recordDeletion = useUndoStore((state) => state.recordDeletion)
-      const relationships = useRelationships()
+  const { hasWriteAccess } = useMapPermissions()
+  const { updateRelationship, deleteRelationship, reverseRelationship } = useCanvasMutations()
+  const setRelationshipEditorOpen = useUIStore((state) => state.setRelationshipEditorOpen)
+  const setSelectedRelationshipId = useUIStore((state) => state.setSelectedRelationshipId)
+  const relationships = useRelationships()
       
       // Get full relationship data from the relationships array
       const fullRelationship = relationships.find((r) => r.id === relationship.id)
@@ -469,7 +465,6 @@ export function EdgeToolbar({
     if (!relationship || !hasWriteAccess) return
     if (!confirm(`Are you sure you want to delete this relationship?`)) return
     try {
-      recordDeletion('relationship', relationship.id)
       await deleteRelationship(relationship.id)
       setSelectedRelationshipId(null)
     } catch (error) {

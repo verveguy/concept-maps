@@ -5,8 +5,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
-import { useConceptActions } from '@/hooks/useConceptActions'
-import { useRelationshipActions } from '@/hooks/useRelationshipActions'
+import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 import { useUIStore } from '@/stores/uiStore'
 import { parseTripleText, formatTriple, type TextTriple } from '@/lib/textRepresentation'
 
@@ -64,8 +63,7 @@ export interface EditableTripleProps {
  * ```
  */
 export function EditableTriple({ triple, onUpdate }: EditableTripleProps) {
-  const { updateConcept } = useConceptActions()
-  const { updateRelationship, deleteRelationship } = useRelationshipActions()
+  const { updateConcept, updateRelationship, deleteRelationship } = useCanvasMutations()
   const { setSelectedRelationshipId, setRelationshipEditorOpen } = useUIStore()
   
   const [isEditing, setIsEditing] = useState(false)

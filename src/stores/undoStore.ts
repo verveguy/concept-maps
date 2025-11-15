@@ -34,6 +34,8 @@ export type MutationType =
   | 'deleteComment'
   | 'linkCommentToConcept'
   | 'unlinkCommentFromConcept'
+  | 'resolveComment'
+  | 'unresolveComment'
   | 'updateMap'
 
 /**
@@ -152,6 +154,22 @@ export interface UnlinkCommentFromConceptCommand extends MutationCommand {
   conceptId: string
 }
 
+export interface ResolveCommentCommand extends MutationCommand {
+  type: 'resolveComment'
+  commentId: string
+  previousState: {
+    resolved: boolean
+  }
+}
+
+export interface UnresolveCommentCommand extends MutationCommand {
+  type: 'unresolveComment'
+  commentId: string
+  previousState: {
+    resolved: boolean
+  }
+}
+
 /**
  * Map mutation commands.
  */
@@ -181,6 +199,8 @@ export type MutationCommandUnion =
   | DeleteCommentCommand
   | LinkCommentToConceptCommand
   | UnlinkCommentFromConceptCommand
+  | ResolveCommentCommand
+  | UnresolveCommentCommand
   | UpdateMapCommand
 
 /**

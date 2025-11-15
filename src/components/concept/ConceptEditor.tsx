@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Trash2, X, Plus } from 'lucide-react'
-import { useConceptActions } from '@/hooks/useConceptActions'
+import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 import { useConcepts } from '@/hooks/useConcepts'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { useUIStore } from '@/stores/uiStore'
@@ -61,7 +61,7 @@ export function ConceptEditor() {
   const conceptEditorOpen = useUIStore((state) => state.conceptEditorOpen)
   const setConceptEditorOpen = useUIStore((state) => state.setConceptEditorOpen)
   const concepts = useConcepts()
-  const { updateConcept, deleteConcept } = useConceptActions()
+  const { updateConcept, deleteConcept } = useCanvasMutations()
   const { hasWriteAccess } = useMapPermissions()
 
   const concept = concepts.find((c) => c.id === selectedConceptId)

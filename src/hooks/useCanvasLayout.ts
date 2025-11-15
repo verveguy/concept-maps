@@ -25,7 +25,7 @@ import {
   applyHierarchicalLayout,
   applyLayeredLayout,
 } from '@/lib/layouts'
-import { useMapActions } from '@/hooks/useMapActions'
+import { useCanvasMutations } from '@/hooks/useCanvasMutations'
 
 /**
  * Options for layout hook.
@@ -77,7 +77,7 @@ export function useCanvasLayout(options: UseCanvasLayoutOptions) {
   } = useUndoStore()
 
   const currentMapId = useMapStore((state) => state.currentMapId)
-  const { updateMap } = useMapActions()
+  const { updateMap } = useCanvasMutations()
 
   /**
    * Apply a layout algorithm to the concept nodes.
