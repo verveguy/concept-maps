@@ -12,7 +12,7 @@
 
 import { useCallback } from 'react'
 import type { Node, NodeChange } from 'reactflow'
-import { useCanvasMutations } from './useCanvasMutations'
+import { useCanvasCommands } from './useCanvasCommands'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useMapStore } from '@/stores/mapStore'
@@ -64,7 +64,7 @@ export function useCanvasNodeHandlers(options: UseCanvasNodeHandlersOptions) {
     updateComment,
     startOperation,
     endOperation,
-  } = useCanvasMutations()
+  } = useCanvasCommands()
 
   const {
     getLastUpdateTime,

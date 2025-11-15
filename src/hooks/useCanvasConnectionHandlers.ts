@@ -12,7 +12,7 @@
 
 import { useCallback } from 'react'
 import type { Node, Connection, OnConnectStart } from 'reactflow'
-import { useCanvasMutations } from './useCanvasMutations'
+import { useCanvasCommands } from './useCanvasCommands'
 import { useCanvasStore } from '@/stores/canvasStore'
 import { useMapStore } from '@/stores/mapStore'
 import { useMapPermissions } from './useMapPermissions'
@@ -43,7 +43,7 @@ export function useCanvasConnectionHandlers(options: UseCanvasConnectionHandlers
     createRelationship,
     createConcept,
     linkCommentToConcept,
-  } = useCanvasMutations()
+  } = useCanvasCommands()
 
   const {
     connectionStart,

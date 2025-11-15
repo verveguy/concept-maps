@@ -54,7 +54,7 @@ import { useState, useEffect, useMemo, memo, useCallback } from 'react'
 import { X, Plus, Play, ChevronRight, ChevronDown, Eye, Settings, Sun, Moon, BookOpen, Trash2 } from 'lucide-react'
 import { useMaps } from '@/hooks/useMaps'
 import { useMapActions } from '@/hooks/useMapActions'
-import { usePerspectiveMutations } from '@/hooks/usePerspectiveMutations'
+import { usePerspectiveCommands } from '@/hooks/usePerspectiveCommands'
 import { useMapStore } from '@/stores/mapStore'
 import { useUIStore } from '@/stores/uiStore'
 import { db } from '@/lib/instant'
@@ -166,7 +166,7 @@ ThemeToggle.displayName = 'ThemeToggle'
  */
 export const Sidebar = () => {
   const { createMap, deleteMap } = useMapActions()
-  const { createPerspective } = usePerspectiveMutations()
+  const { createPerspective } = usePerspectiveCommands()
   const { currentMapId, currentPerspectiveId, setCurrentMapId, setCurrentPerspectiveId } = useMapStore()
   const { setSidebarOpen } = useUIStore()
   const [isCreating, setIsCreating] = useState(false)

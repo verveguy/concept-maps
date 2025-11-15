@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react'
 import { Pencil, Trash2, ArrowLeftRight } from 'lucide-react'
 import { useUIStore } from '@/stores/uiStore'
 import { useRelationshipActions } from '@/hooks/useRelationshipActions'
-import { useCanvasMutations } from '@/hooks/useCanvasMutations'
+import { useCanvasCommands } from '@/hooks/useCanvasCommands'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { useUndoStore } from '@/stores/undoStore'
 import { useRelationships } from '@/hooks/useRelationships'
@@ -374,7 +374,7 @@ export function EdgeToolbar({
 }: EdgeToolbarProps) {
       const { hasWriteAccess } = useMapPermissions()
       const { updateRelationship, deleteRelationship } = useRelationshipActions()
-      const { reverseRelationship } = useCanvasMutations()
+      const { reverseRelationship } = useCanvasCommands()
       const setRelationshipEditorOpen = useUIStore((state) => state.setRelationshipEditorOpen)
       const setSelectedRelationshipId = useUIStore((state) => state.setSelectedRelationshipId)
       const recordDeletion = useUndoStore((state) => state.recordDeletion)

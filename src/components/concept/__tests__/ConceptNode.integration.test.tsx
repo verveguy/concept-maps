@@ -44,8 +44,8 @@ vi.mock('@/stores/canvasStore', () => ({
   }),
 }))
 
-vi.mock('@/hooks/useCanvasMutations', () => ({
-  useCanvasMutations: () => ({
+vi.mock('@/hooks/useCanvasCommands', () => ({
+  useCanvasCommands: () => ({
     updateConcept: vi.fn().mockResolvedValue(undefined),
   }),
 }))

@@ -45,7 +45,7 @@ import { useCallback } from 'react'
 import { useReactFlow } from 'reactflow'
 import { db, tx, id } from '@/lib/instant'
 import { parseTripleText, stripLineBreaks } from '@/lib/textRepresentation'
-import { useCanvasMutations } from '@/hooks/useCanvasMutations'
+import { useCanvasCommands } from '@/hooks/useCanvasCommands'
 import { useConcepts } from '@/hooks/useConcepts'
 import { useMapStore } from '@/stores/mapStore'
 import { useCanvasStore } from '@/stores/canvasStore'
@@ -85,7 +85,7 @@ export interface ProcessTripleEntryResult {
  */
 export function useConceptNodeTripleEntry() {
   const { getNode, getNodes, setNodes } = useReactFlow()
-  const { updateConcept } = useCanvasMutations()
+  const { updateConcept } = useCanvasCommands()
   const concepts = useConcepts()
   const currentMapId = useMapStore((state) => state.currentMapId)
 

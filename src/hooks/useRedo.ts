@@ -5,8 +5,8 @@
  */
 
 import { useCallback } from 'react'
-import { useCanvasMutations } from './useCanvasMutations'
-import { usePerspectiveMutations } from './usePerspectiveMutations'
+import { useCanvasCommands } from './useCanvasCommands'
+import { usePerspectiveCommands } from './usePerspectiveCommands'
 import { useUndoStore, type MutationCommandUnion } from '@/stores/undoStore'
 
 /**
@@ -16,7 +16,7 @@ import { useUndoStore, type MutationCommandUnion } from '@/stores/undoStore'
  * @returns Object containing redo function and redo availability check
  */
 export function useRedo() {
-  // Use canvas mutations hooks so mutations are properly recorded for undo
+  // Use canvas command hooks so commands are properly recorded for undo
   const {
     createConcept,
     updateConcept,
@@ -31,16 +31,16 @@ export function useRedo() {
     linkCommentToConcept,
     unlinkCommentFromConcept,
     updateMap,
-  } = useCanvasMutations()
+  } = useCanvasCommands()
   
-  // Use perspective mutations hooks so mutations are properly recorded for undo
+  // Use perspective command hooks so commands are properly recorded for undo
   const {
     createPerspective,
     updatePerspective,
     deletePerspective,
     toggleConceptInPerspective,
     toggleRelationshipInPerspective,
-  } = usePerspectiveMutations()
+  } = usePerspectiveCommands()
   
   const {
     getMostRecentRedoOperation,

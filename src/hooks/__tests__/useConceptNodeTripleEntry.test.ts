@@ -7,7 +7,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useConceptNodeTripleEntry } from '../useConceptNodeTripleEntry'
 import { useReactFlow } from 'reactflow'
-import { useCanvasMutations } from '@/hooks/useCanvasMutations'
+import { useCanvasCommands } from '@/hooks/useCanvasCommands'
 import { useConcepts } from '@/hooks/useConcepts'
 import { useMapStore } from '@/stores/mapStore'
 
@@ -16,8 +16,8 @@ vi.mock('reactflow', () => ({
   useReactFlow: vi.fn(),
 }))
 
-vi.mock('@/hooks/useCanvasMutations', () => ({
-  useCanvasMutations: vi.fn(),
+vi.mock('@/hooks/useCanvasCommands', () => ({
+  useCanvasCommands: vi.fn(),
 }))
 
 vi.mock('@/hooks/useConcepts', () => ({
@@ -65,7 +65,7 @@ describe('useConceptNodeTripleEntry', () => {
       setEdges: vi.fn(),
       fitView: vi.fn(),
     } as any)
-    vi.mocked(useCanvasMutations).mockReturnValue({
+    vi.mocked(useCanvasCommands).mockReturnValue({
       updateConcept: mockUpdateConcept,
     } as any)
     vi.mocked(useConcepts).mockReturnValue(mockConcepts as any)

@@ -25,7 +25,7 @@ import { useMap } from '@/hooks/useMap'
 import { usePerspectives } from '@/hooks/usePerspectives'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { usePendingInvitation } from '@/hooks/usePendingInvitation'
-import { useCanvasMutations } from '@/hooks/useCanvasMutations'
+import { useCanvasCommands } from '@/hooks/useCanvasCommands'
 import { navigateToRoot } from '@/utils/navigation'
 
 /**
@@ -48,7 +48,7 @@ export function MapPage() {
   const { createConcept } = useConceptActions()
   const { hasWriteAccess, hasReadAccess } = useMapPermissions()
   const { invitation: pendingInvitation, isLoading: isInvitationLoading } = usePendingInvitation(currentMapId)
-  const { updateMap } = useCanvasMutations()
+  const { updateMap } = useCanvasCommands()
   const [isCreatingConcept, setIsCreatingConcept] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showShareDialog, setShowShareDialog] = useState(false)

@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useUndo } from '../useUndo'
 import { useRedo } from '../useRedo'
-import { useCanvasMutations } from '../useCanvasMutations'
+import { useCanvasCommands } from '../useCanvasCommands'
 import { useUndoStore } from '../../stores/undoStore'
 import type {
   CreateConceptCommand,
@@ -15,7 +15,7 @@ import type {
   DeleteConceptCommand,
 } from '../../stores/undoStore'
 
-// Mock action hooks - these will be called by useCanvasMutations
+// Mock action hooks - these will be called by useCanvasCommands
 const mockCreateConceptAction = vi.fn().mockResolvedValue(undefined)
 const mockUpdateConceptAction = vi.fn().mockResolvedValue(undefined)
 const mockDeleteConceptAction = vi.fn().mockResolvedValue(undefined)
@@ -71,7 +71,7 @@ describe('Undo/Redo Integration', () => {
 
   describe('complete undo/redo cycle', () => {
     it('should undo and redo a concept update', async () => {
-      const { result: mutations } = renderHook(() => useCanvasMutations())
+      const { result: mutations } = renderHook(() => useCanvasCommands())
       const { result: undo } = renderHook(() => useUndo())
       const { result: redo } = renderHook(() => useRedo())
 
@@ -123,7 +123,7 @@ describe('Undo/Redo Integration', () => {
     })
 
     it('should undo and redo a concept deletion', async () => {
-      const { result: mutations } = renderHook(() => useCanvasMutations())
+      const { result: mutations } = renderHook(() => useCanvasCommands())
       const { result: undo } = renderHook(() => useUndo())
       const { result: redo } = renderHook(() => useRedo())
 
@@ -172,7 +172,7 @@ describe('Undo/Redo Integration', () => {
     })
 
     it('should clear redo stack when new mutation occurs after undo', async () => {
-      const { result: mutations } = renderHook(() => useCanvasMutations())
+      const { result: mutations } = renderHook(() => useCanvasCommands())
       const { result: undo } = renderHook(() => useUndo())
 
       // Create and delete a concept
@@ -218,7 +218,7 @@ describe('Undo/Redo Integration', () => {
     })
 
     it('should handle multiple undo/redo cycles', async () => {
-      const { result: mutations } = renderHook(() => useCanvasMutations())
+      const { result: mutations } = renderHook(() => useCanvasCommands())
       const { result: undo } = renderHook(() => useUndo())
       const { result: redo } = renderHook(() => useRedo())
 
@@ -296,7 +296,7 @@ describe('Undo/Redo Integration', () => {
     })
 
     it('should group operations correctly for undo', async () => {
-      const { result: mutations } = renderHook(() => useCanvasMutations())
+      const { result: mutations } = renderHook(() => useCanvasCommands())
       const { result: undo } = renderHook(() => useUndo())
 
       // Start an operation
@@ -338,7 +338,7 @@ describe('Undo/Redo Integration', () => {
 
   describe('operation grouping', () => {
     it('should group mutations by operationId', async () => {
-      const { result: mutations } = renderHook(() => useCanvasMutations())
+      const { result: mutations } = renderHook(() => useCanvasCommands())
 
       // Manually set operation ID
       mutations.current.startOperation()

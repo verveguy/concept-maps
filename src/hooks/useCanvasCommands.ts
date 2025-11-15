@@ -1,11 +1,11 @@
 /**
- * Canvas mutations hook.
+ * Canvas commands hook.
  * 
- * Wraps all database mutations with undo tracking and operation grouping.
- * Provides a consistent mutation interface for the canvas component.
+ * Wraps all database actions with command tracking and operation grouping.
+ * Provides a consistent command interface for the canvas component.
  * 
- * This hook implements the Command Pattern, where each mutation is recorded
- * as a command that can be executed and undone. Mutations are automatically
+ * This hook implements the Command Pattern, where each action is recorded
+ * as a command that can be executed and undone. Commands are automatically
  * grouped into operations for better undo/redo behavior.
  */
 
@@ -33,14 +33,14 @@ import type {
 } from '@/stores/undoStore'
 
 /**
- * Hook for canvas mutations with undo tracking.
+ * Hook for canvas commands with undo tracking.
  * 
- * Wraps all mutation actions and automatically records them for undo/redo.
- * Mutations are grouped into operations for better undo behavior.
+ * Wraps all action hooks and automatically records them as commands for undo/redo.
+ * Commands are grouped into operations for better undo behavior.
  * 
- * @returns Object containing wrapped mutation functions
+ * @returns Object containing wrapped command functions
  */
-export function useCanvasMutations() {
+export function useCanvasCommands() {
   const {
     createConcept: createConceptAction,
     updateConcept: updateConceptAction,
@@ -73,7 +73,7 @@ export function useCanvasMutations() {
   } = useUndoStore()
 
   /**
-   * Create a new concept with undo tracking.
+   * Create a new concept with command tracking.
    * Generates the concept ID before creating so it can be stored in the command for undo.
    */
   const createConcept = useCallback(
@@ -85,7 +85,7 @@ export function useCanvasMutations() {
         // Create the concept with the generated ID
         await createConceptAction(data, conceptId)
         
-        // Record mutation for undo with the concept ID
+        // Record command for undo with the concept ID
         const command: CreateConceptCommand = {
           type: 'createConcept',
           id: generateCommandId(),
@@ -104,12 +104,12 @@ export function useCanvasMutations() {
   )
 
   /**
-   * Update a concept with undo tracking.
+   * Update a concept with command tracking.
    * 
    * @param conceptId - ID of the concept to update
    * @param updates - Partial concept data to update
    * @param previousState - Optional previous state for undo support. If not provided,
-   *                        the mutation will be recorded without previousState (undo may not work properly).
+   *                        the command will be recorded without previousState (undo may not work properly).
    */
   const updateConcept = useCallback(
     async (
@@ -127,7 +127,7 @@ export function useCanvasMutations() {
       try {
         await updateConceptAction(conceptId, updates)
         
-        // Record mutation for undo
+        // Record command for undo
         const command: UpdateConceptCommand = {
           type: 'updateConcept',
           id: generateCommandId(),
@@ -147,14 +147,14 @@ export function useCanvasMutations() {
   )
 
   /**
-   * Delete a concept with undo tracking.
+   * Delete a concept with command tracking.
    */
   const deleteConcept = useCallback(
     async (conceptId: string) => {
       try {
         await deleteConceptAction(conceptId)
         
-        // Record mutation for undo (also record in deletion history for backward compatibility)
+        // Record command for undo (also record in deletion history for backward compatibility)
         const command: DeleteConceptCommand = {
           type: 'deleteConcept',
           id: generateCommandId(),
@@ -175,7 +175,7 @@ export function useCanvasMutations() {
   )
 
   /**
-   * Create a new relationship with undo tracking.
+   * Create a new relationship with command tracking.
    * Generates the relationship ID before creating so it can be stored in the command for undo.
    */
   const createRelationship = useCallback(
@@ -187,7 +187,7 @@ export function useCanvasMutations() {
         // Create the relationship with the generated ID
         await createRelationshipAction(data, relationshipId)
         
-        // Record mutation for undo with the relationship ID
+        // Record command for undo with the relationship ID
         const command: CreateRelationshipCommand = {
           type: 'createRelationship',
           id: generateCommandId(),
@@ -206,12 +206,12 @@ export function useCanvasMutations() {
   )
 
   /**
-   * Update a relationship with undo tracking.
+   * Update a relationship with command tracking.
    * 
    * @param relationshipId - ID of the relationship to update
    * @param updates - Partial relationship data to update
    * @param previousState - Optional previous state for undo support. If not provided,
-   *                        the mutation will be recorded without previousState (undo may not work properly).
+   *                        the command will be recorded without previousState (undo may not work properly).
    */
   const updateRelationship = useCallback(
     async (
@@ -227,7 +227,7 @@ export function useCanvasMutations() {
       try {
         await updateRelationshipAction(relationshipId, updates)
         
-        // Record mutation for undo
+        // Record command for undo
         const command: UpdateRelationshipCommand = {
           type: 'updateRelationship',
           id: generateCommandId(),
@@ -247,7 +247,7 @@ export function useCanvasMutations() {
   )
 
   /**
-   * Reverse a relationship's direction with undo tracking.
+   * Reverse a relationship's direction with command tracking.
    */
   const reverseRelationship = useCallback(
     async (
@@ -270,7 +270,7 @@ export function useCanvasMutations() {
 
         await reverseRelationshipAction(relationshipId, relationship)
 
-        // Record mutation for undo
+        // Record command for undo
         const command: ReverseRelationshipCommand = {
           type: 'reverseRelationship',
           id: generateCommandId(),
@@ -289,14 +289,14 @@ export function useCanvasMutations() {
   )
 
   /**
-   * Delete a relationship with undo tracking.
+   * Delete a relationship with command tracking.
    */
   const deleteRelationship = useCallback(
     async (relationshipId: string) => {
       try {
         await deleteRelationshipAction(relationshipId)
         
-        // Record mutation for undo
+        // Record command for undo
         const command: DeleteRelationshipCommand = {
           type: 'deleteRelationship',
           id: generateCommandId(),
@@ -317,7 +317,7 @@ export function useCanvasMutations() {
   )
 
   /**
-   * Create a new comment with undo tracking.
+   * Create a new comment with command tracking.
    * Generates the comment ID before creating so it can be stored in the command for undo.
    */
   const createComment = useCallback(
@@ -329,7 +329,7 @@ export function useCanvasMutations() {
         // Create the comment with the generated ID
         await createCommentAction(data, commentId)
         
-        // Record mutation for undo with the comment ID
+        // Record command for undo with the comment ID
         const command: CreateCommentCommand = {
           type: 'createComment',
           id: generateCommandId(),
@@ -348,12 +348,12 @@ export function useCanvasMutations() {
   )
 
   /**
-   * Update a comment with undo tracking.
+   * Update a comment with command tracking.
    * 
    * @param commentId - ID of the comment to update
    * @param updates - Partial comment data to update
    * @param previousState - Optional previous state for undo support. If not provided,
-   *                        the mutation will be recorded without previousState (undo may not work properly).
+   *                        the command will be recorded without previousState (undo may not work properly).
    */
   const updateComment = useCallback(
     async (
@@ -368,7 +368,7 @@ export function useCanvasMutations() {
       try {
         await updateCommentAction(commentId, updates)
         
-        // Record mutation for undo
+        // Record command for undo
         const command: UpdateCommentCommand = {
           type: 'updateComment',
           id: generateCommandId(),
@@ -388,14 +388,14 @@ export function useCanvasMutations() {
   )
 
   /**
-   * Delete a comment with undo tracking.
+   * Delete a comment with command tracking.
    */
   const deleteComment = useCallback(
     async (commentId: string) => {
       try {
         await deleteCommentAction(commentId)
         
-        // Record mutation for undo
+        // Record command for undo
         const command: DeleteCommentCommand = {
           type: 'deleteComment',
           id: generateCommandId(),
@@ -416,14 +416,14 @@ export function useCanvasMutations() {
   )
 
   /**
-   * Link a comment to a concept with undo tracking.
+   * Link a comment to a concept with command tracking.
    */
   const linkCommentToConcept = useCallback(
     async (commentId: string, conceptId: string) => {
       try {
         await linkCommentToConceptAction(commentId, conceptId)
         
-        // Record mutation for undo
+        // Record command for undo
         const command: LinkCommentToConceptCommand = {
           type: 'linkCommentToConcept',
           id: generateCommandId(),
@@ -442,14 +442,14 @@ export function useCanvasMutations() {
   )
 
   /**
-   * Unlink a comment from a concept with undo tracking.
+   * Unlink a comment from a concept with command tracking.
    */
   const unlinkCommentFromConcept = useCallback(
     async (commentId: string, conceptId: string) => {
       try {
         await unlinkCommentFromConceptAction(commentId, conceptId)
         
-        // Record mutation for undo
+        // Record command for undo
         const command: UnlinkCommentFromConceptCommand = {
           type: 'unlinkCommentFromConcept',
           id: generateCommandId(),
@@ -468,7 +468,7 @@ export function useCanvasMutations() {
   )
 
   /**
-   * Update a map with undo tracking.
+   * Update a map with command tracking.
    */
   const updateMap = useCallback(
     async (
@@ -479,7 +479,7 @@ export function useCanvasMutations() {
       try {
         await updateMapAction(mapId, updates)
         
-        // Record mutation for undo
+        // Record command for undo
         const command: UpdateMapCommand = {
           type: 'updateMap',
           id: generateCommandId(),
@@ -499,25 +499,25 @@ export function useCanvasMutations() {
   )
 
   return {
-    // Concept mutations
+    // Concept commands
     createConcept,
     updateConcept,
     deleteConcept,
     
-    // Relationship mutations
+    // Relationship commands
     createRelationship,
     updateRelationship,
     reverseRelationship,
     deleteRelationship,
     
-    // Comment mutations
+    // Comment commands
     createComment,
     updateComment,
     deleteComment,
     linkCommentToConcept,
     unlinkCommentFromConcept,
     
-    // Map mutations
+    // Map commands
     updateMap,
     
     // Operation management
@@ -525,4 +525,3 @@ export function useCanvasMutations() {
     endOperation,
   }
 }
-
