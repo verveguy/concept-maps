@@ -105,11 +105,26 @@ export function useConceptNodeEditing(
   const measureRef = useRef<HTMLSpanElement>(null)
   const hasTriggeredEditRef = useRef(false)
 
+  // Track when editing state changes to prevent reactive updates from interfering
+  const prevIsEditingRef = useRef(isEditing)
+  
   // Update edit label when data changes (but not while editing)
+  // When editing, ignore changes to initialLabel to prevent reactive database updates from interfering
   useEffect(() => {
-    if (!isEditing) {
+    const wasEditing = prevIsEditingRef.current
+    const isNowEditing = isEditing
+    
+    if (!isNowEditing) {
+      // Not editing: sync editLabel with initialLabel
+      setEditLabel(initialLabel)
+    } else if (!wasEditing && isNowEditing) {
+      // Just started editing: ensure editLabel is set to the current initialLabel
       setEditLabel(initialLabel)
     }
+    // While editing (wasEditing && isNowEditing), ignore changes to initialLabel
+    // This prevents reactive database updates from interfering with user input
+    
+    prevIsEditingRef.current = isNowEditing
   }, [initialLabel, isEditing])
 
   // Update edit notes when data changes (but not while editing)
