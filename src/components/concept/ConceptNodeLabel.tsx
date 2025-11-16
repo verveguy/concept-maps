@@ -108,7 +108,7 @@ export function ConceptNodeLabel({
   }
   
   // Handle blur event - only save if it's a user-initiated blur
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+  const handleBlur = () => {
     // Only save if this is a user blur (not programmatic) and we're not already saving
     // Use a small delay to check if blur was caused by Enter key press
     setTimeout(() => {
