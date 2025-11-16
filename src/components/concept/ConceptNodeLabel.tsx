@@ -1,3 +1,5 @@
+import { useRef } from 'react'
+
 /**
  * Component for displaying and editing concept node labels.
  * 
@@ -37,7 +39,6 @@
  * }
  * ```
  */
-
 
 /**
  * Props for ConceptNodeLabel component
@@ -80,6 +81,11 @@ export function ConceptNodeLabel({
   inputRef,
   measureRef,
 }: ConceptNodeLabelProps) {
+  // Track if save is being triggered programmatically (e.g., from keyboard Enter)
+  // vs user blur event to prevent premature saves
+  const isSavingRef = useRef(false)
+  const isUserBlurRef = useRef(true)
+  
   // Handle input width auto-resize
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
@@ -92,9 +98,48 @@ export function ConceptNodeLabel({
       requestAnimationFrame(() => {
         if (measureRef.current && inputRef.current) {
           inputRef.current.style.width = `${Math.max(measureRef.current.offsetWidth, 20)}px`
+          // Ensure input maintains focus after width adjustment
+          if (document.activeElement !== inputRef.current) {
+            inputRef.current.focus()
+          }
         }
       })
     }
+  }
+  
+  // Handle blur event - only save if it's a user-initiated blur
+  const handleBlur = () => {
+    // Only save if this is a user blur (not programmatic) and we're not already saving
+    // Use a small delay to check if blur was caused by Enter key press
+    setTimeout(() => {
+      if (isUserBlurRef.current && !isSavingRef.current && isEditing) {
+        isSavingRef.current = true
+        onSave()
+        // Reset flag after save completes
+        setTimeout(() => {
+          isSavingRef.current = false
+        }, 200)
+      }
+    }, 10)
+  }
+  
+  // Handle keyboard events - mark as programmatic save for Enter key
+  const handleKeyDownWrapper = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      // Enter key triggers save via onKeyDown handler, mark as programmatic to prevent blur save
+      isUserBlurRef.current = false
+      isSavingRef.current = true
+      // Reset flags after a delay to allow save to complete and blur to be ignored
+      setTimeout(() => {
+        isUserBlurRef.current = true
+        isSavingRef.current = false
+      }, 200)
+    } else {
+      // Other keys are user actions - ensure blur will save
+      isUserBlurRef.current = true
+    }
+    // Call the actual keyboard handler (which handles Enter key save)
+    onKeyDown(e)
   }
 
   return (
@@ -120,8 +165,8 @@ export function ConceptNodeLabel({
             type="text"
             value={editLabel}
             onChange={handleChange}
-            onBlur={onSave}
-            onKeyDown={onKeyDown}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDownWrapper}
             className="inline-block font-semibold text-sm bg-transparent border-0 outline-none text-center"
             style={{ 
               color: textColor,

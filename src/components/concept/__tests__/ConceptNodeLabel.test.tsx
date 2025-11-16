@@ -3,7 +3,7 @@
  * Verifies label display and editing functionality.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ConceptNodeLabel } from '../ConceptNodeLabel'
 
@@ -13,6 +13,12 @@ beforeEach(() => {
     setTimeout(cb, 0)
     return 1
   })
+  // Use fake timers to control setTimeout
+  vi.useFakeTimers()
+})
+
+afterEach(() => {
+  vi.useRealTimers()
 })
 
 describe('ConceptNodeLabel', () => {
@@ -104,6 +110,11 @@ describe('ConceptNodeLabel', () => {
     const input = screen.getByRole('textbox')
     fireEvent.blur(input)
     
+    // The blur handler uses a setTimeout with 10ms delay
+    // Advance timers to trigger the setTimeout
+    vi.advanceTimersByTime(20)
+    
+    // Save should be called after the timeout
     expect(mockOnSave).toHaveBeenCalledTimes(1)
   })
 

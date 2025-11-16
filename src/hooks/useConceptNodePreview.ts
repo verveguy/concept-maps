@@ -309,12 +309,21 @@ export function useConceptNodePreview(params: UseConceptNodePreviewParams): UseC
       previewTimeoutRef.current = null
     }
     
-    // If in editing mode, save changes before closing preview (treat as blur)
-    if (isEditingNotes && onSaveNotes) {
-      await onSaveNotes()
-    }
-    if (isEditing && onSaveLabel) {
-      await onSaveLabel()
+    // Only save if user is actually leaving the node (not just moving mouse)
+    // Check if the input/textarea still has focus - if so, user is still editing
+    // and we shouldn't save yet (let the blur handler handle it)
+    const isInputFocused = document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA'
+    
+    // If input is focused, user is still actively editing - don't save here
+    // The blur handler will handle saving when user actually leaves
+    if (!isInputFocused) {
+      // Input is not focused, user has left the editing field - save changes
+      if (isEditingNotes && onSaveNotes) {
+        await onSaveNotes()
+      }
+      if (isEditing && onSaveLabel) {
+        await onSaveLabel()
+      }
     }
     
     // Set clearing flag to disable transition in style prop
