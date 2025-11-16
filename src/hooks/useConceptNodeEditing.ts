@@ -159,8 +159,15 @@ export function useConceptNodeEditing(
       requestAnimationFrame(() => {
         if (measureRef.current && inputRef.current) {
           inputRef.current.style.width = `${Math.max(measureRef.current.offsetWidth, 20)}px`
-          inputRef.current.focus()
-          inputRef.current.select()
+          // Only focus/select if input is not already focused (prevents interrupting user typing)
+          // This prevents reactive updates from stealing focus during typing
+          if (document.activeElement !== inputRef.current) {
+            inputRef.current.focus()
+            // Only select all text when first entering edit mode, not on every editLabel change
+            if (editLabel === initialLabel) {
+              inputRef.current.select()
+            }
+          }
         }
       })
     }

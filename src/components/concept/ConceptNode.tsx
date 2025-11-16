@@ -100,47 +100,70 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
   
   const processTripleEntry = useConceptNodeTripleEntry()
   
+  // Track if save is in progress to prevent duplicate saves
+  const isSavingRef = useRef(false)
+  
   // Define save handlers before preview hook (which needs them)
   const handleSave = useCallback(async () => {
-    if (!hasWriteAccess) {
-      setIsEditing(false)
-      return
+    // Prevent duplicate saves
+    if (isSavingRef.current) {
+      return Promise.resolve()
     }
     
-    const trimmedLabel = editLabel.trim()
-    if (!trimmedLabel) {
-      setEditLabel(data.label) // Revert if empty
+    // Ensure we're actually in editing mode
+    if (!isEditing) {
+      return Promise.resolve()
+    }
+    
+    if (!hasWriteAccess) {
       setIsEditing(false)
       return Promise.resolve()
     }
-
-    // Try triple entry first
-    const tripleResult = await processTripleEntry({
-      label: trimmedLabel,
-      conceptId: data.concept.id,
-      nodeId,
-      currentLabel: data.label,
-    })
-
-    if (!tripleResult.success) {
-      // Not a triple pattern, just update the concept label
-      if (trimmedLabel !== data.label) {
-        try {
-          await updateConcept(data.concept.id, {
-            label: trimmedLabel,
-          })
-        } catch (error) {
-          console.error('Failed to update concept label:', error)
-          setEditLabel(data.label) // Revert on error
-        }
-      } else {
-        setEditLabel(data.label) // Revert if unchanged
+    
+    isSavingRef.current = true
+    
+    try {
+      const trimmedLabel = editLabel.trim()
+      if (!trimmedLabel) {
+        setEditLabel(data.label) // Revert if empty
+        setIsEditing(false)
+        return Promise.resolve()
       }
+
+      // Try triple entry first
+      const tripleResult = await processTripleEntry({
+        label: trimmedLabel,
+        conceptId: data.concept.id,
+        nodeId,
+        currentLabel: data.label,
+      })
+
+      if (!tripleResult.success) {
+        // Not a triple pattern, just update the concept label
+        if (trimmedLabel !== data.label) {
+          try {
+            await updateConcept(data.concept.id, {
+              label: trimmedLabel,
+            })
+          } catch (error) {
+            console.error('Failed to update concept label:', error)
+            setEditLabel(data.label) // Revert on error
+          }
+        } else {
+          setEditLabel(data.label) // Revert if unchanged
+        }
+      }
+      
+      setIsEditing(false)
+    } finally {
+      // Reset save flag after a short delay to allow save to complete
+      setTimeout(() => {
+        isSavingRef.current = false
+      }, 100)
     }
     
-    setIsEditing(false)
     return Promise.resolve() // Return promise for await in handleKeyDown
-  }, [hasWriteAccess, editLabel, data.label, data.concept.id, nodeId, processTripleEntry, updateConcept, setIsEditing, setEditLabel])
+  }, [hasWriteAccess, editLabel, data.label, data.concept.id, nodeId, processTripleEntry, updateConcept, setIsEditing, setEditLabel, isEditing])
 
   const handleSaveNotes = useCallback(async () => {
     if (!hasWriteAccess) {
