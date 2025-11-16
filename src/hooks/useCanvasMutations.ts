@@ -100,15 +100,32 @@ export function useCanvasMutations() {
 
   /**
    * Update a concept with undo tracking.
-   * Note: Capturing previous state requires fetching current state first.
-   * For now, we'll record the mutation without previous state.
+   * 
+   * Records the mutation as a command for undo/redo functionality.
+   * If previousState is provided, it will be stored in the command to enable
+   * proper undo functionality.
+   * 
+   * @param conceptId - ID of the concept to update
+   * @param updates - Partial concept data to update
+   * @param previousState - Optional previous state to enable undo (should be provided when available)
    */
   const updateConcept = useCallback(
-    async (conceptId: string, updates: UpdateConceptData) => {
+    async (
+      conceptId: string,
+      updates: UpdateConceptData,
+      previousState?: {
+        label?: string
+        position?: { x: number; y: number }
+        notes?: string
+        metadata?: Record<string, unknown>
+        showNotesAndMetadata?: boolean
+        userPlaced?: boolean
+      }
+    ) => {
       try {
         await updateConceptAction(conceptId, updates)
         
-        // Record mutation for undo
+        // Record mutation for undo with previous state if provided
         const command: UpdateConceptCommand = {
           type: 'updateConcept',
           id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -116,6 +133,7 @@ export function useCanvasMutations() {
           operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
           conceptId,
           updates,
+          previousState,
         }
         recordMutation(command)
       } catch (error) {

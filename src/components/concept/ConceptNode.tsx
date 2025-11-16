@@ -126,9 +126,16 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
       // Not a triple pattern, just update the concept label
       if (trimmedLabel !== data.label) {
         try {
-          await updateConcept(data.concept.id, {
-            label: trimmedLabel,
-          })
+          // Capture previous state for undo functionality
+          await updateConcept(
+            data.concept.id,
+            {
+              label: trimmedLabel,
+            },
+            {
+              label: data.label, // Previous label value for undo
+            }
+          )
         } catch (error) {
           console.error('Failed to update concept label:', error)
           setEditLabel(data.label) // Revert on error
@@ -154,9 +161,16 @@ export const ConceptNode = memo(({ data, selected, id: nodeId }: NodeProps<Conce
     // Only update if notes actually changed
     if (trimmedNotes !== currentNotes) {
       try {
-        await updateConcept(data.concept.id, {
-          notes: trimmedNotes,
-        })
+        // Capture previous state for undo functionality
+        await updateConcept(
+          data.concept.id,
+          {
+            notes: trimmedNotes,
+          },
+          {
+            notes: currentNotes, // Previous notes value for undo
+          }
+        )
       } catch (error) {
         console.error('Failed to update concept notes:', error)
         // Revert on error
