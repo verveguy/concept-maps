@@ -25,7 +25,6 @@ Fix concept label editing bug where typing multiple characters resulted in each 
 
 - **Fixed `useConceptNodeEditing` hook**: Added state tracking to prevent reactive database updates from interfering with active editing sessions
   - Added `prevIsEditingRef` to track editing state transitions
-  - Added `editingStartLabelRef` to capture initial label when editing starts
   - Modified `useEffect` to ignore `initialLabel` changes while `isEditing` is true
   - Ensures `editLabel` syncs with `initialLabel` only when not editing
 

@@ -104,10 +104,8 @@ export function useConceptNodeEditing(
   const notesMeasureRef = useRef<HTMLSpanElement>(null)
   const measureRef = useRef<HTMLSpanElement>(null)
   const hasTriggeredEditRef = useRef(false)
-  // Track the label value when editing starts to prevent reactive updates from interfering
-  const editingStartLabelRef = useRef<string | null>(null)
 
-  // Track when editing state changes to capture initial label
+  // Track when editing state changes to prevent reactive updates from interfering
   const prevIsEditingRef = useRef(isEditing)
   
   // Update edit label when data changes (but not while editing)
@@ -119,11 +117,8 @@ export function useConceptNodeEditing(
     if (!isNowEditing) {
       // Not editing: sync editLabel with initialLabel
       setEditLabel(initialLabel)
-      editingStartLabelRef.current = null // Clear the ref when not editing
     } else if (!wasEditing && isNowEditing) {
-      // Just started editing: capture the initial label value
-      editingStartLabelRef.current = initialLabel
-      // Ensure editLabel is set to the current initialLabel when editing starts
+      // Just started editing: ensure editLabel is set to the current initialLabel
       setEditLabel(initialLabel)
     }
     // While editing (wasEditing && isNowEditing), ignore changes to initialLabel
