@@ -39,6 +39,8 @@ export function MapPage() {
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
   const isEditingPerspective = useMapStore((state) => state.isEditingPerspective)
   const setIsEditingPerspective = useMapStore((state) => state.setIsEditingPerspective)
+  const newlyCreatedMapId = useMapStore((state) => state.newlyCreatedMapId)
+  const clearNewlyCreatedMapId = useMapStore((state) => state.clearNewlyCreatedMapId)
   const sidebarOpen = useUIStore((state) => state.sidebarOpen)
   const setSidebarOpen = useUIStore((state) => state.setSidebarOpen)
   const { map, isLoading: isMapLoading } = useMap()
@@ -57,6 +59,7 @@ export function MapPage() {
   const mapNameRef = useRef<HTMLHeadingElement>(null)
   const previousMapNameRef = useRef<string>('')
   const isEditingRef = useRef(false)
+  const shouldFocusMapNameRef = useRef(false)
 
   // Sync contentEditable element with map name when it changes externally
   useEffect(() => {
@@ -67,6 +70,25 @@ export function MapPage() {
       }
     }
   }, [map?.name])
+
+  // Auto-focus map name field when a new map is created
+  useEffect(() => {
+    if (newlyCreatedMapId && newlyCreatedMapId === currentMapId && mapNameRef.current && map?.name === 'Untitled') {
+      // Small delay to ensure the DOM is ready
+      setTimeout(() => {
+        if (mapNameRef.current) {
+          // Select all text in the contentEditable element
+          const range = document.createRange()
+          range.selectNodeContents(mapNameRef.current)
+          const selection = window.getSelection()
+          selection?.removeAllRanges()
+          selection?.addRange(range)
+          mapNameRef.current.focus()
+          clearNewlyCreatedMapId()
+        }
+      }, 100)
+    }
+  }, [newlyCreatedMapId, currentMapId, map?.name, clearNewlyCreatedMapId])
 
   const handleCreateConcept = useCallback(
     async (position: { x: number; y: number }) => {

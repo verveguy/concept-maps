@@ -224,6 +224,33 @@ export interface ShareInvitation {
 }
 
 /**
+ * Represents a folder for organizing maps.
+ * 
+ * Folders allow users to organize their maps into custom groups. Maps can belong
+ * to multiple folders (many-to-many relationship), enabling flexible organization.
+ * 
+ * **Ownership:**
+ * Folders are owned by the user who creates them (`createdBy`). Users can only
+ * view, edit, and delete their own folders.
+ * 
+ * **Soft Deletes:**
+ * Folders support soft deletion via the `deletedAt` field. Soft-deleted folders
+ * are excluded from normal queries but remain in the database for audit trails.
+ * 
+ * **Map Organization:**
+ * Maps are linked to folders via a many-to-many relationship. A map can appear
+ * in multiple folders, and folders can contain multiple maps.
+ */
+export interface Folder {
+  id: string
+  name: string
+  createdBy: string
+  createdAt: Date
+  updatedAt: Date
+  deletedAt: Date | null // Timestamp when soft-deleted, null if not deleted
+}
+
+/**
  * Represents a comment (sticky note) attached to one or more concepts.
  * 
  * Comments allow users to add notes and annotations to concepts in a concept map.

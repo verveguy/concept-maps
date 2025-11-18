@@ -8,6 +8,29 @@ import { useMemo } from 'react'
 import type { Map } from '@/lib/schema'
 
 /**
+ * Categorize maps into owned vs shared maps.
+ * 
+ * @param maps - Array of maps to categorize
+ * @param userId - Current user ID
+ * @param sharedMapIds - Set of map IDs that are shared with the user
+ * @returns Object with ownedMaps and sharedMaps arrays
+ */
+export function categorizeMaps(maps: Map[], userId: string | null, sharedMapIds: Set<string>) {
+  const ownedMaps: Map[] = []
+  const sharedMaps: Map[] = []
+  
+  for (const map of maps) {
+    if (map.createdBy === userId) {
+      ownedMaps.push(map)
+    } else if (sharedMapIds.has(map.id)) {
+      sharedMaps.push(map)
+    }
+  }
+  
+  return { ownedMaps, sharedMaps }
+}
+
+/**
  * Hook to get all maps accessible to the current user.
  * 
  * Uses InstantDB `useQuery()` for real-time updates. Automatically filters

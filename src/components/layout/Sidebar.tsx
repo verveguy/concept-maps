@@ -52,14 +52,14 @@
 
 import { useState, useEffect, useMemo, memo, useCallback } from 'react'
 import { X, Plus, Play, ChevronRight, ChevronDown, Eye, Settings, Sun, Moon, BookOpen, Trash2 } from 'lucide-react'
-import { useMaps } from '@/hooks/useMaps'
+import { useMaps, categorizeMaps } from '@/hooks/useMaps'
 import { useMapActions } from '@/hooks/useMapActions'
 import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
+import { useFolders, createFolder, updateFolder, deleteFolder, addMapToFolder, removeMapFromFolder } from '@/hooks/useFolders'
 import { useMapStore } from '@/stores/mapStore'
 import { useUIStore } from '@/stores/uiStore'
 import { db } from '@/lib/instant'
 import { navigateToMap } from '@/utils/navigation'
-import { format } from 'date-fns'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import {
   AlertDialog,
@@ -72,6 +72,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { UserAvatarSection } from './UserAvatarSection'
+import { MapEntry } from './MapEntry'
+import { FolderEntry } from './FolderEntry'
 
 /**
  * Memoized video popover component.
@@ -167,17 +169,60 @@ ThemeToggle.displayName = 'ThemeToggle'
 export const Sidebar = () => {
   const { createMap, deleteMap } = useMapActions()
   const { createPerspective } = usePerspectiveActions()
-  const { currentMapId, currentPerspectiveId, setCurrentMapId, setCurrentPerspectiveId } = useMapStore()
+  const { currentMapId, currentPerspectiveId, setCurrentMapId, setCurrentPerspectiveId, setNewlyCreatedMapId } = useMapStore()
   const { setSidebarOpen } = useUIStore()
-  const [isCreating, setIsCreating] = useState(false)
-  const [newMapName, setNewMapName] = useState('')
-  const [expandedMaps, setExpandedMaps] = useState<Set<string>>(new Set([currentMapId || '']))
+  const [isCreatingMap, setIsCreatingMap] = useState(false)
+  // Track expansion state per section: 'folders', 'myMaps', 'shared'
+  const [expandedMaps, setExpandedMaps] = useState<Map<string, Set<string>>>(new Map([
+    ['folders', new Set()],
+    ['myMaps', new Set()],
+    ['shared', new Set()],
+  ]))
   const [isCreatingPerspective, setIsCreatingPerspective] = useState<string | null>(null)
   const [newPerspectiveName, setNewPerspectiveName] = useState('')
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [mapToDelete, setMapToDelete] = useState<{ id: string; name: string } | null>(null)
+  const [expandedSections, setExpandedSections] = useState<Set<'folders' | 'myMaps' | 'shared'>>(
+    new Set(['folders', 'myMaps', 'shared'])
+  )
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set())
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [folderToDelete, setFolderToDelete] = useState<{ id: string; name: string } | null>(null)
+  
+  // Drag and drop state
+  const [draggedMapId, setDraggedMapId] = useState<string | null>(null)
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null)
 
+  const auth = db.useAuth()
+  const userId = auth.user?.id || null
   const maps = useMaps()
+  const folders = useFolders()
+  
+  // Query folders with their maps
+  const { data: foldersData } = db.useQuery(
+    userId
+      ? {
+          folders: {
+            creator: {},
+            maps: {},
+          },
+        }
+      : null
+  )
+  
+  // Query shares to identify shared maps
+  const { data: sharesData } = db.useQuery(
+    userId
+      ? {
+          shares: {
+            user: {},
+            map: {},
+          },
+        }
+      : null
+  )
+  
   // Get all perspectives for all maps (not filtered by currentMapId)
   const { data: perspectivesData } = db.useQuery({
     perspectives: {
@@ -198,7 +243,127 @@ export const Sidebar = () => {
       createdAt: new Date(p.createdAt),
     }))
   }, [perspectivesData])
+  
+  // Get shared map IDs from shares
+  const sharedMapIds = useMemo(() => {
+    const ids = new Set<string>()
+    if (sharesData?.shares) {
+      for (const share of sharesData.shares) {
+        if (share.map?.id && share.status === 'active') {
+          ids.add(share.map.id)
+        }
+      }
+    }
+    return ids
+  }, [sharesData])
+  
+  // Categorize maps into owned and shared
+  const { ownedMaps, sharedMaps } = useMemo(() => {
+    return categorizeMaps(maps, userId, sharedMapIds)
+  }, [maps, userId, sharedMapIds])
+  
+  // Build map of folder ID to map IDs
+  const folderMapIds = useMemo(() => {
+    const map = new Map<string, Set<string>>()
+    if (foldersData?.folders) {
+      for (const folder of foldersData.folders) {
+        if (!folder.deletedAt && folder.maps) {
+          const mapIds = new Set<string>()
+          for (const mapItem of folder.maps) {
+            if (mapItem?.id) {
+              mapIds.add(mapItem.id)
+            }
+          }
+          map.set(folder.id, mapIds)
+        }
+      }
+    }
+    return map
+  }, [foldersData])
+  
+  // Get all maps (owned + shared) for folder organization
+  const allMapsForFolders = useMemo(() => {
+    return [...ownedMaps, ...sharedMaps]
+  }, [ownedMaps, sharedMaps])
 
+  // Get maps organized by folder (includes both owned and shared maps)
+  const mapsByFolder = useMemo(() => {
+    const byFolder = new Map<string, typeof allMapsForFolders>()
+    const mapsInFolders = new Set<string>()
+    
+    // Group maps by folder (both owned and shared)
+    for (const folder of folders) {
+      const folderMaps: typeof allMapsForFolders = []
+      const mapIds = folderMapIds.get(folder.id) || new Set()
+      for (const map of allMapsForFolders) {
+        if (mapIds.has(map.id)) {
+          folderMaps.push(map)
+          mapsInFolders.add(map.id)
+        }
+      }
+      if (folderMaps.length > 0) {
+        byFolder.set(folder.id, folderMaps)
+      }
+    }
+    
+    return byFolder
+  }, [folders, allMapsForFolders, folderMapIds])
+
+  // My Maps and Shared with Me show ALL maps in those categories (regardless of folder membership)
+  // Maps can appear in both their folder AND their category section
+  
+  const toggleSection = (section: 'folders' | 'myMaps' | 'shared') => {
+    setExpandedSections((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(section)) {
+        newSet.delete(section)
+      } else {
+        newSet.add(section)
+      }
+      return newSet
+    })
+  }
+  
+  const toggleFolder = (folderId: string) => {
+    setExpandedFolders((prev) => {
+      const newSet = new Set(prev)
+      if (newSet.has(folderId)) {
+        newSet.delete(folderId)
+      } else {
+        newSet.add(folderId)
+      }
+      return newSet
+    })
+  }
+  
+  const handleCreateFolder = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newFolderName.trim() || !userId) return
+    
+    setIsCreatingFolder(true)
+    try {
+      await createFolder(newFolderName.trim(), userId)
+      setNewFolderName('')
+      setIsCreatingFolder(false)
+    } catch (error) {
+      console.error('Failed to create folder:', error)
+      alert('Failed to create folder. Please try again.')
+      setIsCreatingFolder(false)
+    }
+  }
+  
+  const handleDeleteFolder = async () => {
+    if (!folderToDelete) return
+    
+    try {
+      await deleteFolder(folderToDelete.id)
+      setFolderToDelete(null)
+    } catch (error) {
+      console.error('Failed to delete folder:', error)
+      alert('Failed to delete folder. Please try again.')
+      setFolderToDelete(null)
+    }
+  }
   
   // Initialize theme from localStorage or system preference
   useEffect(() => {
@@ -231,26 +396,23 @@ export const Sidebar = () => {
     })
   }, [])
 
-  // Auto-expand map when a perspective is selected
-  useEffect(() => {
-    if (currentPerspectiveId && currentMapId) {
-      setExpandedMaps((prev) => new Set([...prev, currentMapId]))
-    }
-  }, [currentPerspectiveId, currentMapId])
 
-  const handleCreateMap = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newMapName.trim()) return
-
-    setIsCreating(true)
+  const handleCreateMap = async () => {
+    setIsCreatingMap(true)
     try {
-      await createMap(newMapName.trim())
-      setNewMapName('')
+      const newMap = await createMap('Untitled')
+      // Select the newly created map and mark it as newly created
+      if (newMap?.id) {
+        setNewlyCreatedMapId(newMap.id)
+        setCurrentPerspectiveId(null)
+        // Navigate to the map (this will also set currentMapId)
+        navigateToMap(newMap.id)
+      }
     } catch (error) {
       console.error('Failed to create map:', error)
       alert('Failed to create map. Please try again.')
     } finally {
-      setIsCreating(false)
+      setIsCreatingMap(false)
     }
   }
 
@@ -269,8 +431,6 @@ export const Sidebar = () => {
       })
       setNewPerspectiveName('')
       setIsCreatingPerspective(null)
-      // Expand the map to show the new perspective
-      setExpandedMaps(new Set([...expandedMaps, mapId]))
     } catch (error) {
       console.error('Failed to create perspective:', error)
       alert('Failed to create perspective. Please try again.')
@@ -279,15 +439,19 @@ export const Sidebar = () => {
     }
   }
 
-  const toggleMapExpanded = (mapId: string) => {
-    const newExpanded = new Set(expandedMaps)
-    if (newExpanded.has(mapId)) {
-      newExpanded.delete(mapId)
-    } else {
-      newExpanded.add(mapId)
-    }
-    setExpandedMaps(newExpanded)
-  }
+  const toggleMapExpanded = useCallback((mapId: string, section: 'folders' | 'myMaps' | 'shared') => {
+    setExpandedMaps((prev) => {
+      const newMap = new Map(prev)
+      const sectionSet = new Set(newMap.get(section) || [])
+      if (sectionSet.has(mapId)) {
+        sectionSet.delete(mapId)
+      } else {
+        sectionSet.add(mapId)
+      }
+      newMap.set(section, sectionSet)
+      return newMap
+    })
+  }, [])
 
   /**
    * Handle selecting a map.
@@ -348,6 +512,45 @@ export const Sidebar = () => {
     }
   }
 
+  /**
+   * Handle dropping a map into a folder.
+   */
+  const handleDropMap = useCallback(async (mapId: string, targetFolderId: string | null) => {
+    if (!userId) return
+    
+    try {
+      // Get current folders for this map
+      const currentFolders = Array.from(folderMapIds.entries())
+        .filter(([_, mapIds]) => mapIds.has(mapId))
+        .map(([folderId]) => folderId)
+      
+      // Remove from all current folders
+      for (const folderId of currentFolders) {
+        await removeMapFromFolder(mapId, folderId)
+      }
+      
+      // Add to target folder if specified (null means "Uncategorized")
+      if (targetFolderId) {
+        await addMapToFolder(mapId, targetFolderId)
+      }
+    } catch (error) {
+      console.error('Failed to move map:', error)
+      alert('Failed to move map. Please try again.')
+    }
+  }, [userId, folderMapIds])
+
+  // Drag handlers for map entries
+  const handleDragStart = useCallback((e: React.DragEvent, mapId: string) => {
+    setDraggedMapId(mapId)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', mapId)
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedMapId(null)
+    setDragOverFolderId(null)
+  }, [])
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -364,28 +567,6 @@ export const Sidebar = () => {
         </div>
       </div>
 
-      {/* Create Map Form */}
-      <div className="p-4 border-b">
-        <form onSubmit={handleCreateMap} className="space-y-2">
-          <input
-            type="text"
-            value={newMapName}
-            onChange={(e) => setNewMapName(e.target.value)}
-            placeholder="New map name..."
-            className="w-full px-3 py-2 text-sm border rounded-md"
-            disabled={isCreating}
-            autoFocus
-          />
-          <button
-            type="submit"
-            disabled={isCreating || !newMapName.trim()}
-            className="w-full px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            {isCreating ? 'Creating...' : 'Create Map'}
-          </button>
-        </form>
-      </div>
 
       {/* Maps List */}
       <div className="flex-1 overflow-y-auto">
@@ -394,158 +575,250 @@ export const Sidebar = () => {
             No maps yet. Create your first map above!
           </div>
         ) : (
-          <ul className="divide-y">
-            {maps.map((map) => {
-              const perspectives = allPerspectives.filter((p) => p.mapId === map.id)
-              const isExpanded = expandedMaps.has(map.id)
-              // Map is selected if it's the current map and no perspective is selected
-              // OR if a perspective from this map is selected
-              const isMapSelected = currentMapId === map.id && !currentPerspectiveId
-              const hasActivePerspective = currentPerspectiveId && perspectives.some(p => p.id === currentPerspectiveId)
-              const isSelected = isMapSelected || hasActivePerspective
-              const isCreatingPerspectiveForThisMap = isCreatingPerspective === map.id
-
-              return (
-                <li key={map.id}>
-                  <div>
-                    {/* Map Header */}
-                    <div className="group relative">
-                      <button
-                        onClick={() => {
-                          toggleMapExpanded(map.id)
-                          handleSelectMap(map.id)
+          <>
+            {/* Folders Section */}
+            <div>
+              <div className="flex items-center">
+                <button
+                  onClick={() => toggleSection('folders')}
+                  className="flex-1 text-left px-3 py-2 hover:bg-accent transition-colors text-xs font-semibold text-muted-foreground uppercase"
+                >
+                  Folders
+                </button>
+                {isCreatingFolder ? (
+                  <div className="px-2">
+                    <form onSubmit={handleCreateFolder} className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={newFolderName}
+                        onChange={(e) => setNewFolderName(e.target.value)}
+                        placeholder="Folder name..."
+                        className="px-2 py-1 text-xs border rounded-md w-32"
+                        autoFocus
+                        onBlur={() => {
+                          if (!newFolderName.trim()) {
+                            setIsCreatingFolder(false)
+                            setNewFolderName('')
+                          }
                         }}
-                        className={`w-full text-left p-4 hover:bg-accent transition-colors flex items-center gap-2 ${
-                          isSelected 
-                            ? 'bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-500 font-semibold text-black dark:text-white' 
-                            : ''
-                        }`}
-                      >
-                        {perspectives.length > 0 && (
-                          <div className="flex-shrink-0">
-                            {isExpanded ? (
-                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                            )}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium">{map.name}</div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Updated {format(map.updatedAt, 'MMM d, yyyy')}
-                            {perspectives.length > 0 && ` ? ${perspectives.length} perspective${perspectives.length === 1 ? '' : 's'}`}
-                          </div>
-                        </div>
-                      </button>
-                      {/* Delete button - shows on hover only */}
+                      />
                       <button
-                        onClick={(e) => handleDeleteMapClick(map.id, map.name, e)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors opacity-0 group-hover:opacity-100"
-                        title="Delete map"
-                        aria-label={`Delete ${map.name}`}
+                        type="submit"
+                        disabled={!newFolderName.trim()}
+                        className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
                       >
-                        <Trash2 className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                        Create
                       </button>
-                    </div>
-
-                    {/* Perspectives List */}
-                    {isExpanded && perspectives.length > 0 && (
-                      <ul className="bg-muted/30">
-                        {perspectives.map((perspective) => {
-                          const isPerspectiveSelected = currentPerspectiveId === perspective.id
-                          return (
-                            <li key={perspective.id}>
-                              <button
-                                onClick={(e) => handleSelectPerspective(perspective.id, map.id, e)}
-                                className={`w-full text-left pl-12 pr-4 py-2 hover:bg-accent transition-colors flex items-center gap-2 group ${
-                                  isPerspectiveSelected 
-                                    ? 'bg-blue-50 dark:bg-blue-900 border-l-4 border-blue-500 font-semibold text-black dark:text-white' 
-                                    : ''
-                                }`}
-                                title={`Click to ${isPerspectiveSelected ? 'view/edit' : 'edit'} perspective`}
-                              >
-                                <Eye className={`h-3 w-3 flex-shrink-0 ${
-                                  isPerspectiveSelected ? 'text-blue-600 dark:text-blue-300' : 'text-muted-foreground'
-                                }`} />
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-sm font-medium">{perspective.name}</div>
-                                  <div className="text-xs text-muted-foreground mt-0.5">
-                                    {perspective.conceptIds.length} concept{perspective.conceptIds.length === 1 ? '' : 's'} ? {perspective.relationshipIds.length} relationship{perspective.relationshipIds.length === 1 ? '' : 's'}
-                                  </div>
-                                </div>
-                                <Settings className={`h-3 w-3 text-muted-foreground flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity ${
-                                  isPerspectiveSelected ? 'opacity-100' : ''
-                                }`} />
-                              </button>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    )}
-
-                    {/* Create Perspective Form */}
-                    {isExpanded && (
-                      <div className="px-4 py-2 bg-muted/20">
-                        {isCreatingPerspectiveForThisMap ? (
-                          <form
-                            onSubmit={(e) => handleCreatePerspective(e, map.id)}
-                            className="space-y-2"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <input
-                              type="text"
-                              value={newPerspectiveName}
-                              onChange={(e) => setNewPerspectiveName(e.target.value)}
-                              placeholder="New perspective name..."
-                              className="w-full px-2 py-1.5 text-xs border rounded-md"
-                              autoFocus
-                              onBlur={() => {
-                                if (!newPerspectiveName.trim()) {
-                                  setIsCreatingPerspective(null)
-                                  setNewPerspectiveName('')
-                                }
-                              }}
-                            />
-                            <div className="flex gap-1">
-                              <button
-                                type="submit"
-                                disabled={!newPerspectiveName.trim()}
-                                className="flex-1 px-2 py-1 text-xs bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
-                              >
-                                Create
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsCreatingPerspective(null)
-                                  setNewPerspectiveName('')
-                                }}
-                                className="px-2 py-1 text-xs border rounded-md hover:bg-accent"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </form>
-                        ) : (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setIsCreatingPerspective(map.id)
-                            }}
-                            className="w-full text-left pl-12 pr-4 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded-md transition-colors flex items-center gap-2"
-                          >
-                            <Plus className="h-3 w-3" />
-                            Add Perspective
-                          </button>
-                        )}
-                      </div>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsCreatingFolder(false)
+                          setNewFolderName('')
+                        }}
+                        className="px-2 py-1 text-xs border rounded-md hover:bg-accent"
+                      >
+                        Cancel
+                      </button>
+                    </form>
                   </div>
-                </li>
-              )
-            })}
-          </ul>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setIsCreatingFolder(true)
+                    }}
+                    className="p-2 hover:bg-accent transition-colors rounded"
+                    title="New Folder"
+                  >
+                    <Plus className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+              {expandedSections.has('folders') && (
+                <div className="pl-3">
+                  {/* Folders */}
+                  {folders.length > 0 && (
+                    <ul className="divide-y">
+                      {folders.map((folder) => {
+                        const folderMaps = mapsByFolder.get(folder.id) || []
+                        const isFolderExpanded = expandedFolders.has(folder.id)
+                        const isDragOver = dragOverFolderId === folder.id && draggedMapId !== null
+                        
+                        return (
+                          <FolderEntry
+                            key={folder.id}
+                            folder={folder}
+                            maps={folderMaps}
+                            allPerspectives={allPerspectives}
+                            isExpanded={isFolderExpanded}
+                            isDragOver={isDragOver}
+                            currentMapId={currentMapId}
+                            currentPerspectiveId={currentPerspectiveId}
+                            isCreatingPerspective={isCreatingPerspective}
+                            newPerspectiveName={newPerspectiveName}
+                            userId={userId}
+                            draggedMapId={draggedMapId}
+                            onToggleFolder={toggleFolder}
+                            onDeleteFolder={(id, name) => setFolderToDelete({ id, name })}
+                            onSelectMap={handleSelectMap}
+                            onSelectPerspective={handleSelectPerspective}
+                            onDeleteMap={handleDeleteMapClick}
+                            onCreatePerspective={handleCreatePerspective}
+                            onSetCreatingPerspective={setIsCreatingPerspective}
+                            onSetNewPerspectiveName={setNewPerspectiveName}
+                            onToggleMapExpanded={(mapId: string) => toggleMapExpanded(mapId, 'folders')}
+                            expandedMaps={expandedMaps.get('folders') || new Set()}
+                            onDragOver={(e) => {
+                              if (draggedMapId) {
+                                e.preventDefault()
+                                e.dataTransfer.dropEffect = 'move'
+                                setDragOverFolderId(folder.id)
+                              }
+                            }}
+                            onDragLeave={() => {
+                              setDragOverFolderId(null)
+                            }}
+                            onDrop={async (e) => {
+                              e.preventDefault()
+                              const mapId = e.dataTransfer.getData('text/plain')
+                              if (mapId && draggedMapId === mapId) {
+                                await handleDropMap(mapId, folder.id)
+                              }
+                              setDragOverFolderId(null)
+                              setDraggedMapId(null)
+                            }}
+                            onDragStart={handleDragStart}
+                            onDragEnd={handleDragEnd}
+                          />
+                        )
+                      })}
+                    </ul>
+                  )}
+                  
+                  {/* Empty state */}
+                  {folders.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-muted-foreground">No folders yet</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* My Maps Section */}
+            <div>
+              <div className="flex items-center">
+                <button
+                  onClick={() => toggleSection('myMaps')}
+                  className="flex-1 text-left px-3 py-2 hover:bg-accent transition-colors text-xs font-semibold text-muted-foreground uppercase"
+                >
+                  My Maps
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleCreateMap()
+                  }}
+                  disabled={isCreatingMap}
+                  className="p-2 hover:bg-accent transition-colors rounded disabled:opacity-50"
+                  title="Create Map"
+                >
+                  <Plus className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+              {expandedSections.has('myMaps') && (
+                <div className="pl-3">
+                  <ul className="divide-y">
+                    {/* Existing Maps */}
+                    {ownedMaps.length > 0 && ownedMaps.map((map) => {
+                        const perspectives = allPerspectives.filter((p) => p.mapId === map.id)
+                        const isExpanded = (expandedMaps.get('myMaps') || new Set()).has(map.id)
+                        const isMapSelected = currentMapId === map.id && !currentPerspectiveId
+                        const hasActivePerspective = currentPerspectiveId && perspectives.some(p => p.id === currentPerspectiveId)
+                        const isSelected = isMapSelected || hasActivePerspective
+
+                        return (
+                          <MapEntry
+                            key={map.id}
+                            map={map}
+                            perspectives={perspectives}
+                            isExpanded={isExpanded}
+                            isSelected={isSelected}
+                            currentPerspectiveId={currentPerspectiveId}
+                            isCreatingPerspective={isCreatingPerspective}
+                            newPerspectiveName={newPerspectiveName}
+                            userId={userId}
+                            draggedMapId={draggedMapId}
+                            onToggleExpanded={(mapId: string) => toggleMapExpanded(mapId, 'myMaps')}
+                            onSelectMap={handleSelectMap}
+                            onSelectPerspective={handleSelectPerspective}
+                            onDeleteMap={handleDeleteMapClick}
+                            onCreatePerspective={handleCreatePerspective}
+                            onSetCreatingPerspective={setIsCreatingPerspective}
+                            onSetNewPerspectiveName={setNewPerspectiveName}
+                            onDragStart={handleDragStart}
+                            onDragEnd={handleDragEnd}
+                          />
+                        )
+                    })}
+                    {/* Empty state */}
+                    {ownedMaps.length === 0 && (
+                      <li>
+                        <div className="px-3 py-2 text-xs text-muted-foreground">No maps yet</div>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Shared with me Section */}
+            {sharedMaps.length > 0 && (
+              <div>
+                <button
+                  onClick={() => toggleSection('shared')}
+                  className="w-full text-left px-3 py-2 hover:bg-accent transition-colors text-xs font-semibold text-muted-foreground uppercase"
+                >
+                  Shared with me
+                </button>
+                {expandedSections.has('shared') && (
+                  <div className="pl-3">
+                    <ul className="divide-y">
+                      {sharedMaps.map((map) => {
+                        const perspectives = allPerspectives.filter((p) => p.mapId === map.id)
+                        const isExpanded = (expandedMaps.get('shared') || new Set()).has(map.id)
+                        const isMapSelected = currentMapId === map.id && !currentPerspectiveId
+                        const hasActivePerspective = currentPerspectiveId && perspectives.some(p => p.id === currentPerspectiveId)
+                        const isSelected = isMapSelected || hasActivePerspective
+
+                        return (
+                          <MapEntry
+                            key={map.id}
+                            map={map}
+                            perspectives={perspectives}
+                            isExpanded={isExpanded}
+                            isSelected={isSelected}
+                            currentPerspectiveId={currentPerspectiveId}
+                            isCreatingPerspective={isCreatingPerspective}
+                            newPerspectiveName={newPerspectiveName}
+                            userId={userId}
+                            draggedMapId={draggedMapId}
+                            onToggleExpanded={(mapId: string) => toggleMapExpanded(mapId, 'shared')}
+                            onSelectMap={handleSelectMap}
+                            onSelectPerspective={handleSelectPerspective}
+                            onDeleteMap={handleDeleteMapClick}
+                            onCreatePerspective={handleCreatePerspective}
+                            onSetCreatingPerspective={setIsCreatingPerspective}
+                            onSetNewPerspectiveName={setNewPerspectiveName}
+                            onDragStart={handleDragStart}
+                            onDragEnd={handleDragEnd}
+                          />
+                        )
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -574,6 +847,27 @@ export const Sidebar = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Folder Confirmation Dialog */}
+      <AlertDialog open={!!folderToDelete} onOpenChange={(open) => !open && setFolderToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Folder</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{folderToDelete?.name}"? Maps in this folder will not be deleted, only the folder organization will be removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteFolder}
               className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
             >
               Delete

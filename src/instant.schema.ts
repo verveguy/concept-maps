@@ -35,6 +35,12 @@ const _schema = i.schema({
       updatedAt: i.number().indexed(),
       userPlaced: i.boolean().optional(),
     }),
+    folders: i.entity({
+      createdAt: i.number().indexed(),
+      deletedAt: i.number().optional(),
+      name: i.string().indexed(),
+      updatedAt: i.number().indexed(),
+    }),
     maps: i.entity({
       createdAt: i.number().indexed(),
       deletedAt: i.number().optional(),
@@ -138,6 +144,18 @@ const _schema = i.schema({
         label: 'concepts',
       },
     },
+    foldersCreator: {
+      forward: {
+        on: 'folders',
+        has: 'one',
+        label: 'creator',
+      },
+      reverse: {
+        on: '$users',
+        has: 'many',
+        label: 'createdFolders',
+      },
+    },
     mapsCreator: {
       forward: {
         on: 'maps',
@@ -149,6 +167,18 @@ const _schema = i.schema({
         on: '$users',
         has: 'many',
         label: 'createdMaps',
+      },
+    },
+    mapsFolders: {
+      forward: {
+        on: 'maps',
+        has: 'many',
+        label: 'folders',
+      },
+      reverse: {
+        on: 'folders',
+        has: 'many',
+        label: 'maps',
       },
     },
     mapsManagePermissions: {
