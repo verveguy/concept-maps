@@ -58,6 +58,8 @@ import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
 import { useFolders, createFolder, updateFolder, deleteFolder, addMapToFolder, removeMapFromFolder } from '@/hooks/useFolders'
 import { useMapStore } from '@/stores/mapStore'
 import { useUIStore } from '@/stores/uiStore'
+import { useUndoStore } from '@/stores/undoStore'
+import type { CreateMapCommand, CreatePerspectiveCommand, DeletePerspectiveCommand } from '@/stores/undoStore'
 import { db } from '@/lib/instant'
 import { navigateToMap } from '@/utils/navigation'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
@@ -168,9 +170,10 @@ ThemeToggle.displayName = 'ThemeToggle'
  */
 export const Sidebar = () => {
   const { createMap, deleteMap } = useMapActions()
-  const { createPerspective } = usePerspectiveActions()
-  const { currentMapId, currentPerspectiveId, setCurrentMapId, setCurrentPerspectiveId, setNewlyCreatedMapId } = useMapStore()
+  const { createPerspective, deletePerspective } = usePerspectiveActions()
+  const { currentMapId, currentPerspectiveId, setCurrentMapId, setCurrentPerspectiveId, setNewlyCreatedMapId, setNewlyCreatedPerspectiveId } = useMapStore()
   const { setSidebarOpen } = useUIStore()
+  const { recordMutation, startOperation, endOperation } = useUndoStore()
   const [isCreatingMap, setIsCreatingMap] = useState(false)
   // Track expansion state per section: 'folders', 'myMaps', 'shared'
   const [expandedMaps, setExpandedMaps] = useState<Map<string, Set<string>>>(new Map([
@@ -178,10 +181,9 @@ export const Sidebar = () => {
     ['myMaps', new Set()],
     ['shared', new Set()],
   ]))
-  const [isCreatingPerspective, setIsCreatingPerspective] = useState<string | null>(null)
-  const [newPerspectiveName, setNewPerspectiveName] = useState('')
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [mapToDelete, setMapToDelete] = useState<{ id: string; name: string } | null>(null)
+  const [perspectiveToDelete, setPerspectiveToDelete] = useState<{ id: string; name: string; mapId: string } | null>(null)
   const [expandedSections, setExpandedSections] = useState<Set<'folders' | 'myMaps' | 'shared'>>(
     new Set(['folders', 'myMaps', 'shared'])
   )
@@ -400,42 +402,81 @@ export const Sidebar = () => {
   const handleCreateMap = async () => {
     setIsCreatingMap(true)
     try {
+      // Start operation for undo tracking
+      startOperation()
+      
       const newMap = await createMap('Untitled')
       // Select the newly created map and mark it as newly created
       if (newMap?.id) {
+        // Record mutation for undo
+        const command: CreateMapCommand = {
+          type: 'createMap',
+          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: Date.now(),
+          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          mapId: newMap.id,
+          name: 'Untitled',
+        }
+        recordMutation(command)
+        
         setNewlyCreatedMapId(newMap.id)
         setCurrentPerspectiveId(null)
         // Navigate to the map (this will also set currentMapId)
         navigateToMap(newMap.id)
       }
+      
+      // End operation
+      endOperation()
     } catch (error) {
       console.error('Failed to create map:', error)
       alert('Failed to create map. Please try again.')
+      // End operation even on error
+      endOperation()
     } finally {
       setIsCreatingMap(false)
     }
   }
 
-  const handleCreatePerspective = async (e: React.FormEvent, mapId: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!newPerspectiveName.trim()) return
-
-    setIsCreatingPerspective(mapId)
+  const handleCreatePerspective = async (mapId: string) => {
     try {
-      await createPerspective({
+      // Start operation for undo tracking
+      startOperation()
+      
+      const newPerspective = await createPerspective({
         mapId,
-        name: newPerspectiveName.trim(),
+        name: 'Untitled',
         conceptIds: [],
         relationshipIds: [],
       })
-      setNewPerspectiveName('')
-      setIsCreatingPerspective(null)
+      // Select the newly created perspective and mark it as newly created
+      if (newPerspective?.id) {
+        // Record mutation for undo
+        const command: CreatePerspectiveCommand = {
+          type: 'createPerspective',
+          id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          timestamp: Date.now(),
+          operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+          perspectiveId: newPerspective.id,
+          mapId,
+          name: 'Untitled',
+          conceptIds: [],
+          relationshipIds: [],
+        }
+        recordMutation(command)
+        
+        setNewlyCreatedPerspectiveId(newPerspective.id)
+        setCurrentPerspectiveId(newPerspective.id)
+        // Navigate to the map (perspective is set via store)
+        navigateToMap(mapId)
+      }
+      
+      // End operation
+      endOperation()
     } catch (error) {
       console.error('Failed to create perspective:', error)
       alert('Failed to create perspective. Please try again.')
-    } finally {
-      setIsCreatingPerspective(null)
+      // End operation even on error
+      endOperation()
     }
   }
 
@@ -509,6 +550,55 @@ export const Sidebar = () => {
       console.error('Failed to delete map:', error)
       alert('Failed to delete map. Please try again.')
       setMapToDelete(null)
+    }
+  }
+
+  /**
+   * Handle perspective deletion click - opens confirmation dialog.
+   */
+  const handleDeletePerspectiveClick = (perspectiveId: string, perspectiveName: string, mapId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setPerspectiveToDelete({ id: perspectiveId, name: perspectiveName, mapId })
+  }
+
+  /**
+   * Handle perspective deletion after confirmation.
+   * Deletes the perspective and clears selection if it's the current perspective.
+   */
+  const handleConfirmDeletePerspective = async () => {
+    if (!perspectiveToDelete) return
+
+    try {
+      // Start operation for undo tracking
+      startOperation()
+      
+      await deletePerspective(perspectiveToDelete.id)
+      
+      // Record mutation for undo
+      const command: DeletePerspectiveCommand = {
+        type: 'deletePerspective',
+        id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: Date.now(),
+        operationId: useUndoStore.getState().currentOperationId || `op_${Date.now()}`,
+        perspectiveId: perspectiveToDelete.id,
+      }
+      recordMutation(command)
+      
+      // If the deleted perspective is the current perspective, clear the selection
+      if (currentPerspectiveId === perspectiveToDelete.id) {
+        setCurrentPerspectiveId(null)
+      }
+      
+      // End operation
+      endOperation()
+      
+      setPerspectiveToDelete(null)
+    } catch (error) {
+      console.error('Failed to delete perspective:', error)
+      alert('Failed to delete perspective. Please try again.')
+      // End operation even on error
+      endOperation()
+      setPerspectiveToDelete(null)
     }
   }
 
@@ -654,8 +744,6 @@ export const Sidebar = () => {
                             isDragOver={isDragOver}
                             currentMapId={currentMapId}
                             currentPerspectiveId={currentPerspectiveId}
-                            isCreatingPerspective={isCreatingPerspective}
-                            newPerspectiveName={newPerspectiveName}
                             userId={userId}
                             draggedMapId={draggedMapId}
                             onToggleFolder={toggleFolder}
@@ -663,9 +751,8 @@ export const Sidebar = () => {
                             onSelectMap={handleSelectMap}
                             onSelectPerspective={handleSelectPerspective}
                             onDeleteMap={handleDeleteMapClick}
+                            onDeletePerspective={(perspectiveId, perspectiveName, mapId, e) => handleDeletePerspectiveClick(perspectiveId, perspectiveName, mapId, e)}
                             onCreatePerspective={handleCreatePerspective}
-                            onSetCreatingPerspective={setIsCreatingPerspective}
-                            onSetNewPerspectiveName={setNewPerspectiveName}
                             onToggleMapExpanded={(mapId: string) => toggleMapExpanded(mapId, 'folders')}
                             expandedMaps={expandedMaps.get('folders') || new Set()}
                             onDragOver={(e) => {
@@ -728,37 +815,39 @@ export const Sidebar = () => {
                 <div className="pl-3">
                   <ul className="divide-y">
                     {/* Existing Maps */}
-                    {ownedMaps.length > 0 && ownedMaps.map((map) => {
-                        const perspectives = allPerspectives.filter((p) => p.mapId === map.id)
-                        const isExpanded = (expandedMaps.get('myMaps') || new Set()).has(map.id)
-                        const isMapSelected = currentMapId === map.id && !currentPerspectiveId
-                        const hasActivePerspective = currentPerspectiveId && perspectives.some(p => p.id === currentPerspectiveId)
-                        const isSelected = isMapSelected || hasActivePerspective
+               {ownedMaps.length > 0 && ownedMaps.map((map) => {
+                   const perspectives = allPerspectives.filter((p) => p.mapId === map.id).map(p => ({
+                     id: p.id,
+                     mapId: p.mapId,
+                     name: p.name,
+                     createdBy: p.createdBy,
+                   }))
+                   const isExpanded = (expandedMaps.get('myMaps') || new Set()).has(map.id)
+                   const isMapSelected = currentMapId === map.id && !currentPerspectiveId
+                   const hasActivePerspective = currentPerspectiveId && perspectives.some(p => p.id === currentPerspectiveId)
+                   const isSelected = isMapSelected || hasActivePerspective
 
-                        return (
-                          <MapEntry
-                            key={map.id}
-                            map={map}
-                            perspectives={perspectives}
-                            isExpanded={isExpanded}
-                            isSelected={isSelected}
-                            currentPerspectiveId={currentPerspectiveId}
-                            isCreatingPerspective={isCreatingPerspective}
-                            newPerspectiveName={newPerspectiveName}
-                            userId={userId}
-                            draggedMapId={draggedMapId}
-                            onToggleExpanded={(mapId: string) => toggleMapExpanded(mapId, 'myMaps')}
-                            onSelectMap={handleSelectMap}
-                            onSelectPerspective={handleSelectPerspective}
-                            onDeleteMap={handleDeleteMapClick}
-                            onCreatePerspective={handleCreatePerspective}
-                            onSetCreatingPerspective={setIsCreatingPerspective}
-                            onSetNewPerspectiveName={setNewPerspectiveName}
-                            onDragStart={handleDragStart}
-                            onDragEnd={handleDragEnd}
-                          />
-                        )
-                    })}
+                   return (
+                     <MapEntry
+                       key={map.id}
+                       map={map}
+                       perspectives={perspectives}
+                       isExpanded={isExpanded}
+                       isSelected={isSelected}
+                       currentPerspectiveId={currentPerspectiveId}
+                       userId={userId}
+                       draggedMapId={draggedMapId}
+                       onToggleExpanded={(mapId: string) => toggleMapExpanded(mapId, 'myMaps')}
+                       onSelectMap={handleSelectMap}
+                       onSelectPerspective={handleSelectPerspective}
+                       onDeleteMap={handleDeleteMapClick}
+                       onDeletePerspective={(perspectiveId, perspectiveName, e) => handleDeletePerspectiveClick(perspectiveId, perspectiveName, map.id, e)}
+                       onCreatePerspective={handleCreatePerspective}
+                       onDragStart={handleDragStart}
+                       onDragEnd={handleDragEnd}
+                     />
+                   )
+               })}
                     {/* Empty state */}
                     {ownedMaps.length === 0 && (
                       <li>
@@ -783,7 +872,12 @@ export const Sidebar = () => {
                   <div className="pl-3">
                     <ul className="divide-y">
                       {sharedMaps.map((map) => {
-                        const perspectives = allPerspectives.filter((p) => p.mapId === map.id)
+                        const perspectives = allPerspectives.filter((p) => p.mapId === map.id).map(p => ({
+                          id: p.id,
+                          mapId: p.mapId,
+                          name: p.name,
+                          createdBy: p.createdBy,
+                        }))
                         const isExpanded = (expandedMaps.get('shared') || new Set()).has(map.id)
                         const isMapSelected = currentMapId === map.id && !currentPerspectiveId
                         const hasActivePerspective = currentPerspectiveId && perspectives.some(p => p.id === currentPerspectiveId)
@@ -797,17 +891,14 @@ export const Sidebar = () => {
                             isExpanded={isExpanded}
                             isSelected={isSelected}
                             currentPerspectiveId={currentPerspectiveId}
-                            isCreatingPerspective={isCreatingPerspective}
-                            newPerspectiveName={newPerspectiveName}
                             userId={userId}
                             draggedMapId={draggedMapId}
                             onToggleExpanded={(mapId: string) => toggleMapExpanded(mapId, 'shared')}
                             onSelectMap={handleSelectMap}
                             onSelectPerspective={handleSelectPerspective}
                             onDeleteMap={handleDeleteMapClick}
+                            onDeletePerspective={(perspectiveId, perspectiveName, e) => handleDeletePerspectiveClick(perspectiveId, perspectiveName, map.id, e)}
                             onCreatePerspective={handleCreatePerspective}
-                            onSetCreatingPerspective={setIsCreatingPerspective}
-                            onSetNewPerspectiveName={setNewPerspectiveName}
                             onDragStart={handleDragStart}
                             onDragEnd={handleDragEnd}
                           />
@@ -868,6 +959,27 @@ export const Sidebar = () => {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteFolder}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Perspective Confirmation Dialog */}
+      <AlertDialog open={!!perspectiveToDelete} onOpenChange={(open) => !open && setPerspectiveToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Perspective</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{perspectiveToDelete?.name}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeletePerspective}
               className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
             >
               Delete

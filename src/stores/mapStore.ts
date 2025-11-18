@@ -44,6 +44,12 @@ export interface MapState {
   setNewlyCreatedMapId: (id: string | null) => void
   /** Clear the newly created map ID */
   clearNewlyCreatedMapId: () => void
+  /** ID of a newly created perspective (used to trigger auto-focus on perspective name) */
+  newlyCreatedPerspectiveId: string | null
+  /** Set the newly created perspective ID */
+  setNewlyCreatedPerspectiveId: (id: string | null) => void
+  /** Clear the newly created perspective ID */
+  clearNewlyCreatedPerspectiveId: () => void
 
   /** Clear all map state when navigating away */
   clearMapState: () => void
@@ -71,6 +77,9 @@ export const useMapStore = create<MapState>((set) => ({
   newlyCreatedMapId: null,
   setNewlyCreatedMapId: (id) => set({ newlyCreatedMapId: id }),
   clearNewlyCreatedMapId: () => set({ newlyCreatedMapId: null }),
+  newlyCreatedPerspectiveId: null,
+  setNewlyCreatedPerspectiveId: (id) => set({ newlyCreatedPerspectiveId: id }),
+  clearNewlyCreatedPerspectiveId: () => set({ newlyCreatedPerspectiveId: null }),
   clearMapState: () =>
     set({
       currentMapId: null,
@@ -81,5 +90,6 @@ export const useMapStore = create<MapState>((set) => ({
       hideNonPerspective: false,
       isEditingPerspective: false,
       newlyCreatedMapId: null,
+      newlyCreatedPerspectiveId: null,
     }),
 }))

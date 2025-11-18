@@ -13,6 +13,7 @@ interface Perspective {
   id: string
   mapId: string
   name: string
+  createdBy?: string
 }
 
 interface FolderEntryProps {
@@ -23,8 +24,6 @@ interface FolderEntryProps {
   isDragOver: boolean
   currentMapId: string | null
   currentPerspectiveId: string | null
-  isCreatingPerspective: string | null
-  newPerspectiveName: string
   userId: string | null
   draggedMapId: string | null
   onToggleFolder: (folderId: string) => void
@@ -32,9 +31,7 @@ interface FolderEntryProps {
   onSelectMap: (mapId: string) => void
   onSelectPerspective: (perspectiveId: string, mapId: string, e: React.MouseEvent) => void
   onDeleteMap: (mapId: string, mapName: string, e: React.MouseEvent) => void
-  onCreatePerspective: (e: React.FormEvent, mapId: string) => void
-  onSetCreatingPerspective: (mapId: string | null) => void
-  onSetNewPerspectiveName: (name: string) => void
+  onCreatePerspective: (mapId: string) => void
   onToggleMapExpanded: (mapId: string) => void
   expandedMaps: Set<string>
   onDragOver: (e: React.DragEvent) => void
@@ -52,8 +49,6 @@ export const FolderEntry = memo(({
   isDragOver,
   currentMapId,
   currentPerspectiveId,
-  isCreatingPerspective,
-  newPerspectiveName,
   userId,
   draggedMapId,
   onToggleFolder,
@@ -61,9 +56,8 @@ export const FolderEntry = memo(({
   onSelectMap,
   onSelectPerspective,
   onDeleteMap,
+  onDeletePerspective,
   onCreatePerspective,
-  onSetCreatingPerspective,
-  onSetNewPerspectiveName,
   onToggleMapExpanded,
   expandedMaps,
   onDragOver,
@@ -119,7 +113,12 @@ export const FolderEntry = memo(({
               <li className="px-6 py-2 text-xs text-muted-foreground">No maps in this folder</li>
             ) : (
               maps.map((map) => {
-                const perspectives = allPerspectives.filter((p) => p.mapId === map.id)
+                const perspectives = allPerspectives.filter((p) => p.mapId === map.id).map(p => ({
+                  id: p.id,
+                  mapId: p.mapId,
+                  name: p.name,
+                  createdBy: p.createdBy,
+                }))
                 const isMapExpanded = expandedMaps.has(map.id)
                 const isMapSelected = currentMapId === map.id && !currentPerspectiveId
                 const hasActivePerspective = currentPerspectiveId && perspectives.some(p => p.id === currentPerspectiveId)
@@ -133,17 +132,14 @@ export const FolderEntry = memo(({
                     isExpanded={isMapExpanded}
                     isSelected={isSelected}
                     currentPerspectiveId={currentPerspectiveId}
-                    isCreatingPerspective={isCreatingPerspective}
-                    newPerspectiveName={newPerspectiveName}
                     userId={userId}
                     draggedMapId={draggedMapId}
                     onToggleExpanded={onToggleMapExpanded}
                     onSelectMap={onSelectMap}
                     onSelectPerspective={onSelectPerspective}
                     onDeleteMap={onDeleteMap}
+                    onDeletePerspective={(perspectiveId, perspectiveName, e) => onDeletePerspective(perspectiveId, perspectiveName, map.id, e)}
                     onCreatePerspective={onCreatePerspective}
-                    onSetCreatingPerspective={onSetCreatingPerspective}
-                    onSetNewPerspectiveName={onSetNewPerspectiveName}
                     onDragStart={onDragStart}
                     onDragEnd={onDragEnd}
                   />

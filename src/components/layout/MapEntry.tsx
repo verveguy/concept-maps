@@ -12,6 +12,7 @@ interface Perspective {
   id: string
   mapId: string
   name: string
+  createdBy?: string
 }
 
 interface MapEntryProps {
@@ -20,17 +21,14 @@ interface MapEntryProps {
   isExpanded: boolean
   isSelected: boolean
   currentPerspectiveId: string | null
-  isCreatingPerspective: string | null
-  newPerspectiveName: string
   userId: string | null
   draggedMapId: string | null
   onToggleExpanded: (mapId: string) => void
   onSelectMap: (mapId: string) => void
   onSelectPerspective: (perspectiveId: string, mapId: string, e: React.MouseEvent) => void
   onDeleteMap: (mapId: string, mapName: string, e: React.MouseEvent) => void
-  onCreatePerspective: (e: React.FormEvent, mapId: string) => void
-  onSetCreatingPerspective: (mapId: string | null) => void
-  onSetNewPerspectiveName: (name: string) => void
+  onDeletePerspective: (perspectiveId: string, perspectiveName: string, e: React.MouseEvent) => void
+  onCreatePerspective: (mapId: string) => void
   onDragStart: (e: React.DragEvent, mapId: string) => void
   onDragEnd: () => void
 }
@@ -41,22 +39,18 @@ export const MapEntry = memo(({
   isExpanded,
   isSelected,
   currentPerspectiveId,
-  isCreatingPerspective,
-  newPerspectiveName,
   userId,
   draggedMapId,
   onToggleExpanded,
   onSelectMap,
   onSelectPerspective,
   onDeleteMap,
+  onDeletePerspective,
   onCreatePerspective,
-  onSetCreatingPerspective,
-  onSetNewPerspectiveName,
   onDragStart,
   onDragEnd,
 }: MapEntryProps) => {
   const isDragging = draggedMapId === map.id
-  const isCreatingPerspectiveForThisMap = isCreatingPerspective === map.id
 
   return (
     <li>
@@ -120,7 +114,7 @@ export const MapEntry = memo(({
             <IconButton
               onClick={(e) => {
                 e.stopPropagation()
-                onSetCreatingPerspective(map.id)
+                onCreatePerspective(map.id)
               }}
               title="Add Perspective"
               size="icon"
@@ -156,10 +150,10 @@ export const MapEntry = memo(({
                       {/* Spacer div to align with map name text (chevron width + padding) */}
                       <div className="w-6 shrink-0"></div>
                       {/* Perspective content with highlight */}
-                      <div className={`flex-1 pr-3 ${isPerspectiveSelected ? 'bg-blue-50 dark:bg-blue-900' : ''}`}>
+                      <div className={`group/perspective relative flex-1 pr-3 ${isPerspectiveSelected ? 'bg-blue-50 dark:bg-blue-900' : ''}`}>
                         <button
                           onClick={(e) => onSelectPerspective(perspective.id, map.id, e)}
-                          className={`w-full text-left py-1.5 hover:bg-accent transition-colors flex items-center gap-2 group ${
+                          className={`w-full text-left py-1.5 hover:bg-accent transition-colors flex items-center gap-2 ${
                             isPerspectiveSelected 
                               ? 'border-l-4 border-blue-500 font-semibold text-black dark:text-white' 
                               : ''
@@ -170,60 +164,26 @@ export const MapEntry = memo(({
                             <div className="text-sm font-medium">{perspective.name}</div>
                           </div>
                         </button>
+                        {/* Delete button - shows on hover */}
+                        {perspective.createdBy === userId && (
+                          <div className="absolute right-0 top-0 bottom-0 flex items-center pr-1 opacity-0 group-hover/perspective:opacity-100 transition-opacity pointer-events-none">
+                            <IconButton
+                              onClick={(e) => onDeletePerspective(perspective.id, perspective.name, e)}
+                              title="Delete perspective"
+                              aria-label={`Delete ${perspective.name}`}
+                              size="icon"
+                              className="h-7 w-7 pointer-events-auto bg-background/90 backdrop-blur-sm text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </IconButton>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </li>
                 )
               })}
             </ul>
-
-            {/* Create Perspective Form */}
-            {isCreatingPerspectiveForThisMap && (
-              <div className="flex">
-                <div className="w-10 shrink-0"></div>
-                <div className="flex-1 pr-4 pt-1 pb-2">
-                  <form
-                    onSubmit={(e) => onCreatePerspective(e, map.id)}
-                    className="space-y-2"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <input
-                      type="text"
-                      value={newPerspectiveName}
-                      onChange={(e) => onSetNewPerspectiveName(e.target.value)}
-                      placeholder="New perspective name..."
-                      className="w-full px-2 py-1.5 text-xs border rounded-md"
-                      autoFocus
-                      onBlur={() => {
-                        if (!newPerspectiveName.trim()) {
-                          onSetCreatingPerspective(null)
-                          onSetNewPerspectiveName('')
-                        }
-                      }}
-                    />
-                    <div className="flex gap-1">
-                      <button
-                        type="submit"
-                        disabled={!newPerspectiveName.trim()}
-                        className="flex-1 px-2 py-1 text-xs bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
-                      >
-                        Create
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onSetCreatingPerspective(null)
-                          onSetNewPerspectiveName('')
-                        }}
-                        className="px-2 py-1 text-xs border rounded-md hover:bg-accent"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
