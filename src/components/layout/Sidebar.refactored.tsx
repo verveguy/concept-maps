@@ -202,7 +202,7 @@ export const Sidebar = () => {
       }
       return newSet
     })
-  }, [sidebarState.setExpandedSections])
+  }, [sidebarState])
 
   // Toggle folder expansion
   const toggleFolder = useCallback((folderId: string) => {
@@ -215,7 +215,7 @@ export const Sidebar = () => {
       }
       return newSet
     })
-  }, [sidebarState.setExpandedFolders])
+  }, [sidebarState])
 
   // Toggle map expansion
   const toggleMapExpanded = useCallback((mapId: string, section: 'folders' | 'myMaps' | 'shared') => {
@@ -230,7 +230,7 @@ export const Sidebar = () => {
       newMap.set(section, sectionSet)
       return newMap
     })
-  }, [sidebarState.setExpandedMaps])
+  }, [sidebarState])
 
   // Handle drag over folder
   const handleDragOverFolder = useCallback((e: React.DragEvent, folderId: string) => {

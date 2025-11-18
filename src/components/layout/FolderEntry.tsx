@@ -31,6 +31,7 @@ interface FolderEntryProps {
   onSelectMap: (mapId: string) => void
   onSelectPerspective: (perspectiveId: string, mapId: string, e: React.MouseEvent) => void
   onDeleteMap: (mapId: string, mapName: string, e: React.MouseEvent) => void
+  onDeletePerspective: (perspectiveId: string, perspectiveName: string, mapId: string, e: React.MouseEvent) => void
   onCreatePerspective: (mapId: string) => void
   onToggleMapExpanded: (mapId: string) => void
   expandedMaps: Set<string>
@@ -74,23 +75,18 @@ export const FolderEntry = memo(({
         onDragLeave={onDragLeave}
         onDrop={onDrop}
       >
-        <button
-          onClick={() => onToggleFolder(folder.id)}
-          className="flex-shrink-0 p-2 hover:bg-accent transition-colors"
-          title={isExpanded ? 'Collapse' : 'Expand'}
-        >
-          {isExpanded ? (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          )}
-        </button>
+        <div className="shrink-0 w-2"></div>
         <button
           onClick={() => onToggleFolder(folder.id)}
           className="flex-1 text-left px-1 py-2 hover:bg-accent transition-colors flex items-center gap-2"
         >
           <div className="flex-1 text-sm font-medium flex items-center gap-1.5">
             {folder.name}
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            )}
           </div>
           <span className="text-xs text-muted-foreground">{maps.length}</span>
         </button>
@@ -121,7 +117,7 @@ export const FolderEntry = memo(({
                 }))
                 const isMapExpanded = expandedMaps.has(map.id)
                 const isMapSelected = currentMapId === map.id && !currentPerspectiveId
-                const hasActivePerspective = currentPerspectiveId && perspectives.some(p => p.id === currentPerspectiveId)
+                const hasActivePerspective = Boolean(currentPerspectiveId && perspectives.some(p => p.id === currentPerspectiveId))
                 const isSelected = isMapSelected || hasActivePerspective
 
                 return (
