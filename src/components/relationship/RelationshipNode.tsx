@@ -8,9 +8,7 @@ import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
 import { usePresence } from '@/hooks/usePresence'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { usePerspectives } from '@/hooks/usePerspectives'
-import { useAllRelationships } from '@/hooks/useRelationships'
 import { getNonStyleMetadata } from '@/lib/nodeStyleUtils'
-import { useConceptNodeStyle } from '@/hooks/useConceptNodeStyle'
 import { useConceptNodeEditing } from '@/hooks/useConceptNodeEditing'
 import { useConceptNodePreview } from '@/hooks/useConceptNodePreview'
 import { useConceptNodeKeyboard } from '@/hooks/useConceptNodeKeyboard'
@@ -23,7 +21,6 @@ import { ConceptNodeHandles } from '@/components/concept/ConceptNodeHandles'
 import { ConceptNodeCollaboration } from '@/components/concept/ConceptNodeCollaboration'
 import { ConceptNodePreviewIndicator } from '@/components/concept/ConceptNodePreviewIndicator'
 import { useCanvasStore } from '@/stores/canvasStore'
-import { NodeToolbar } from '@/components/toolbar/NodeToolbar'
 
 /**
  * Custom React Flow node component for Relationship nodes.
@@ -50,13 +47,10 @@ import { NodeToolbar } from '@/components/toolbar/NodeToolbar'
  * @param props.id - Node ID (relationship group ID)
  * @returns The relationship node JSX
  */
-export const RelationshipNode = memo(({ data, selected, id: nodeId }: NodeProps<RelationshipNodeData>) => {
+export const RelationshipNode = memo(({ data, id: nodeId }: NodeProps<RelationshipNodeData>) => {
   const setSelectedConceptId = useUIStore((state) => state.setSelectedConceptId)
   const setSelectedRelationshipId = useUIStore((state) => state.setSelectedRelationshipId)
   const setSelectedCommentId = useUIStore((state) => state.setSelectedCommentId)
-  const selectedRelationshipId = useUIStore((state) => state.selectedRelationshipId)
-  const relationshipEditorOpen = useUIStore((state) => state.relationshipEditorOpen)
-  const setRelationshipEditorOpen = useUIStore((state) => state.setRelationshipEditorOpen)
   const { updateRelationship } = useCanvasMutations()
   const { toggleRelationshipInPerspective } = usePerspectiveActions()
   const { otherUsersPresence } = usePresence()
@@ -65,14 +59,10 @@ export const RelationshipNode = memo(({ data, selected, id: nodeId }: NodeProps<
   const isEditingPerspective = data.isEditingPerspective ?? false
   const isInPerspective = data.isInPerspective ?? true
   const perspectives = usePerspectives()
-  const allRelationships = useAllRelationships()
   const isOptionKeyPressed = useCanvasStore((state) => state.isOptionKeyPressed)
   const nodeRef = useRef<HTMLDivElement>(null)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isMetadataExpanded, setIsMetadataExpanded] = useState(false)
-
-  // Extract hooks
-  const nodeStyle = useConceptNodeStyle(data.relationship?.metadata || {}, selected)
   const editingUsers = useConceptNodeCollaboration(otherUsersPresence, data.relationshipIds[0])
   const {
     isEditing,
@@ -132,7 +122,7 @@ export const RelationshipNode = memo(({ data, selected, id: nodeId }: NodeProps<
         try {
           // Update all relationships in the group
           await Promise.all(
-            data.relationshipIds.map((relationshipId) =>
+            data.relationshipIds.map((relationshipId: string) =>
               updateRelationship(relationshipId, {
                 primaryLabel: trimmedLabel,
               })
@@ -171,7 +161,7 @@ export const RelationshipNode = memo(({ data, selected, id: nodeId }: NodeProps<
       try {
         // Update all relationships in the group with the new notes
         await Promise.all(
-          data.relationshipIds.map((relationshipId) =>
+          data.relationshipIds.map((relationshipId: string) =>
             updateRelationship(relationshipId, {
               notes: trimmedNotes,
             })
@@ -192,7 +182,6 @@ export const RelationshipNode = memo(({ data, selected, id: nodeId }: NodeProps<
     previewTransform,
     isClearingPreview,
     handlePreviewEnter,
-    handlePreviewLeave,
     handleShowNotesAndMetadata,
   } = useConceptNodePreview({
     nodeRef,
@@ -201,7 +190,7 @@ export const RelationshipNode = memo(({ data, selected, id: nodeId }: NodeProps<
     metadata: data.relationship.metadata || {},
     showNotesAndMetadata: true, // Always show for relationships
     hasWriteAccess,
-    onUpdateConcept: async (id, updates) => {
+    onUpdateConcept: async (_id, updates) => {
       // For relationships, showNotesAndMetadata is always true, so this is a no-op
       // But we keep the hook for preview transform functionality
       if (updates.showNotesAndMetadata !== undefined) {
@@ -246,7 +235,7 @@ export const RelationshipNode = memo(({ data, selected, id: nodeId }: NodeProps<
       if (currentPerspective) {
         // Toggle all relationships in the group
         Promise.all(
-          data.relationshipIds.map((relationshipId) =>
+          data.relationshipIds.map((relationshipId: string) =>
             toggleRelationshipInPerspective(
               currentPerspectiveId,
               relationshipId,
@@ -371,13 +360,15 @@ export const RelationshipNode = memo(({ data, selected, id: nodeId }: NodeProps<
         tabIndex={0}
       >
         {/* Collaboration indicators */}
-        <ConceptNodeCollaboration editingUsers={editingUsers} />
+        <ConceptNodeCollaboration editingUsers={editingUsers} nodeId={data.relationshipIds[0]} />
         
         {/* Preview indicator */}
         {shouldShowIndicator && (
           <ConceptNodePreviewIndicator
+            onClick={handleShowNotesAndMetadata}
             onMouseEnter={handlePreviewEnter}
-            onMouseLeave={handlePreviewLeave}
+            hasWriteAccess={hasWriteAccess}
+            textColor="#ffffff"
           />
         )}
 
@@ -398,22 +389,28 @@ export const RelationshipNode = memo(({ data, selected, id: nodeId }: NodeProps<
         {shouldShowNotesAndMetadata && (
           <>
             <ConceptNodeNotes
-              isEditingNotes={isEditingNotes}
+              notes={data.relationship.notes || ''}
+              isEditing={isEditingNotes}
               editNotes={editNotes}
-              setEditNotes={setEditNotes}
+              onEditNotesChange={setEditNotes}
+              onEdit={() => setIsEditingNotes(true)}
+              onSave={handleSaveNotes}
+              onKeyDown={handleNotesKeyDown}
+              textColor="#ffffff"
+              hasWriteAccess={hasWriteAccess}
               notesTextareaRef={notesTextareaRef}
               notesDisplayRef={notesDisplayRef}
               notesMeasureRef={notesMeasureRef}
               notesDisplayHeight={notesDisplayHeight}
               notesDisplayWidth={notesDisplayWidth}
-              onKeyDown={handleNotesKeyDown}
-              onSave={handleSaveNotes}
-              onCancel={handleCancelNotes}
+              shouldShow={shouldShowNotesAndMetadata}
             />
             <ConceptNodeMetadata
               metadata={data.relationship.metadata || {}}
               isExpanded={isMetadataExpanded}
-              setIsExpanded={setIsMetadataExpanded}
+              onToggleExpand={() => setIsMetadataExpanded(!isMetadataExpanded)}
+              textColor="#ffffff"
+              borderColor="#ffffff"
             />
           </>
         )}
@@ -421,26 +418,10 @@ export const RelationshipNode = memo(({ data, selected, id: nodeId }: NodeProps<
         {/* Connection handles */}
         <ConceptNodeHandles
           isOptionHovered={isOptionHovered}
-          hasWriteAccess={hasWriteAccess}
-          isEditing={isEditing}
         />
       </div>
-      {selectedRelationshipId === data.relationshipIds[0] && !relationshipEditorOpen && (
-        <NodeToolbar
-          nodeRef={nodeRef as React.RefObject<HTMLDivElement>}
-          visible={true}
-          type="relationship"
-          relationship={{
-            id: data.relationshipIds[0],
-            relationshipIds: data.relationshipIds,
-            metadata: data.relationship.metadata,
-          }}
-          onEdit={() => {
-            setRelationshipEditorOpen(true)
-            // Keep selectedRelationshipId so UnifiedEditor knows which relationship to edit
-          }}
-        />
-      )}
+      {/* Note: NodeToolbar currently only supports 'concept' and 'comment' types, not 'relationship' */}
+      {/* Relationship editing is handled via the relationship editor that opens when selected */}
     </>
   )
 })

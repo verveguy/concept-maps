@@ -4,10 +4,10 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook } from '@testing-library/react'
 import { useSidebarData } from '../useSidebarData'
 import { db } from '@/lib/instant'
-import { useMaps, categorizeMaps } from '../useMaps'
+import { useMaps } from '../useMaps'
 import { useFolders } from '../useFolders'
 
 // Mock dependencies

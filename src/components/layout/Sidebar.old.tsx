@@ -51,11 +51,11 @@
  */
 
 import { useState, useEffect, useMemo, memo, useCallback } from 'react'
-import { X, Plus, Play, ChevronRight, ChevronDown, Eye, Settings, Sun, Moon, BookOpen, Trash2 } from 'lucide-react'
+import { X, Plus, Play, Sun, Moon, BookOpen } from 'lucide-react'
 import { useMaps, categorizeMaps } from '@/hooks/useMaps'
 import { useMapActions } from '@/hooks/useMapActions'
 import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
-import { useFolders, createFolder, updateFolder, deleteFolder, addMapToFolder, removeMapFromFolder } from '@/hooks/useFolders'
+import { useFolders, createFolder, deleteFolder, addMapToFolder, removeMapFromFolder } from '@/hooks/useFolders'
 import { useMapStore } from '@/stores/mapStore'
 import { useUIStore } from '@/stores/uiStore'
 import { useUndoStore } from '@/stores/undoStore'
@@ -822,10 +822,10 @@ export const Sidebar = () => {
                      name: p.name,
                      createdBy: p.createdBy,
                    }))
-                   const isExpanded = (expandedMaps.get('myMaps') || new Set()).has(map.id)
-                   const isMapSelected = currentMapId === map.id && !currentPerspectiveId
-                   const hasActivePerspective = currentPerspectiveId && perspectives.some(p => p.id === currentPerspectiveId)
-                   const isSelected = isMapSelected || hasActivePerspective
+                  const isExpanded = (expandedMaps.get('myMaps') || new Set()).has(map.id)
+                  const isMapSelected = currentMapId === map.id && !currentPerspectiveId
+                  const hasActivePerspective = Boolean(currentPerspectiveId && perspectives.some(p => p.id === currentPerspectiveId))
+                  const isSelected = isMapSelected || hasActivePerspective
 
                    return (
                      <MapEntry
@@ -880,7 +880,7 @@ export const Sidebar = () => {
                         }))
                         const isExpanded = (expandedMaps.get('shared') || new Set()).has(map.id)
                         const isMapSelected = currentMapId === map.id && !currentPerspectiveId
-                        const hasActivePerspective = currentPerspectiveId && perspectives.some(p => p.id === currentPerspectiveId)
+                        const hasActivePerspective = Boolean(currentPerspectiveId && perspectives.some(p => p.id === currentPerspectiveId))
                         const isSelected = isMapSelected || hasActivePerspective
 
                         return (

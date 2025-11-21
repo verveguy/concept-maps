@@ -7,17 +7,6 @@ import { useMemo } from 'react'
 import { db } from '@/lib/instant'
 import { useMaps, categorizeMaps } from '@/hooks/useMaps'
 import { useFolders } from '@/hooks/useFolders'
-import type { Map } from '@/lib/schema'
-
-interface Perspective {
-  id: string
-  mapId: string
-  name: string
-  conceptIds: string[]
-  relationshipIds: string[]
-  createdBy: string
-  createdAt: Date
-}
 
 export function useSidebarData(userId: string | null) {
   const maps = useMaps()

@@ -63,7 +63,7 @@ export function MapPage() {
   const mapNameRef = useRef<HTMLHeadingElement>(null)
   const previousMapNameRef = useRef<string>('')
   const isEditingRef = useRef(false)
-  const shouldFocusMapNameRef = useRef(false)
+  // Removed unused shouldFocusMapNameRef
   const perspectiveNameRef = useRef<HTMLSpanElement>(null)
   const previousPerspectiveNameRef = useRef<string>('')
   const isEditingPerspectiveNameRef = useRef(false)

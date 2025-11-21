@@ -157,7 +157,7 @@ export async function removeMapFromFolder(mapId: string, folderId: string): Prom
  * @param mapId - ID of the map
  * @returns Array of folder IDs that contain the map
  */
-export function getFoldersForMap(mapId: string): string[] {
+export function getFoldersForMap(_mapId: string): string[] {
   // This would typically be done via a query, but for now we'll return empty
   // The actual implementation would query maps with folders link
   // For now, this is a placeholder - the actual folders will be queried via useQuery
