@@ -24,6 +24,25 @@ export interface ConceptNodeData {
 }
 
 /**
+ * Custom node data type for Relationship nodes in React Flow.
+ * Contains relationship data and metadata for rendering relationship nodes.
+ */
+export interface RelationshipNodeData {
+  /** Display label for the relationship */
+  label: string
+  /** The primary relationship entity data */
+  relationship: Relationship
+  /** Array of relationship IDs that share the same label */
+  relationshipIds: string[]
+  /** Whether this relationship is included in the current perspective */
+  isInPerspective?: boolean
+  /** Whether we're currently editing a perspective */
+  isEditingPerspective?: boolean
+  /** Flag to trigger edit mode when node is first created */
+  shouldStartEditing?: boolean
+}
+
+/**
  * Custom edge data type for Relationship edges in React Flow.
  * Contains the relationship data and metadata for rendering.
  */

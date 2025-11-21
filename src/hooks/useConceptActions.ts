@@ -270,7 +270,6 @@ export function useConceptActions() {
           updatedAt: Date.now(),
         }),
       ])
-      console.log('Successfully undeleted concept:', conceptId)
     } catch (error) {
       console.error('Error undeleting concept:', conceptId, error)
       throw error

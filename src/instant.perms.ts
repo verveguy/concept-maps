@@ -70,6 +70,15 @@ const rules = {
       update: 'isOwnerOrManager',
     },
   },
+  folders: {
+    bind: ['isOwner', 'auth.id != null && auth.id in data.ref("creator.id")'],
+    allow: {
+      view: 'auth.id != null',
+      create: 'auth.id != null',
+      delete: 'isOwner',
+      update: 'isOwner',
+    },
+  },
   concepts: {
     bind: [
       'mapIsOwned',

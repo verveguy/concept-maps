@@ -279,7 +279,6 @@ export function useRelationshipActions() {
           updatedAt: Date.now(),
         }),
       ])
-      console.log('Successfully undeleted relationship:', relationshipId)
     } catch (error) {
       console.error('Error undeleting relationship:', relationshipId, error)
       throw error

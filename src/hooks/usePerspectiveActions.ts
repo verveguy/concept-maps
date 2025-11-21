@@ -119,7 +119,7 @@ export function usePerspectiveActions() {
    * })
    * ```
    */
-  const createPerspective = async (perspective: CreatePerspectiveData) => {
+  const createPerspective = async (perspective: CreatePerspectiveData): Promise<{ id: string }> => {
     if (!auth.user?.id) throw new Error('User must be authenticated')
 
     const perspectiveId = id()
@@ -136,6 +136,8 @@ export function usePerspectiveActions() {
           creator: auth.user.id,
         }),
     ])
+    
+    return { id: perspectiveId }
   }
 
   /**

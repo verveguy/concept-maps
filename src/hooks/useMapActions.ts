@@ -76,7 +76,7 @@ export function useMapActions() {
    * }
    * ```
    */
-  const createMap = async (name: string) => {
+  const createMap = async (name: string): Promise<{ id: string }> => {
     if (!auth.user?.id) throw new Error('User must be authenticated')
 
     const mapId = id()
@@ -89,6 +89,8 @@ export function useMapActions() {
         })
         .link({ creator: auth.user.id }),
     ])
+    
+    return { id: mapId }
   }
 
   /**

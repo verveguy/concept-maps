@@ -38,6 +38,18 @@ export interface MapState {
   isEditingPerspective: boolean
   /** Set whether we're editing a perspective */
   setIsEditingPerspective: (on: boolean) => void
+  /** ID of a newly created map (used to trigger auto-focus on map name) */
+  newlyCreatedMapId: string | null
+  /** Set the newly created map ID */
+  setNewlyCreatedMapId: (id: string | null) => void
+  /** Clear the newly created map ID */
+  clearNewlyCreatedMapId: () => void
+  /** ID of a newly created perspective (used to trigger auto-focus on perspective name) */
+  newlyCreatedPerspectiveId: string | null
+  /** Set the newly created perspective ID */
+  setNewlyCreatedPerspectiveId: (id: string | null) => void
+  /** Clear the newly created perspective ID */
+  clearNewlyCreatedPerspectiveId: () => void
 
   /** Clear all map state when navigating away */
   clearMapState: () => void
@@ -62,6 +74,12 @@ export const useMapStore = create<MapState>((set) => ({
   setHideNonPerspective: (on) => set({ hideNonPerspective: on }),
   isEditingPerspective: false,
   setIsEditingPerspective: (on) => set({ isEditingPerspective: on }),
+  newlyCreatedMapId: null,
+  setNewlyCreatedMapId: (id) => set({ newlyCreatedMapId: id }),
+  clearNewlyCreatedMapId: () => set({ newlyCreatedMapId: null }),
+  newlyCreatedPerspectiveId: null,
+  setNewlyCreatedPerspectiveId: (id) => set({ newlyCreatedPerspectiveId: id }),
+  clearNewlyCreatedPerspectiveId: () => set({ newlyCreatedPerspectiveId: null }),
   clearMapState: () =>
     set({
       currentMapId: null,
@@ -71,5 +89,7 @@ export const useMapStore = create<MapState>((set) => ({
       perspectiveSelectionMode: false,
       hideNonPerspective: false,
       isEditingPerspective: false,
+      newlyCreatedMapId: null,
+      newlyCreatedPerspectiveId: null,
     }),
 }))

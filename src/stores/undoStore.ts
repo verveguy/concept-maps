@@ -34,7 +34,10 @@ export type MutationType =
   | 'deleteComment'
   | 'linkCommentToConcept'
   | 'unlinkCommentFromConcept'
+  | 'createMap'
   | 'updateMap'
+  | 'createPerspective'
+  | 'deletePerspective'
 
 /**
  * Base mutation command interface.
@@ -155,6 +158,12 @@ export interface UnlinkCommentFromConceptCommand extends MutationCommand {
 /**
  * Map mutation commands.
  */
+export interface CreateMapCommand extends MutationCommand {
+  type: 'createMap'
+  mapId: string
+  name: string
+}
+
 export interface UpdateMapCommand extends MutationCommand {
   type: 'updateMap'
   mapId: string
@@ -163,6 +172,23 @@ export interface UpdateMapCommand extends MutationCommand {
     name?: string
     layoutAlgorithm?: string
   }
+}
+
+/**
+ * Perspective mutation commands.
+ */
+export interface CreatePerspectiveCommand extends MutationCommand {
+  type: 'createPerspective'
+  perspectiveId: string
+  mapId: string
+  name: string
+  conceptIds: string[]
+  relationshipIds: string[]
+}
+
+export interface DeletePerspectiveCommand extends MutationCommand {
+  type: 'deletePerspective'
+  perspectiveId: string
 }
 
 /**
@@ -181,7 +207,10 @@ export type MutationCommandUnion =
   | DeleteCommentCommand
   | LinkCommentToConceptCommand
   | UnlinkCommentFromConceptCommand
+  | CreateMapCommand
   | UpdateMapCommand
+  | CreatePerspectiveCommand
+  | DeletePerspectiveCommand
 
 /**
  * Represents a deletion entry in the undo history.

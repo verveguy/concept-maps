@@ -78,42 +78,29 @@ export function useUndo() {
   const undo = useCallback(async (): Promise<boolean> => {
     const operation = getMostRecentOperation()
     if (operation.length === 0) {
-      console.log('No deletion history to undo')
       return false
     }
-
-    console.log('Attempting to undo operation with', operation.length, 'deletions:', operation)
     
     try {
       // Undelete all items in the operation
       // Process concepts first, then relationships, then comments
       const conceptPromises = operation
         .filter((entry) => entry.type === 'concept')
-        .map((entry) => {
-          console.log('Undeleting concept:', entry.id)
-          return undeleteConcept(entry.id)
-        })
+        .map((entry) => undeleteConcept(entry.id))
       
       const relationshipPromises = operation
         .filter((entry) => entry.type === 'relationship')
-        .map((entry) => {
-          console.log('Undeleting relationship:', entry.id)
-          return undeleteRelationship(entry.id)
-        })
+        .map((entry) => undeleteRelationship(entry.id))
       
       const commentPromises = operation
         .filter((entry) => entry.type === 'comment')
-        .map((entry) => {
-          console.log('Undeleting comment:', entry.id)
-          return undeleteComment(entry.id)
-        })
+        .map((entry) => undeleteComment(entry.id))
       
       // Execute all undeletes in parallel
       await Promise.all([...conceptPromises, ...relationshipPromises, ...commentPromises])
       
       // Remove the entire operation from history after successful undo
       removeMostRecentOperation()
-      console.log('Undo successful - restored', operation.length, 'items')
       
       return true
     } catch (error) {

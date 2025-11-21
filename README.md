@@ -1,6 +1,31 @@
 # Concept Mapping Tool
 
-A collaborative concept mapping tool built with React, InstantDB, and React Flow.
+A collaborative concept mapping tool built with React, InstantDB, and React Flow. Create, visualize, and share concept maps with real-time collaboration, multiple editing modes, and rich metadata support.
+
+## 🚀 Try It Now
+
+**🌐 [Access the Application →](https://verveguy.github.io/concept-maps)**
+
+The app is hosted on GitHub Pages and ready to use! No installation required.
+
+### Creating an Account
+
+1. **Visit the app** at [https://verveguy.github.io/concept-maps](https://verveguy.github.io/concept-maps)
+2. **Click "Sign Up"** if you're a new user
+3. **Enter your email address**
+4. **Check your email** for a magic code
+5. **Enter the code** to complete sign up
+6. **Start creating maps** immediately!
+
+The app uses InstantDB for authentication and data storage. See [Getting Started Guide](https://verveguy.github.io/concept-maps/docs/user-guide/getting-started) in the documentation.
+
+## 📚 Documentation
+
+**📖 [View Full Documentation →](https://verveguy.github.io/concept-maps/docs/)**
+
+- **[User Guide](https://verveguy.github.io/concept-maps/docs/user-guide/intro)** - Learn how to use the application
+- **[Developer Guide](https://verveguy.github.io/concept-maps/docs/developing/intro)** - Setup and development documentation
+- **[API Reference](https://verveguy.github.io/concept-maps/docs/docs/)** - Complete API documentation
 
 ## Features
 

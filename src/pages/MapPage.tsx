@@ -22,6 +22,7 @@ import { useUIStore } from '@/stores/uiStore'
 import { useConceptActions } from '@/hooks/useConceptActions'
 import { useMap } from '@/hooks/useMap'
 import { usePerspectives } from '@/hooks/usePerspectives'
+import { usePerspectiveActions } from '@/hooks/usePerspectiveActions'
 import { useMapPermissions } from '@/hooks/useMapPermissions'
 import { usePendingInvitation } from '@/hooks/usePendingInvitation'
 import { useCanvasMutations } from '@/hooks/useCanvasMutations'
@@ -39,6 +40,10 @@ export function MapPage() {
   const currentPerspectiveId = useMapStore((state) => state.currentPerspectiveId)
   const isEditingPerspective = useMapStore((state) => state.isEditingPerspective)
   const setIsEditingPerspective = useMapStore((state) => state.setIsEditingPerspective)
+  const newlyCreatedMapId = useMapStore((state) => state.newlyCreatedMapId)
+  const clearNewlyCreatedMapId = useMapStore((state) => state.clearNewlyCreatedMapId)
+  const newlyCreatedPerspectiveId = useMapStore((state) => state.newlyCreatedPerspectiveId)
+  const clearNewlyCreatedPerspectiveId = useMapStore((state) => state.clearNewlyCreatedPerspectiveId)
   const sidebarOpen = useUIStore((state) => state.sidebarOpen)
   const setSidebarOpen = useUIStore((state) => state.setSidebarOpen)
   const { map, isLoading: isMapLoading } = useMap()
@@ -48,6 +53,7 @@ export function MapPage() {
   const { hasWriteAccess, hasReadAccess } = useMapPermissions()
   const { invitation: pendingInvitation, isLoading: isInvitationLoading } = usePendingInvitation(currentMapId)
   const { updateMap } = useCanvasMutations()
+  const { updatePerspective } = usePerspectiveActions()
   const [isCreatingConcept, setIsCreatingConcept] = useState(false)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showShareDialog, setShowShareDialog] = useState(false)
@@ -57,6 +63,10 @@ export function MapPage() {
   const mapNameRef = useRef<HTMLHeadingElement>(null)
   const previousMapNameRef = useRef<string>('')
   const isEditingRef = useRef(false)
+  // Removed unused shouldFocusMapNameRef
+  const perspectiveNameRef = useRef<HTMLSpanElement>(null)
+  const previousPerspectiveNameRef = useRef<string>('')
+  const isEditingPerspectiveNameRef = useRef(false)
 
   // Sync contentEditable element with map name when it changes externally
   useEffect(() => {
@@ -67,6 +77,54 @@ export function MapPage() {
       }
     }
   }, [map?.name])
+
+  // Sync contentEditable element with perspective name when it changes externally
+  useEffect(() => {
+    if (perspectiveNameRef.current && !isEditingPerspectiveNameRef.current && currentPerspective?.name) {
+      const currentText = perspectiveNameRef.current.textContent?.trim() || ''
+      if (currentText !== currentPerspective.name) {
+        perspectiveNameRef.current.textContent = currentPerspective.name
+      }
+    }
+  }, [currentPerspective?.name])
+
+  // Auto-focus map name field when a new map is created
+  useEffect(() => {
+    if (newlyCreatedMapId && newlyCreatedMapId === currentMapId && mapNameRef.current && map?.name === 'Untitled') {
+      // Small delay to ensure the DOM is ready
+      setTimeout(() => {
+        if (mapNameRef.current) {
+          // Select all text in the contentEditable element
+          const range = document.createRange()
+          range.selectNodeContents(mapNameRef.current)
+          const selection = window.getSelection()
+          selection?.removeAllRanges()
+          selection?.addRange(range)
+          mapNameRef.current.focus()
+          clearNewlyCreatedMapId()
+        }
+      }, 100)
+    }
+  }, [newlyCreatedMapId, currentMapId, map?.name, clearNewlyCreatedMapId])
+
+  // Auto-focus perspective name field when a new perspective is created
+  useEffect(() => {
+    if (newlyCreatedPerspectiveId && newlyCreatedPerspectiveId === currentPerspectiveId && perspectiveNameRef.current && currentPerspective?.name === 'Untitled') {
+      // Small delay to ensure the DOM is ready
+      setTimeout(() => {
+        if (perspectiveNameRef.current) {
+          // Select all text in the contentEditable element
+          const range = document.createRange()
+          range.selectNodeContents(perspectiveNameRef.current)
+          const selection = window.getSelection()
+          selection?.removeAllRanges()
+          selection?.addRange(range)
+          perspectiveNameRef.current.focus()
+          clearNewlyCreatedPerspectiveId()
+        }
+      }, 100)
+    }
+  }, [newlyCreatedPerspectiveId, currentPerspectiveId, currentPerspective?.name, clearNewlyCreatedPerspectiveId])
 
   const handleCreateConcept = useCallback(
     async (position: { x: number; y: number }) => {
@@ -167,6 +225,66 @@ export function MapPage() {
       }
     },
     [map]
+  )
+
+  /**
+   * Handle perspective name editing - save on blur.
+   */
+  const handlePerspectiveNameBlur = useCallback(
+    async (e: React.FocusEvent<HTMLSpanElement>) => {
+      isEditingPerspectiveNameRef.current = false
+      if (!currentPerspectiveId || !currentPerspective || !hasWriteAccess) return
+
+      const newName = e.currentTarget.textContent?.trim() || ''
+      const previousName = previousPerspectiveNameRef.current || currentPerspective.name || 'Untitled'
+
+      // Only update if the name actually changed and is not empty/whitespace-only
+      if (newName !== previousName && newName.length > 0) {
+        try {
+          await updatePerspective(currentPerspectiveId, {
+            name: newName,
+          })
+          // Update ref after successful save so Escape reverts to the new name
+          previousPerspectiveNameRef.current = newName
+        } catch (error) {
+          console.error('Failed to update perspective name:', error)
+          // Revert to previous name on error
+          e.currentTarget.textContent = previousName
+        }
+      } else if (!newName || newName.trim().length === 0) {
+        // If empty or whitespace-only, revert to previous name
+        e.currentTarget.textContent = previousName
+      }
+    },
+    [currentPerspectiveId, currentPerspective, hasWriteAccess, updatePerspective]
+  )
+
+  /**
+   * Handle perspective name focus - store previous name for undo.
+   */
+  const handlePerspectiveNameFocus = useCallback(
+    (e: React.FocusEvent<HTMLSpanElement>) => {
+      isEditingPerspectiveNameRef.current = true
+      previousPerspectiveNameRef.current = e.currentTarget.textContent?.trim() || currentPerspective?.name || 'Untitled'
+    },
+    [currentPerspective]
+  )
+
+  /**
+   * Handle Enter key to blur (save) the perspective name.
+   */
+  const handlePerspectiveNameKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLSpanElement>) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        e.currentTarget.blur()
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        e.currentTarget.textContent = previousPerspectiveNameRef.current || currentPerspective?.name || 'Untitled'
+        e.currentTarget.blur()
+      }
+    },
+    [currentPerspective]
   )
 
   if (!currentMapId) {
@@ -312,7 +430,18 @@ export function MapPage() {
               <>
                 <span className="text-muted-foreground">/</span>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-sm text-muted-foreground">{currentPerspective.name}</span>
+                  <span
+                    ref={perspectiveNameRef}
+                    contentEditable={hasWriteAccess}
+                    suppressContentEditableWarning
+                    onBlur={handlePerspectiveNameBlur}
+                    onFocus={handlePerspectiveNameFocus}
+                    onKeyDown={handlePerspectiveNameKeyDown}
+                    className="text-sm text-muted-foreground outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded px-1 -mx-1"
+                    style={{ cursor: hasWriteAccess ? 'text' : 'default' }}
+                  >
+                    {currentPerspective.name}
+                  </span>
                   {isEditingPerspective && (
                     <span 
                       title="Editing perspective - Shift+Click concepts to toggle inclusion"
