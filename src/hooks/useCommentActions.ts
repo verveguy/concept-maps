@@ -351,7 +351,6 @@ export function useCommentActions() {
           updatedAt: Date.now(),
         }),
       ])
-      console.log('Successfully undeleted comment:', commentId)
     } catch (error) {
       console.error('Error undeleting comment:', commentId, error)
       throw error

@@ -19,14 +19,11 @@ export function navigateToConcept(mapId: string, conceptId: string): void {
   const basePath = import.meta.env.BASE_URL.replace(/\/$/, '')
   const newPath = `${basePath}/map/${mapId}/concept/${conceptId}`
   
-  console.log('[navigation] navigateToConcept', { mapId, conceptId, newPath })
-  
   // Update URL without reloading (works with GitHub Pages 404.html redirect mechanism)
   window.history.pushState({}, '', newPath)
   
   // Update the store directly
   const { setCurrentMapId, setCurrentConceptId, setShouldAutoCenterConcept } = useMapStore.getState()
-  console.log('[navigation] Setting store values', { mapId, conceptId, shouldAutoCenter: true })
   setCurrentMapId(mapId)
   setCurrentConceptId(conceptId)
   setShouldAutoCenterConcept(true) // Enable auto-centering for URL navigation
